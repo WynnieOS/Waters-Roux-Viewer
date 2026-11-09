@@ -21,6 +21,7 @@ mod layout;
 pub(crate) mod manager;
 mod manager_drag;
 pub(crate) mod motion;
+mod wallpaper;
 pub mod photo_quality_notice;
 pub mod safe_graphics_notice;
 
@@ -30,6 +31,7 @@ const REMEMBERED_PASSWORD_MASK: &str = "•••••••••••••�
 pub struct LoginForm {
     pub accounts: Vec<crate::login_accounts::Account>,
     pub accounts_loaded: bool,
+    pub wallpaper: wallpaper::Wallpaper,
     pub remember_checked: bool,
     pub remember_mfa: bool,
     pub mfa_authorization: Option<crate::credentials::MfaAuthorization>,
@@ -169,14 +171,16 @@ pub(crate) fn terms_link(ui: &mut egui::Ui, p: &Palette, url: &str) {
 
 /// Animated aurora background (also behind the loading screens without a
 /// last view).
-pub fn draw_background(ui: &egui::Ui, p: &Palette) {
+pub fn draw_background(ui: &egui::Ui, p: &Palette, form: &mut LoginForm) {
     let ctx = ui.ctx();
     let rect = ctx.content_rect();
     let painter = ctx.layer_painter(egui::LayerId::background());
     let t = ctx.input(|i| i.time) as f32;
-    super::aurora_bg::paint(&painter, p, rect, t, 1.0);
-    // slow animation: ~30 images/s are plenty
-    ctx.request_repaint_after(std::time::Duration::from_millis(33));
+    if !form.wallpaper.paint(ctx, &painter, rect) {
+        super::aurora_bg::paint(&painter, p, rect, t, 1.0);
+        // Only the procedural sky animates; the New Orleans wallpaper is static.
+        ctx.request_repaint_after(std::time::Duration::from_millis(33));
+    }
 }
 
 fn img(ui: &egui::Ui, icons: &Icons, name: &str, rect: egui::Rect, tint: Color32) {
@@ -516,7 +520,18 @@ fn glass_card<R>(
             ),
         ];
         behind.0.set(behind.1, egui::Shape::Vec(lights.clone()));
-        let mut shapes = super::aurora_bg::frosted_pane(p, ctx.content_rect(), ctx.input(|i| i.time) as f32, rect, lights);
+        let mut shapes = if let Some(wallpaper) = wallpaper::frosted_shape(ctx, ctx.content_rect()) {
+            vec![
+                wallpaper,
+                egui::Shape::rect_filled(
+                    rect,
+                    0.0,
+                    Color32::from_rgba_unmultiplied(p.panel.r(), p.panel.g(), p.panel.b(), p.panel_alpha),
+                ),
+            ]
+        } else {
+            super::aurora_bg::frosted_pane(p, ctx.content_rect(), ctx.input(|i| i.time) as f32, rect, lights)
+        };
         let top = |height: f32| egui::Rect::from_min_size(rect.min, Vec2::new(rect.width(), height));
         if accent {
             shapes.push(strip(top(2.0), &[(0.0, p.violet), (1.0, p.teal)]));
@@ -672,7 +687,7 @@ pub fn show(
     if form.accounts_loaded {
         return carousel::show(ui, p, icons, logo, settings, form, info, progress);
     }
-    draw_background(ui, p);
+    draw_background(ui, p, form);
     let mut action = LoginAction::None;
     let ctx = ui.ctx().clone();
     let screen = ctx.content_rect();
