@@ -323,6 +323,26 @@ const PAUSED_RESOLUTION_DIVISOR: u32 = 16;
 /// the README and the exe icon.
 pub(crate) const LOGO_PNG: &[u8] = include_bytes!("../../../assets/branding/aurora-logo.png");
 
+/// Prefer the exact user-approved Waters Roux transparent logo. The external
+/// PNG keeps the original artwork byte-for-byte intact; nothing is generated
+/// or altered in this loader. The inherited image is a development fallback
+/// only until the branded assets are included in the release package.
+fn branded_logo() -> Vec<u8> {
+    let mut candidates = vec![crate::settings::config_dir().join("branding").join("waters-roux-logo.png")];
+    if let Some(dir) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(std::path::Path::to_path_buf)) {
+        candidates.push(dir.join("assets").join("branding").join("waters-roux-logo.png"));
+    }
+    for file in candidates {
+        if let Ok(bytes) = std::fs::read(&file) {
+            log::info!("Waters Roux logo loaded from {}", file.display());
+            return bytes;
+        }
+    }
+    log::warn!("Waters Roux transparent logo is not yet installed; using temporary development artwork");
+    LOGO_PNG.to_vec()
+}
+
+
 struct LogoData {
     ui: egui::ColorImage,
     icon: Option<(Vec<u8>, u32, u32)>,
@@ -1449,7 +1469,7 @@ impl App {
 
         // Decode the logo off the main thread.
         let (tx, rx) = crossbeam_channel::bounded(1);
-        std::thread::spawn(move || match image::load_from_memory(LOGO_PNG) {
+        std::thread::spawn(move || match image::load_from_memory(&branded_logo()) {
             Ok(img) => {
                 let ui_img = img.resize(384, 384, image::imageops::FilterType::Triangle).to_rgba8();
                 let icon = img.resize(64, 64, image::imageops::FilterType::Triangle).to_rgba8();
