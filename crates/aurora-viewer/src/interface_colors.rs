@@ -61,6 +61,7 @@ static CURRENT: RwLock<InterfaceColors> = RwLock::new(InterfaceColors {
     accent: None,
     surface: None,
     text: None,
+    glass_alpha: None,
 });
 /// The skin's palette of the last build, for the page's swatches.
 static SKIN: Mutex<Option<Palette>> = Mutex::new(None);
