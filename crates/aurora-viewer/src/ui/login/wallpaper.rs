@@ -18,7 +18,7 @@ pub struct Wallpaper {
 }
 
 fn context_id() -> Id {
-    Id::new("waters_roux_login_frosted_wallpaper")
+    Id::unique("waters_roux_login_frosted_wallpaper")
 }
 
 fn candidates() -> Vec<PathBuf> {
