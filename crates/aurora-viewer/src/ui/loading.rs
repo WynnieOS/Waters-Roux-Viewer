@@ -290,7 +290,7 @@ fn banner(
     let mut brand_text = brand.x;
     if let Some(l) = logo {
         let size = 40.0 * k;
-        let rect = Rect::from_min_size(Pos2::new(brand.x, brand.y - size / 2.0), Vec2::splat(size));
+        let rect = Rect::from_min_size(Pos2::new(brand.x, brand.y - size / 2.0), Vec2::new(size * l.aspect_ratio(), size));
         let breathe = 0.85 + 0.15 * (t * 1.4).sin();
         super::aurora_bg::radial_glow(painter, rect.center(), size * 1.1, p.violet, 0.4 * breathe * a);
         painter.image(
@@ -304,7 +304,7 @@ fn banner(
     painter.text(
         Pos2::new(brand_text, brand.y),
         egui::Align2::LEFT_CENTER,
-        "Aurora Viewer",
+        aurora_i18n::tr!("waters-roux-name"),
         egui::FontId::proportional(15.0 * k),
         p.violet_pale.gamma_multiply(a),
     );
