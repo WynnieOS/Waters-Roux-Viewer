@@ -1130,6 +1130,8 @@ pub struct Settings {
     /// colours of the interface (`crate::interface_colors`), each the
     /// skin's by default.
     pub interface_colors: crate::interface_colors::InterfaceColors,
+    /// Waters Roux's named Everyday, Studio and Creator window workspace.
+    pub workspace_mode: crate::ui::workspaces::Mode,
     /// Firestorm's camera and movement windows (floater_camera.xml,
     /// floater_moveview.xml) instead of `ui/controls.rs`.
     pub classic_controls: bool,
@@ -2103,6 +2105,7 @@ impl Default for Settings {
             color_blindness_strength: 1.0,
             high_contrast: false,
             interface_colors: Default::default(),
+            workspace_mode: crate::ui::workspaces::Mode::Everyday,
             classic_controls: false,
             camera_shots: Vec::new(),
             camera_views: Default::default(),
