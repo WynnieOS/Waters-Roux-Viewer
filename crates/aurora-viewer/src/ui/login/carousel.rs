@@ -110,7 +110,7 @@ pub fn show(
     info: &LoginInfo,
     progress: Option<(&str, f32)>,
 ) -> LoginAction {
-    super::draw_background(ui, p);
+    super::draw_background(ui, p, form);
     let ctx = ui.ctx().clone();
     let grids_open = crate::ui::grids::is_open(&ctx);
     let screen = ctx.content_rect();
