@@ -69,6 +69,41 @@ impl Default for Theme {
     }
 }
 
+impl Theme {
+    /// The Waters Roux identity: the six approved pastel/sage colours plus
+    /// a warm Bayou Gold accent. Kept separate from Aurora's own defaults
+    /// to preserve upstream tests and make future merges safer.
+    pub fn waters_roux() -> Self {
+        Self {
+            violet: "#815168".into(),       // readable muted rose accent
+            indigo: "#95BFC3".into(),       // pale bayou blue
+            teal: "#5D8587".into(),         // legible blue-green links
+            navy: "#5D6B6B".into(),         // approved deep slate
+            panel: "#D5E5E5".into(),        // approved light blue-grey
+            bar: "#BDD7D8".into(),          // approved powder blue
+            field: "#F1F7F7".into(),        // approved cloud white
+            raised: "#DDD3D3".into(),       // approved warm stone
+            violet_light: "#F7CBCA".into(), // approved blush pink
+            violet_pale: "#F7CBCA".into(),
+            ink: "#23363A".into(), // dark ink for light glass
+            muted: "#415A5D".into(),
+            muted_dim: "#5D6B6B".into(),
+            amber: "#C99530".into(), // Bayou Gold
+            rose: "#F7CBCA".into(),
+            danger: "#A34256".into(),
+            success: "#477568".into(),
+            warn: "#986A28".into(),
+            danger_dim: "#895562".into(),
+            indigo_light: "#BDD7D8".into(),
+            on_accent: "#F1F7F7".into(),
+            panel_alpha: 172, // translucent frosted glass at startup
+            button_radius: 12,
+            window_radius: 18,
+            ..Self::default()
+        }
+    }
+}
+
 pub fn hex(s: &str) -> Color32 {
     let t = s.trim().trim_start_matches('#');
     let p = |i: usize| t.get(i..i + 2).and_then(|h| u8::from_str_radix(h, 16).ok()).unwrap_or(255);
@@ -343,6 +378,22 @@ impl egui::theme::StyleProvider<egui::widget_style::TextEditStyle> for FieldSize
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn waters_roux_brand_colors_and_frosted_glass() {
+        let theme = Theme::waters_roux();
+        assert_eq!(theme.rose, "#F7CBCA");
+        assert_eq!(theme.raised, "#DDD3D3");
+        assert_eq!(theme.field, "#F1F7F7");
+        assert_eq!(theme.panel, "#D5E5E5");
+        assert_eq!(theme.bar, "#BDD7D8");
+        assert_eq!(theme.navy, "#5D6B6B");
+        assert_eq!(theme.amber, "#C99530");
+        assert!(theme.panel_alpha < 255);
+        assert!(theme.panel_alpha > 0);
+        // The upstream Aurora default is intentionally not overwritten.
+        assert_eq!(Theme::default().violet, "#8B5CF6");
+    }
+
     use egui::{
         Event, ImeEvent, Shape,
         text::{CCursor, CCursorRange},

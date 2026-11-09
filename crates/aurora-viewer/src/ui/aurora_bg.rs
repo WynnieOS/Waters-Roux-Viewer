@@ -57,14 +57,15 @@ pub fn frosted(p: &Palette, rect: Rect, t: f32) -> Vec<Shape> {
     shapes(p, rect, t, 1.0, true)
 }
 
-/// Shared login glass: a softened sky under the skin's lighter panel tint.
-pub const LOGIN_TINT: f32 = 0.56;
+/// Shared login tint used by the glass widgets and the login background.
+/// A value of 1.0 honours the complete range of the selected opacity.
+pub const LOGIN_TINT: f32 = 1.0;
 
 /// The sky shown through a login card, with its own lights and panel tint.
 pub fn frosted_pane(p: &Palette, screen: Rect, t: f32, pane: Rect, lights: Vec<Shape>) -> Vec<Shape> {
     let mut out = frosted(p, screen, t);
     out.extend(lights);
-    let alpha = (f32::from(p.panel_alpha) * LOGIN_TINT) as u8;
+    let alpha = p.panel_alpha;
     out.push(Shape::rect_filled(
         pane,
         0.0,

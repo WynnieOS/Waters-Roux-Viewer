@@ -1,0 +1,50 @@
+name: Waters Roux — Windows verification
+
+# Build validation for the independent Waters Roux viewer fork.
+# No credentials, login, releases or downloads; it never connects to a grid.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/waters-roux-verify.yml'
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: waters-roux-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows Rust and glass UI checks
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - name: Install Rust stable with formatting tools
+        shell: pwsh
+        run: |
+          rustup update stable --no-self-update
+          rustup component add rustfmt clippy
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: waters-roux-windows
+      - name: Validate formatting
+        shell: pwsh
+        run: cargo fmt --all -- --check
+      - name: Check viewer and all tests
+        shell: pwsh
+        run: cargo check --locked --profile ci --all-targets -p aurora-viewer
+      - name: Run Waters Roux brand and glass tests
+        shell: pwsh
+        run: cargo test --locked --profile ci -p aurora-viewer waters_roux_

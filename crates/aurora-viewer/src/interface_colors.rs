@@ -46,6 +46,9 @@ pub struct InterfaceColors {
     pub accent: Option<Rgba>,
     pub surface: Option<Rgba>,
     pub text: Option<Rgba>,
+    /// Window and dock opacity (0 = clear, 255 = opaque). A separate choice
+    /// from surface tint; None uses the selected skin's opacity.
+    pub glass_alpha: Option<u8>,
 }
 
 impl InterfaceColors {
@@ -58,6 +61,7 @@ static CURRENT: RwLock<InterfaceColors> = RwLock::new(InterfaceColors {
     accent: None,
     surface: None,
     text: None,
+    glass_alpha: None,
 });
 /// The skin's palette of the last build, for the page's swatches.
 static SKIN: Mutex<Option<Palette>> = Mutex::new(None);
@@ -116,7 +120,8 @@ pub fn apply(skin: Palette, colors: &InterfaceColors) -> Palette {
     if let Ok(mut s) = SKIN.lock() {
         *s = Some(skin);
     }
-    let p = derive(skin, colors).0;
+    let mut p = derive(skin, colors).0;
+    p.panel_alpha = colors.glass_alpha.unwrap_or(skin.panel_alpha);
     if let Ok(mut panel) = PANEL.lock() {
         let wanted = (p.panel != skin.panel).then_some(p.panel);
         if panel.as_ref().map(|(c, _)| *c) != wanted {

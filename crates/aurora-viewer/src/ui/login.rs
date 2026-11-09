@@ -23,6 +23,7 @@ mod manager_drag;
 pub(crate) mod motion;
 pub mod photo_quality_notice;
 pub mod safe_graphics_notice;
+mod wallpaper;
 
 const REMEMBERED_PASSWORD_MASK: &str = "••••••••••••••••";
 
@@ -30,6 +31,7 @@ const REMEMBERED_PASSWORD_MASK: &str = "•••••••••••••�
 pub struct LoginForm {
     pub accounts: Vec<crate::login_accounts::Account>,
     pub accounts_loaded: bool,
+    wallpaper: wallpaper::Wallpaper,
     pub remember_checked: bool,
     pub remember_mfa: bool,
     pub mfa_authorization: Option<crate::credentials::MfaAuthorization>,
@@ -167,16 +169,26 @@ pub(crate) fn terms_link(ui: &mut egui::Ui, p: &Palette, url: &str) {
     }
 }
 
-/// Animated aurora background (also behind the loading screens without a
-/// last view).
+/// Aurora's procedural fallback remains shared with loading and teleport
+/// screens, preserving its original two-argument interface.
 pub fn draw_background(ui: &egui::Ui, p: &Palette) {
     let ctx = ui.ctx();
     let rect = ctx.content_rect();
     let painter = ctx.layer_painter(egui::LayerId::background());
     let t = ctx.input(|i| i.time) as f32;
     super::aurora_bg::paint(&painter, p, rect, t, 1.0);
-    // slow animation: ~30 images/s are plenty
     ctx.request_repaint_after(std::time::Duration::from_millis(33));
+}
+
+/// Login alone can substitute a separate New Orleans bayou wallpaper.
+/// The loading and teleport screens remain unchanged.
+pub fn draw_login_background(ui: &egui::Ui, p: &Palette, form: &mut LoginForm) {
+    let ctx = ui.ctx();
+    let rect = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::background());
+    if !form.wallpaper.paint(ctx, &painter, rect) {
+        draw_background(ui, p);
+    }
 }
 
 fn img(ui: &egui::Ui, icons: &Icons, name: &str, rect: egui::Rect, tint: Color32) {
@@ -490,6 +502,11 @@ fn glass_card<R>(
     let behind = (ui.painter().clone(), ui.painter().add(egui::Shape::Noop));
     let mut pane = None;
     let mut frame = widgets::overlay_frame(ui.ctx(), p);
+    if p.panel_alpha < 255 {
+        // The frosted image is tinted below at the selected opacity.
+        // Do not tint the frame a second time and obscure the scenery.
+        frame.fill = Color32::TRANSPARENT;
+    }
     frame.stroke.color = edge.unwrap_or_else(|| frame.stroke.color.lerp_to_gamma(p.violet_pale, hover * 0.7));
     let response = frame.inner_margin(Margin::same(margin)).show(ui, |ui| {
         pane = Some((ui.painter().clone(), ui.painter().add(egui::Shape::Noop)));
@@ -516,7 +533,18 @@ fn glass_card<R>(
             ),
         ];
         behind.0.set(behind.1, egui::Shape::Vec(lights.clone()));
-        let mut shapes = super::aurora_bg::frosted_pane(p, ctx.content_rect(), ctx.input(|i| i.time) as f32, rect, lights);
+        let mut shapes = if let Some(wallpaper) = wallpaper::frosted_shape(ctx, ctx.content_rect()) {
+            vec![
+                wallpaper,
+                egui::Shape::rect_filled(
+                    rect,
+                    0.0,
+                    Color32::from_rgba_unmultiplied(p.panel.r(), p.panel.g(), p.panel.b(), p.panel_alpha),
+                ),
+            ]
+        } else {
+            super::aurora_bg::frosted_pane(p, ctx.content_rect(), ctx.input(|i| i.time) as f32, rect, lights)
+        };
         let top = |height: f32| egui::Rect::from_min_size(rect.min, Vec2::new(rect.width(), height));
         if accent {
             shapes.push(strip(top(2.0), &[(0.0, p.violet), (1.0, p.teal)]));
@@ -672,7 +700,7 @@ pub fn show(
     if form.accounts_loaded {
         return carousel::show(ui, p, icons, logo, settings, form, info, progress);
     }
-    draw_background(ui, p);
+    draw_login_background(ui, p, form);
     let mut action = LoginAction::None;
     let ctx = ui.ctx().clone();
     let screen = ctx.content_rect();
@@ -715,7 +743,7 @@ pub fn show(
                     super::aurora_bg::radial_glow(&painter, r.center(), 150.0, p.violet, 0.42);
                 }
                 ui.add_space(2.0);
-                ui.label(RichText::new("Aurora Viewer").size(34.0).strong().color(p.ink));
+                ui.label(RichText::new("Waters Roux").size(34.0).strong().color(p.ink));
                 ui.label(RichText::new(client_tagline()).size(13.0).color(p.violet_pale));
                 ui.add_space(18.0);
             });

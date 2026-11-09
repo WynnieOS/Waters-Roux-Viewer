@@ -19,6 +19,18 @@ param(
 
 New-Item -ItemType Directory -Force -Path (Join-Path $Out 'assets/emoji') -ErrorAction Stop | Out-Null
 Copy-Item -LiteralPath $Exe -Destination $Out -ErrorAction Stop
+
+# Include the exact Waters Roux PNG assets when they have been added to the
+# source tree. Optional in development previews, mandatory before release.
+$brandingSource = Join-Path $Source 'assets/branding'
+$brandingOut = Join-Path $Out 'assets/branding'
+foreach ($name in @('waters-roux-logo.png', 'waters-roux-background.png')) {
+    $asset = Join-Path $brandingSource $name
+    if (Test-Path -LiteralPath $asset -PathType Leaf) {
+        New-Item -ItemType Directory -Force -Path $brandingOut -ErrorAction Stop | Out-Null
+        Copy-Item -LiteralPath $asset -Destination $brandingOut -ErrorAction Stop
+    }
+}
 # The emoji font is inside the exe; its licence ships, and the assets folder
 # stays: the updater of the published versions refuses a package without it.
 Copy-Item -LiteralPath (Join-Path $Source 'assets/emoji/LICENSE-OFL.txt') -Destination (Join-Path $Out 'assets/emoji') -ErrorAction Stop
