@@ -138,6 +138,7 @@ pub mod wearable;
 pub mod web_browser;
 pub mod web_view;
 pub mod widgets;
+pub mod workspaces;
 
 #[cfg(test)]
 mod uri_restore_tests;
