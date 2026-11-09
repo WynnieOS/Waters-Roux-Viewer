@@ -301,18 +301,9 @@ mod tests {
             title_with(Some("Test ombres"), "debug", "0.2.0"),
             "Waters Roux Viewer 0.2.0 - Test ombres (Dev)"
         );
-        assert_eq!(
-            title_with(None, "release", "0.2.0"),
-            "Waters Roux Viewer 0.2.0 (Release)"
-        );
-        assert_eq!(
-            title_with(None, "debugging", "0.2.0"),
-            "Waters Roux Viewer 0.2.0 (Debug)"
-        );
-        assert_eq!(
-            title_with(Some("X"), "unknown", "0.2.0"),
-            "Waters Roux Viewer 0.2.0 - X"
-        );
+        assert_eq!(title_with(None, "release", "0.2.0"), "Waters Roux Viewer 0.2.0 (Release)");
+        assert_eq!(title_with(None, "debugging", "0.2.0"), "Waters Roux Viewer 0.2.0 (Debug)");
+        assert_eq!(title_with(Some("X"), "unknown", "0.2.0"), "Waters Roux Viewer 0.2.0 - X");
         assert_eq!(
             title_with(None, "debug", "0.2.0+7.gabcdef123"),
             "Waters Roux Viewer 0.2.0+7.gabcdef123 (Dev)"
