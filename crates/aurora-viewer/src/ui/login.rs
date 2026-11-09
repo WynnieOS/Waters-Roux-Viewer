@@ -31,7 +31,7 @@ const REMEMBERED_PASSWORD_MASK: &str = "•••••••••••••�
 pub struct LoginForm {
     pub accounts: Vec<crate::login_accounts::Account>,
     pub accounts_loaded: bool,
-    pub wallpaper: wallpaper::Wallpaper,
+    wallpaper: wallpaper::Wallpaper,
     pub remember_checked: bool,
     pub remember_mfa: bool,
     pub mfa_authorization: Option<crate::credentials::MfaAuthorization>,
@@ -169,17 +169,25 @@ pub(crate) fn terms_link(ui: &mut egui::Ui, p: &Palette, url: &str) {
     }
 }
 
-/// Animated aurora background (also behind the loading screens without a
-/// last view).
-pub fn draw_background(ui: &egui::Ui, p: &Palette, form: &mut LoginForm) {
+/// Aurora's procedural fallback remains shared with loading and teleport
+/// screens, preserving its original two-argument interface.
+pub fn draw_background(ui: &egui::Ui, p: &Palette) {
     let ctx = ui.ctx();
     let rect = ctx.content_rect();
     let painter = ctx.layer_painter(egui::LayerId::background());
     let t = ctx.input(|i| i.time) as f32;
+    super::aurora_bg::paint(&painter, p, rect, t, 1.0);
+    ctx.request_repaint_after(std::time::Duration::from_millis(33));
+}
+
+/// Login alone can substitute a separate New Orleans bayou wallpaper.
+/// The loading and teleport screens remain unchanged.
+pub fn draw_login_background(ui: &egui::Ui, p: &Palette, form: &mut LoginForm) {
+    let ctx = ui.ctx();
+    let rect = ctx.content_rect();
+    let painter = ctx.layer_painter(egui::LayerId::background());
     if !form.wallpaper.paint(ctx, &painter, rect) {
-        super::aurora_bg::paint(&painter, p, rect, t, 1.0);
-        // Only the procedural sky animates; the New Orleans wallpaper is static.
-        ctx.request_repaint_after(std::time::Duration::from_millis(33));
+        draw_background(ui, p);
     }
 }
 
@@ -692,7 +700,7 @@ pub fn show(
     if form.accounts_loaded {
         return carousel::show(ui, p, icons, logo, settings, form, info, progress);
     }
-    draw_background(ui, p, form);
+    draw_login_background(ui, p, form);
     let mut action = LoginAction::None;
     let ctx = ui.ctx().clone();
     let screen = ctx.content_rect();
