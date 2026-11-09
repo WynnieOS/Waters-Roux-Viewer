@@ -20,6 +20,8 @@
 //! DebugShowColor ("Color Under Cursor"). Not here yet: the editor of the
 //! rows (any debug setting, add / remove / reorder, QuickPrefsEditMode).
 
+mod rows;
+
 use super::environment::{EnvAction, EnvironmentUi};
 use super::widgets::{self, Floater};
 use crate::settings::Settings;
@@ -39,7 +41,7 @@ const WIDTH: f32 = 540.0;
 const SLIDER_W: f32 = 180.0;
 
 /// A numeric row, bound to the setting of the same name in Preferences.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Slot {
     /// RenderFarClip (Preferences › Graphics).
     DrawDistance,
@@ -217,6 +219,8 @@ pub struct QuickPrefsUi {
     hover_editing: bool,
     /// A setting changed and waits for the button to be released to be saved.
     unsaved: bool,
+    /// User-selected order and visibility of optional controls.
+    row_editor: rows::Editor,
 }
 
 impl QuickPrefsUi {
@@ -242,8 +246,10 @@ impl QuickPrefsUi {
             .auto_height()
             .show(ctx, p, open, |ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
-                // the user-defined rows
-                for slot in Slot::ROWS {
+                // The user may show, hide and reorder optional rows. Core
+                // controls below remain visible in every configuration.
+                self.row_editor.show(ui);
+                for slot in self.row_editor.visible.iter().copied() {
                     out.changed |= slot_row(ui, p, settings, slot);
                 }
                 out.changed |= name_tags_row(ui, p, settings);
