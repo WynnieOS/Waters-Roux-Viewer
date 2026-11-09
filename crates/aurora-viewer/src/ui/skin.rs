@@ -107,9 +107,8 @@ fn skin_dirs(name: &str) -> Vec<PathBuf> {
 pub fn recovery_theme() -> Theme {
     skin_dirs("aurora")
         .into_iter()
-        .find(|dir| dir.is_dir())
-        .map(|dir| read_json(&dir.join("theme.json")))
-        .unwrap_or_default()
+        .find_map(|dir| dir.join("theme.json").is_file().then(|| read_json(&dir.join("theme.json"))))
+        .unwrap_or_else(Theme::waters_roux)
 }
 
 /// Latest modification time of any file in the skin (for hot reload).
@@ -149,7 +148,7 @@ impl Skin {
         let dir = dir.or_else(|| {
             let d = crate::settings::config_dir().join("skins").join(name);
             std::fs::create_dir_all(d.join("icons")).ok()?;
-            let theme = serde_json::to_vec_pretty(&Theme::default()).ok()?;
+            let theme = serde_json::to_vec_pretty(&Theme::waters_roux()).ok()?;
             let layout = serde_json::to_vec_pretty(&Layout::default()).ok()?;
             // Templates only: copy to theme.json / layout.json to customise.
             std::fs::write(d.join("theme.example.json"), theme).ok()?;
@@ -160,7 +159,14 @@ impl Skin {
             );
             Some(d)
         });
-        let theme = dir.as_ref().map(|d| read_json::<Theme>(&d.join("theme.json"))).unwrap_or_default();
+        // The Waters Roux fork has its own startup palette; the base Aurora theme
+        // remains available as Theme::default() for compatibility and tests.
+        let theme = dir
+            .as_ref()
+            .map(|d| d.join("theme.json"))
+            .filter(|path| path.is_file())
+            .map(|path| read_json::<Theme>(&path))
+            .unwrap_or_else(Theme::waters_roux);
         let layout = dir
             .as_ref()
             .map(|d| read_json::<Layout>(&d.join("layout.json")))
