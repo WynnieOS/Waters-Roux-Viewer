@@ -23,7 +23,10 @@ fn context_id() -> Id {
 
 fn candidates() -> Vec<PathBuf> {
     let mut paths = vec![crate::settings::config_dir().join("branding").join(FILE)];
-    if let Some(dir) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(std::path::Path::to_path_buf)) {
+    if let Some(dir) = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+    {
         paths.push(dir.join("assets").join("branding").join(FILE));
     }
     paths
