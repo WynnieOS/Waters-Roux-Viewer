@@ -87,6 +87,20 @@ fn interface_colors(cx: &mut Cx) {
             shown.text,
             skin.ink,
         );
+        // Waters Roux: genuine blurred glass, not a translucent flat panel.
+        // The preference is part of InterfaceColors, so App's existing
+        // theme-refresh path applies it live and persists it automatically.
+        cx.row("Glass opacity", "Lower values show more of the world through the frosted glass.", &field!(interface_colors.glass_alpha), |ui, s| {
+            let mut alpha = s.interface_colors.glass_alpha.unwrap_or(172);
+            let changed = ui
+                .add(egui::Slider::new(&mut alpha, 24..=255).suffix(" / 255"))
+                .changed();
+            if changed {
+                s.interface_colors.glass_alpha = Some(alpha);
+            }
+            changed
+        });
+        cx.note("The blur stays on behind translucent panels. Fully opaque glass disables it. High-contrast mode temporarily overrides the skin.");
         cx.row(tr!("ui-options-all-interface-colors"), "", &Nothing, |ui, s| {
             let reset = crate::ui::widgets::action_button_if(
                 ui,
