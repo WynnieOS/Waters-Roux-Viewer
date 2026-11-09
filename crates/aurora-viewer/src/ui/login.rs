@@ -21,9 +21,9 @@ mod layout;
 pub(crate) mod manager;
 mod manager_drag;
 pub(crate) mod motion;
-mod wallpaper;
 pub mod photo_quality_notice;
 pub mod safe_graphics_notice;
+mod wallpaper;
 
 const REMEMBERED_PASSWORD_MASK: &str = "••••••••••••••••";
 
