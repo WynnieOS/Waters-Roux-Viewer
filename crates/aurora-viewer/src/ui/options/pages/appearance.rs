@@ -91,12 +91,13 @@ fn interface_colors(cx: &mut Cx) {
         // The preference is part of InterfaceColors, so App's existing
         // theme-refresh path applies it live and persists it automatically.
         cx.row("Glass opacity", "Lower values show more of the world through the frosted glass.", &field!(interface_colors.glass_alpha), |ui, s| {
-            let mut alpha = s.interface_colors.glass_alpha.unwrap_or(172);
+            let alpha = s.interface_colors.glass_alpha.unwrap_or(172);
+            let mut opacity = (f32::from(alpha) * 100.0 / 255.0).round() as u8;
             let changed = ui
-                .add(egui::Slider::new(&mut alpha, 24..=255).suffix(" / 255"))
+                .add(egui::Slider::new(&mut opacity, 10..=100).suffix("% opaque"))
                 .changed();
             if changed {
-                s.interface_colors.glass_alpha = Some(alpha);
+                s.interface_colors.glass_alpha = Some(((f32::from(opacity) / 100.0) * 255.0).round() as u8);
             }
             changed
         });
