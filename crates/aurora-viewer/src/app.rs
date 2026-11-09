@@ -329,7 +329,10 @@ pub(crate) const LOGO_PNG: &[u8] = include_bytes!("../../../assets/branding/auro
 /// only until the branded assets are included in the release package.
 fn branded_logo() -> Vec<u8> {
     let mut candidates = vec![crate::settings::config_dir().join("branding").join("waters-roux-logo.png")];
-    if let Some(dir) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(std::path::Path::to_path_buf)) {
+    if let Some(dir) = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+    {
         candidates.push(dir.join("assets").join("branding").join("waters-roux-logo.png"));
     }
     for file in candidates {
@@ -341,7 +344,6 @@ fn branded_logo() -> Vec<u8> {
     log::warn!("Waters Roux transparent logo is not yet installed; using temporary development artwork");
     LOGO_PNG.to_vec()
 }
-
 
 struct LogoData {
     ui: egui::ColorImage,
