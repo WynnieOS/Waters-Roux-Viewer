@@ -25,12 +25,10 @@ fn load() -> Vec<Slot> {
     let Ok(bytes) = std::fs::read(path()) else {
         return Slot::ROWS.to_vec();
     };
-    serde_json::from_slice::<Vec<Slot>>(&bytes)
-        .map(normalize)
-        .unwrap_or_else(|err| {
-            log::warn!("quick preferences row layout ignored: {err}");
-            Slot::ROWS.to_vec()
-        })
+    serde_json::from_slice::<Vec<Slot>>(&bytes).map(normalize).unwrap_or_else(|err| {
+        log::warn!("quick preferences row layout ignored: {err}");
+        Slot::ROWS.to_vec()
+    })
 }
 
 fn save(visible: &[Slot]) {
