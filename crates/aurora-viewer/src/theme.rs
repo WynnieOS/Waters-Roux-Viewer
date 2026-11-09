@@ -69,7 +69,6 @@ impl Default for Theme {
     }
 }
 
-
 impl Theme {
     /// The Waters Roux identity: the six approved pastel/sage colours plus
     /// a warm Bayou Gold accent. Kept separate from Aurora's own defaults
@@ -86,10 +85,10 @@ impl Theme {
             raised: "#DDD3D3".into(),       // approved warm stone
             violet_light: "#F7CBCA".into(), // approved blush pink
             violet_pale: "#F7CBCA".into(),
-            ink: "#23363A".into(),          // dark ink for light glass
+            ink: "#23363A".into(), // dark ink for light glass
             muted: "#415A5D".into(),
             muted_dim: "#5D6B6B".into(),
-            amber: "#C99530".into(),        // Bayou Gold
+            amber: "#C99530".into(), // Bayou Gold
             rose: "#F7CBCA".into(),
             danger: "#A34256".into(),
             success: "#477568".into(),
@@ -97,7 +96,7 @@ impl Theme {
             danger_dim: "#895562".into(),
             indigo_light: "#BDD7D8".into(),
             on_accent: "#F1F7F7".into(),
-            panel_alpha: 172,              // translucent frosted glass at startup
+            panel_alpha: 172, // translucent frosted glass at startup
             button_radius: 12,
             window_radius: 18,
             ..Self::default()
