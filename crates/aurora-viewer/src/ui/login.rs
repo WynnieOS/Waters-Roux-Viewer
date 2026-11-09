@@ -186,7 +186,7 @@ pub fn draw_login_background(ui: &egui::Ui, p: &Palette, form: &mut LoginForm) {
     let ctx = ui.ctx();
     let rect = ctx.content_rect();
     let painter = ctx.layer_painter(egui::LayerId::background());
-    if !form.wallpaper.paint(ctx, &painter, rect) {
+    if !form.wallpaper.paint(ctx, &painter, rect, p) {
         draw_background(ui, p);
     }
 }
@@ -507,7 +507,13 @@ fn glass_card<R>(
         // Do not tint the frame a second time and obscure the scenery.
         frame.fill = Color32::TRANSPARENT;
     }
-    frame.stroke.color = edge.unwrap_or_else(|| frame.stroke.color.lerp_to_gamma(p.violet_pale, hover * 0.7));
+    frame.stroke.color = edge.unwrap_or_else(|| {
+        if p.high_contrast {
+            frame.stroke.color
+        } else {
+            p.amber.lerp_to_gamma(p.rose, hover * 0.5)
+        }
+    });
     let response = frame.inner_margin(Margin::same(margin)).show(ui, |ui| {
         pane = Some((ui.painter().clone(), ui.painter().add(egui::Shape::Noop)));
         body(ui)
@@ -533,12 +539,12 @@ fn glass_card<R>(
             ),
         ];
         behind.0.set(behind.1, egui::Shape::Vec(lights.clone()));
-        let mut shapes = if let Some(wallpaper) = wallpaper::frosted_shape(ctx, ctx.content_rect()) {
+        let mut shapes = if let Some(wallpaper) = wallpaper::frosted_shape(ctx, ctx.content_rect(), rect, frame.corner_radius) {
             vec![
                 wallpaper,
                 egui::Shape::rect_filled(
                     rect,
-                    0.0,
+                    frame.corner_radius,
                     Color32::from_rgba_unmultiplied(p.panel.r(), p.panel.g(), p.panel.b(), p.panel_alpha),
                 ),
             ]
@@ -737,13 +743,15 @@ pub fn show(
             ui.set_width(card_w);
             ui.vertical_centered(|ui| {
                 if let Some(l) = logo {
-                    let r = ui.add(egui::Image::new(l).fit_to_exact_size(Vec2::splat(logo_size))).rect;
+                    let r = ui
+                        .add(egui::Image::new(l).fit_to_exact_size(Vec2::new(logo_size * l.aspect_ratio(), logo_size)))
+                        .rect;
                     // soft light behind the logo (additive)
                     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::unique("halo")));
                     super::aurora_bg::radial_glow(&painter, r.center(), 150.0, p.violet, 0.42);
                 }
                 ui.add_space(2.0);
-                ui.label(RichText::new("Waters Roux").size(34.0).strong().color(p.ink));
+                ui.label(RichText::new(aurora_i18n::tr!("waters-roux-name")).size(34.0).strong().color(p.ink));
                 ui.label(RichText::new(client_tagline()).size(13.0).color(p.violet_pale));
                 ui.add_space(18.0);
             });

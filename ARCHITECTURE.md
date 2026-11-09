@@ -4538,3 +4538,29 @@ independent. Pending or over-budget avatars draw neutral silhouette cards rather
 than disappearing; cards have a dynamically sized instance buffer.
 
 `build/linking.rs` follows LLSelectMgr::enableLinkObjects / linkObjects: full selection properties and effective rights are checked before sending, with permanent-object, region, owner, RLVa and animated-mesh limits shared by both layouts and the object menu. Scene mesh-header estimates are refreshed before editor input. `aurora-net::build::link_batches` retains the root in every 254-object packet; confirmation accounts for later batches preceding earlier children. OpenRegionInfo supplies the region link limit; SimulatorFeatures supplies the animated-object triangle budget.
+
+## Waters Roux portable beta integration (2026-11-09)
+
+The `feat/waters-roux-branded-beta` integration retains the glass foundation and
+Quick Preferences branches. `ui/login/wallpaper.rs` loads a standalone approved
+wallpaper, or generates a bounded temporary bayou dusk image once; the login
+card samples the same image blurred and clipped to the skin's rounded corners.
+The first-account screen puts the exact original emblem and real credential
+form in one glass card. Saved-account authentication remains in the existing
+carousel. No reference screenshot data is used.
+
+`build.rs` embeds exact logo PNG bytes when present and Windows metadata with
+the optional original-logo ICO. `app.rs` shares the emblem with login/loading,
+About, window icons and notifications; missing art uses text branding, never
+the upstream wolf. The public logo file must be approved by the owner before
+it is added. `scripts/package-waters-roux-preview.ps1` packages the existing
+binary as `waters-roux-viewer.exe`, verifies its version/name and logo hash,
+includes upstream notices and provides `Launch Waters Roux.cmd`.
+
+A `waters-roux-portable.txt` marker beside the executable opts into a sibling
+`profile/` directory. `settings.rs` places configuration, cache and media there;
+`logging.rs` places logs there. `credentials.rs` scopes beta OS-vault entries to
+the portable root's digest. Extracting to a new folder cannot overwrite the
+previous preview's settings. Internal crate names and compatible file formats
+remain unchanged. Windows preview/verification workflows run on this beta
+branch without publishing a release or merging main.

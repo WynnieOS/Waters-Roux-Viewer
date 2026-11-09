@@ -2298,8 +2298,55 @@ pub fn config_dir() -> PathBuf {
     for_mode(default_config_root())
 }
 
+/// A portable beta keeps its profile beside the executable, isolated from
+/// previous previews. A marker is packaged with the beta; normal installs
+/// retain the platform directories. No existing settings are migrated.
+pub(crate) fn portable_root() -> Option<PathBuf> {
+    static ROOT: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    ROOT.get_or_init(|| {
+        let exe = std::env::current_exe().ok()?;
+        portable_root_at(&exe)
+    })
+    .clone()
+}
+
+fn portable_root_at(exe: &Path) -> Option<PathBuf> {
+    let dir = exe.parent()?;
+    dir.join("waters-roux-portable.txt").is_file().then(|| dir.join("profile"))
+}
+
+#[cfg(test)]
+mod waters_roux_portable_tests {
+    use super::*;
+
+    #[test]
+    fn waters_roux_portable_profiles_are_opt_in_and_separate() {
+        let root = std::env::temp_dir().join(format!("waters-roux-portable-{}", uuid::Uuid::new_v4()));
+        let first = root.join("first");
+        let second = root.join("second");
+        for dir in [&first, &second] {
+            std::fs::create_dir_all(dir).expect("test folder");
+        }
+        let exe = first.join("waters-roux-viewer.exe");
+        assert_eq!(portable_root_at(&exe), None);
+        for dir in [&first, &second] {
+            std::fs::write(dir.join("waters-roux-portable.txt"), "portable").expect("marker");
+        }
+        assert_eq!(portable_root_at(&exe), Some(first.join("profile")));
+        assert_eq!(
+            portable_root_at(&second.join("waters-roux-viewer.exe")),
+            Some(second.join("profile"))
+        );
+        assert_ne!(portable_root_at(&exe), portable_root_at(&second.join("waters-roux-viewer.exe")));
+        std::fs::remove_dir_all(root).expect("test cleanup");
+    }
+}
+
 /// The settings folder before the demo's subfolder.
 pub(crate) fn default_config_root() -> PathBuf {
+    if let Some(root) = portable_root() {
+        return root.join("config");
+    }
     directories::ProjectDirs::from("org", "WatersRoux", "WatersRouxViewer")
         .map(|d| d.config_dir().to_path_buf())
         .unwrap_or_else(|| PathBuf::from("."))
@@ -2342,6 +2389,9 @@ pub fn asset_cache_dir() -> PathBuf {
 }
 
 pub(crate) fn default_cache_root() -> PathBuf {
+    if let Some(root) = portable_root() {
+        return root.join("cache");
+    }
     directories::ProjectDirs::from("org", "WatersRoux", "WatersRouxViewer")
         .map(|d| d.cache_dir().to_path_buf())
         .unwrap_or_else(|| PathBuf::from("cache"))
@@ -2358,6 +2408,9 @@ pub fn default_cache_dirs() -> Vec<PathBuf> {
 /// by the offline demo and the real sessions, several hundred MB being
 /// downloaded once.
 pub fn media_plugins_dir() -> PathBuf {
+    if let Some(root) = portable_root() {
+        return root.join("media-plugins");
+    }
     if let Some(root) = unit_test_root() {
         return root.join("media-plugins");
     }

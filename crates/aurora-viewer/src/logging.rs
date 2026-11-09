@@ -42,7 +42,10 @@ pub fn logs_dir() -> PathBuf {
     if let Some(test) = aurora_updater::test_environment() {
         return test.root.join("logs");
     }
-    directories::ProjectDirs::from("org", "Aurora", "AuroraViewer")
+    if let Some(root) = crate::settings::portable_root() {
+        return root.join("logs");
+    }
+    directories::ProjectDirs::from("org", "WatersRoux", "WatersRouxViewer")
         .map(|d| d.data_local_dir().join("logs"))
         .unwrap_or_else(|| PathBuf::from("logs"))
 }
@@ -501,7 +504,7 @@ pub fn init() {
         drain(DRAIN_WAIT);
     }));
     log::info!(
-        "Aurora Viewer {} starting ({} {}, {} allocator), log: {}",
+        "Waters Roux Viewer {} starting ({} {}, {} allocator), log: {}",
         aurora_version::version(),
         std::env::consts::OS,
         std::env::consts::ARCH,

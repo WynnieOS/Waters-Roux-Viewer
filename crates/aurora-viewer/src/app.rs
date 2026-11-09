@@ -318,15 +318,15 @@ const FOV_SEND_EPSILON: f32 = 1e-3;
 /// targets of a 3840 x 2054 window at 240 x 128; texture_budget::Background).
 const PAUSED_RESOLUTION_DIVISOR: u32 = 16;
 
-/// The wolf logo (window icon, login and loading screens, About, system
+/// The exact Waters Roux logo (window icon, login and loading screens, About, system
 /// notifications), read from the branding folder: one file for the viewer,
 /// the README and the exe icon.
-pub(crate) const LOGO_PNG: &[u8] = include_bytes!("../../../assets/branding/aurora-logo.png");
+pub(crate) const LOGO_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/waters-roux-logo.png"));
 
 /// Prefer the exact user-approved Waters Roux transparent logo. The external
 /// PNG keeps the original artwork byte-for-byte intact; nothing is generated
-/// or altered in this loader. The inherited image is a development fallback
-/// only until the branded assets are included in the release package.
+/// or altered in this loader. If the source asset is absent, only the viewer
+/// name is shown; the inherited Aurora emblem is never substituted.
 fn branded_logo() -> Vec<u8> {
     let mut candidates = vec![crate::settings::config_dir().join("branding").join("waters-roux-logo.png")];
     if let Some(dir) = std::env::current_exe()
@@ -341,7 +341,9 @@ fn branded_logo() -> Vec<u8> {
             return bytes;
         }
     }
-    log::warn!("Waters Roux transparent logo is not yet installed; using temporary development artwork");
+    if LOGO_PNG.is_empty() {
+        log::warn!("Original Waters Roux logo is missing; displaying the viewer name without substitute artwork");
+    }
     LOGO_PNG.to_vec()
 }
 
@@ -1473,7 +1475,7 @@ impl App {
         let (tx, rx) = crossbeam_channel::bounded(1);
         std::thread::spawn(move || match image::load_from_memory(&branded_logo()) {
             Ok(img) => {
-                let ui_img = img.resize(384, 384, image::imageops::FilterType::Triangle).to_rgba8();
+                let ui_img = img.resize(960, 640, image::imageops::FilterType::Triangle).to_rgba8();
                 let icon = img.resize(64, 64, image::imageops::FilterType::Triangle).to_rgba8();
                 let ci = egui::ColorImage::from_rgba_unmultiplied([ui_img.width() as usize, ui_img.height() as usize], ui_img.as_raw());
                 let (w, h) = icon.dimensions();

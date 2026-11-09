@@ -205,37 +205,49 @@ pub fn show(
                 .max_height(available_height)
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
-                    ui.vertical_centered(|ui| {
-                        if let Some(logo) = logo {
-                            ui.add(
-                                egui::Image::new(logo)
-                                    .fit_to_exact_size(Vec2::splat((if screen.height() < 800.0 { 32.0 } else { 64.0 }) * layout.scale)),
-                            );
-                        }
-                        ui.label(RichText::new("Waters Roux").size(28.0 * layout.text_scale).strong().color(p.ink));
-                        ui.label(
-                            RichText::new(crate::ui::login::client_tagline())
-                                .size(13.0 * layout.text_scale)
-                                .color(p.violet_pale),
-                        );
-                        ui.add_space(8.0);
-                        if first_account {
+                    let brand = |ui: &mut egui::Ui| {
+                        ui.vertical_centered(|ui| {
+                            if let Some(logo) = logo {
+                                ui.add(egui::Image::new(logo).fit_to_exact_size(
+                                    Vec2::new(logo.aspect_ratio(), 1.0)
+                                        * (if screen.height() < 800.0 { 86.0 } else { 138.0 })
+                                        * layout.scale,
+                                ));
+                            }
                             ui.label(
-                                RichText::new(aurora_i18n::tr!("login-accounts-first-title"))
-                                    .size(20.0 * layout.text_scale)
+                                RichText::new(aurora_i18n::tr!("waters-roux-name"))
+                                    .size(28.0 * layout.text_scale)
                                     .strong()
                                     .color(p.ink),
                             );
-                        }
-                        ui.add_space(10.0);
-                    });
+                            ui.label(
+                                RichText::new(crate::ui::login::client_tagline())
+                                    .size(13.0 * layout.text_scale)
+                                    .color(p.violet_pale),
+                            );
+                            ui.add_space(8.0);
+                            if first_account {
+                                ui.label(
+                                    RichText::new(aurora_i18n::tr!("login-accounts-first-title"))
+                                        .size(20.0 * layout.text_scale)
+                                        .strong()
+                                        .color(p.ink),
+                                );
+                            }
+                            ui.add_space(10.0);
+                        });
+                    };
+                    if !first_account {
+                        brand(ui);
+                    }
                     if first_account {
                         ui.horizontal(|ui| {
-                            ui.add_space(((ui.available_width() - 372.0) / 2.0).max(0.0));
+                            ui.add_space(((ui.available_width() - 500.0_f32.min(layout.main_width)) / 2.0).max(0.0));
                             ui.vertical(|ui| {
-                                ui.set_width(372.0);
+                                ui.set_width(500.0_f32.min(layout.main_width));
                                 let response = super::card(ui, p, 16, true, |ui| {
-                                    ui.set_width(340.0);
+                                    ui.set_width((500.0_f32.min(layout.main_width) - 34.0).max(240.0));
+                                    brand(ui);
                                     super::credentials_form::content(ui, p, icons, settings, form, true, progress)
                                 });
                                 card_rect = response.response.rect;

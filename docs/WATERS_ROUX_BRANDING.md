@@ -82,3 +82,23 @@ authentication flow, grid selection, version calculation, and live status.
 
 **Status:** First glass-theme coding stage only. The application is not yet a
 fully rebranded or validated Waters Roux release.
+
+## Branded beta implementation — November 9, 2026
+
+The first-account form is now one rounded glass card with the identity above
+its live controls; existing accounts retain their tested carousel. The logo's
+aspect ratio is preserved. Pale emphasis labels now use readable muted rose
+on light glass. Login frames use the Bayou Gold accent. Opacity remains
+10–100%, saved in the existing interface-color settings; High Contrast uses
+its existing opaque palette.
+
+The login has a temporary procedural bayou dusk image while the approved
+standalone background is unavailable. The panel samples a blurred copy of
+that same image with UVs aligned to the scenery and rounded texture corners.
+This is explicitly temporary artwork, not the approved reference background.
+
+The owner approved public publication of the exact supplied logo in chat on
+November 9, 2026. Its original downloadable PNG is still needed in the workspace.
+The build supports exact-byte embedding and external PNG loading. It never
+substitutes the Aurora emblem. Without the PNG/ICO the beta uses its text name
+and Windows' default application icon, with `MISSING-ARTWORK.txt` in the package.

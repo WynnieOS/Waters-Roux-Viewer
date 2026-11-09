@@ -3,10 +3,14 @@ name: Waters Roux — Windows verification
 # Build validation for the independent Waters Roux viewer fork.
 # No credentials, login, releases or downloads; it never connects to a grid.
 on:
+  push:
+    branches: [feat/waters-roux-branded-beta]
   pull_request:
     paths:
       - '.github/workflows/waters-roux-verify.yml'
       - 'crates/**'
+      - 'assets/branding/**'
+      - 'scripts/package*.ps1'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -42,9 +46,22 @@ jobs:
       - name: Validate formatting
         shell: pwsh
         run: cargo fmt --all -- --check
+      - name: Clippy with warnings as errors
+        shell: pwsh
+        run: cargo clippy --locked --profile ci --workspace --all-targets -- -D warnings
       - name: Check viewer and all tests
         shell: pwsh
         run: cargo check --locked --profile ci --all-targets -p aurora-viewer
       - name: Run Waters Roux brand and glass tests
         shell: pwsh
-        run: cargo test --locked --profile ci -p aurora-viewer waters_roux_
+        run: cargo test --locked --profile ci --workspace waters_roux_
+      - name: Login, glass and profile regression tests
+        shell: pwsh
+        run: |
+          cargo test --locked --profile ci --workspace ui::login
+          cargo test --locked --profile ci --workspace interface_colors
+          cargo test --locked --profile ci --workspace credentials
+          cargo test --locked --profile ci --workspace ui::theme_guard
+          cargo test --locked --profile ci --workspace ui::quick_prefs
+          cargo test --locked --profile ci --workspace cli::tests
+          cargo test --locked --profile ci --workspace ui::about

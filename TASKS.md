@@ -1,3 +1,9 @@
+## Waters Roux branded Windows beta
+
+- 🔧 Branded portable beta (2026-11-09, task `branded-beta`): retain PR #1's glass foundation and PR #2's Quick Preferences; new first-account glass card, readable rose/slate text, temporary bayou dusk background with matching blurred glass, translated prominent application branding, embedded original-logo support without Aurora emblem fallback, Windows resource identity, and isolated portable profile/vault scope. Verification in progress; no merge or production release authorized.
+  - ⬜ Original logo PNG/derived ICO and approved standalone background are not available as workspace files; do not reconstruct them from the reference screenshot.
+  - ⬜ Human acceptance of the new Windows artifact, including real-grid authentication, keyboard navigation, 10–100% glass opacity, restart persistence and high contrast.
+
 # Aurora Viewer — task tracking
 
 - ✅ Preferences resets ask first (human request, 2026-11-09; task `options-reset-confirm`; no issue; [PR #3043](https://github.com/Aurora-Viewer/Aurora-Viewer/pull/3043); validated by the human in demo on 2026-11-09): "Reset everything…", "Reset <page>…" and the modified view's "Reset them all…" open a "Reset …?" dialog (`widgets::Modal`, Reset / Cancel, Escape cancels) before anything changes; the 8-second Undo still follows the reset. The dialog's titles and the page text are the ones the per-section reset of PR #317 had, unused since the redesign of PR #793. Like the Legacy Viewer, whose "Reset all settings" asks too (LLFloaterPreference::onClickClearSettings, indra/newview/llfloaterpreference.cpp). Demo: `AURORA_DEMO_OPTIONS=<page>:reset-ask|reset-all-ask|modified-ask`.

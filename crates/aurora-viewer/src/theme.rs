@@ -83,8 +83,8 @@ impl Theme {
             bar: "#BDD7D8".into(),          // approved powder blue
             field: "#F1F7F7".into(),        // approved cloud white
             raised: "#DDD3D3".into(),       // approved warm stone
-            violet_light: "#F7CBCA".into(), // approved blush pink
-            violet_pale: "#F7CBCA".into(),
+            violet_light: "#815168".into(), // readable rose emphasis on light glass
+            violet_pale: "#815168".into(),
             ink: "#23363A".into(), // dark ink for light glass
             muted: "#415A5D".into(),
             muted_dim: "#5D6B6B".into(),

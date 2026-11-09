@@ -345,3 +345,20 @@ fn waters_roux_glass_opacity_is_a_saved_palette_choice() {
     assert_eq!(apply(skin, &opaque).panel_alpha, 255);
     assert!(!transparent.is_default());
 }
+
+#[test]
+fn waters_roux_readable_labels_and_saved_opacity_endpoints() {
+    let skin = Theme::waters_roux().skin_palette();
+    for ink in [skin.ink, skin.muted, skin.violet_pale] {
+        assert!(contrast(ink, skin.panel) >= 4.5, "{ink:?} must read on bayou glass tint");
+    }
+    for alpha in [26, 172, 255] {
+        let saved = InterfaceColors {
+            glass_alpha: Some(alpha),
+            ..Default::default()
+        };
+        let bytes = serde_json::to_vec(&saved).expect("serialize interface choices");
+        let restored: InterfaceColors = serde_json::from_slice(&bytes).expect("restore interface choices");
+        assert_eq!(apply(skin, &restored).panel_alpha, alpha);
+    }
+}

@@ -22,6 +22,13 @@ fn main() {
         .unwrap_or_default();
     println!("cargo:rustc-env=AURORA_BUILD_PROFILE={dir}");
     dictionaries();
+    // Keep the exact approved bytes in the executable as well as the package.
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("Cargo supplies CARGO_MANIFEST_DIR");
+    let logo = Path::new(&manifest).join("../../assets/branding/waters-roux-logo.png");
+    println!("cargo:rerun-if-changed={}", logo.display());
+    let embedded = Path::new(&out).join("waters-roux-logo.png");
+    let bytes = std::fs::read(&logo).unwrap_or_default();
+    std::fs::write(embedded, bytes).expect("the build folder is writable");
 
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         windows_resources();
@@ -74,7 +81,7 @@ fn dictionaries() {
 /// release must not ship without its icon again.
 fn windows_resources() {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("Cargo supplies CARGO_MANIFEST_DIR");
-    let icon = Path::new(&manifest).join("../../assets/branding/aurora.ico");
+    let icon = Path::new(&manifest).join("../../assets/branding/waters-roux.ico");
     println!("cargo:rerun-if-changed={}", icon.display());
 
     let display = std::env::var("DEP_AURORA_VERSION_DISPLAY").expect("aurora-version's build script supplies the version");
@@ -87,10 +94,14 @@ fn windows_resources() {
         .fold(0u64, |acc, part| (acc << 16) | part.parse::<u64>().unwrap_or(0).min(0xFFFF));
 
     let mut res = winresource::WindowsResource::new();
-    res.set_icon(&icon.to_string_lossy())
-        .set("ProductName", "Aurora Viewer")
-        .set("FileDescription", "Aurora Viewer")
-        .set("OriginalFilename", "aurora-viewer.exe")
+    if icon.is_file() {
+        res.set_icon(&icon.to_string_lossy());
+    } else {
+        println!("cargo:warning=Original Waters Roux icon is missing; development preview uses the system application icon");
+    }
+    res.set("ProductName", "Waters Roux Viewer")
+        .set("FileDescription", "Waters Roux Viewer — Development Preview")
+        .set("OriginalFilename", "waters-roux-viewer.exe")
         .set("ProductVersion", &display)
         .set("FileVersion", &display)
         .set_version_info(winresource::VersionInfo::PRODUCTVERSION, packed)

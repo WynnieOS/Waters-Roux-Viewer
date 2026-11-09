@@ -120,7 +120,7 @@ pub fn release_notes(version: &str) -> Option<String> {
 /// its English labels).
 pub fn copy_text(sections: &[Section]) -> String {
     let version = aurora_version::version();
-    let mut out = format!("Aurora Viewer {version}\n");
+    let mut out = format!("Waters Roux Viewer {version}\n");
     if let Some(url) = release_notes(version) {
         out.push_str(&format!("Release notes: {url}\n"));
     }
@@ -255,11 +255,14 @@ fn hero(ui: &mut egui::Ui, p: &Palette, logo: Option<&egui::TextureHandle>) {
     child.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 18.0;
         if let Some(logo) = logo {
-            logo_rect = Some(ui.add(egui::Image::new(logo).fit_to_exact_size(Vec2::splat(LOGO))).rect);
+            logo_rect = Some(
+                ui.add(egui::Image::new(logo).fit_to_exact_size(Vec2::new(logo.aspect_ratio(), 1.0) * LOGO))
+                    .rect,
+            );
         }
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = 4.0;
-            ui.label(sheet::semibold(ui, "Aurora Viewer", 22.0, p.ink));
+            ui.label(sheet::semibold(ui, aurora_i18n::tr!("waters-roux-name"), 22.0, p.ink));
             ui.label(RichText::new(crate::ui::login::client_tagline()).size(12.0).color(p.violet_pale));
             ui.add(
                 egui::Label::new(
@@ -357,6 +360,7 @@ fn licences(ui: &mut egui::Ui, p: &Palette, to_end: bool) {
             let mut card = sheet::card_begin(ui);
             let c = &mut card.child;
             sheet::card_title(c, p, "license", aurora_i18n::tr!("about-licence-title"), None);
+            c.label(aurora_i18n::tr!("waters-roux-upstream"));
             c.add_space(6.0);
             c.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
@@ -457,7 +461,7 @@ mod tests {
         ];
         let text = copy_text(&sections);
         let blocks: Vec<&str> = text.split("\n\n").collect();
-        assert!(blocks[0].starts_with(&format!("Aurora Viewer {}", aurora_version::version())));
+        assert!(blocks[0].starts_with(&format!("Waters Roux Viewer {}", aurora_version::version())));
         assert_eq!(
             blocks[1],
             format!(

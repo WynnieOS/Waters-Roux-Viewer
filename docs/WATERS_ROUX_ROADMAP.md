@@ -84,3 +84,18 @@ yet recorded** in this document. The source is not yet a released binary.
 Development branches:
 - `feature/waters-roux-glass-foundation`
 - PR: <https://github.com/WynnieOS/Waters-Roux-Viewer/pull/1>
+
+## Owner-tested preview and current beta — November 9, 2026
+
+The owner reports successful Windows login to Second Life, avatar/world
+rendering, inventory, camera, movement, communications, Quick Preferences
+and initial glass preferences in the preceding preview. This supersedes the
+initial "not tested" status above for that preview only; the new branded beta
+requires fresh human validation.
+
+The beta branch integrates the existing glass and Quick Preferences work,
+adds the branded first-account glass layout and isolated portable package,
+and preserves all upstream license notices. PR #3's test-only constant warning
+is fixed separately on its existing branch; its workspaces are not silently
+merged into the beta. Original downloadable logo/background files remain
+artwork blockers until supplied. Build results will be recorded after checks.

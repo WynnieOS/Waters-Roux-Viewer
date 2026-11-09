@@ -11,7 +11,7 @@ pub const NEW_ISSUE: &str = "https://github.com/WynnieOS/Waters-Roux-Viewer/pull
 /// (`scripts/build-wiki.ps1`): Help › Aurora Viewer wiki.
 pub const WIKI: &str = "https://github.com/Aurora-Viewer/Aurora-Viewer/wiki";
 /// Community Discord invite.
-pub const DISCORD: &str = "https://discord.gg/TK4nbMGmKt";
+pub const DISCORD: &str = "";
 /// Temporary project home, until a dedicated Waters Roux website exists.
 pub const WEBSITE: &str = "https://github.com/WynnieOS/Waters-Roux-Viewer";
 /// The privacy policy on the website (Preferences › Privacy › Your data).
@@ -20,7 +20,7 @@ pub const PRIVACY_POLICY: &str = "https://aurora-viewer.org/privacy/";
 /// `<language>.md` per UI language (`news/` at the repository root). The
 /// viewer keeps what it read in its cache as a JSON array of
 /// `{"date", "title", "summary", "url"}`.
-pub const NEWS_FEED: &str = "https://raw.githubusercontent.com/WynnieOS/Waters-Roux-Viewer/main/news/";
+pub const NEWS_FEED: &str = "https://raw.githubusercontent.com/WynnieOS/Waters-Roux-Viewer/feat/waters-roux-branded-beta/news/";
 /// Files of the source repository as GitHub serves them unrendered; a branch
 /// name and a path follow.
 pub const RAW_FILES: &str = "https://raw.githubusercontent.com/WynnieOS/Waters-Roux-Viewer/";

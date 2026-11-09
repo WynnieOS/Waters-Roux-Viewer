@@ -3,10 +3,14 @@ name: Waters Roux — Windows preview
 # This is intentionally a development preview, never a public release or
 # installer. Do not trigger upstream Aurora's tag/release workflows.
 on:
+  push:
+    branches: [feat/waters-roux-branded-beta]
   pull_request:
     paths:
       - '.github/workflows/waters-roux-preview.yml'
       - 'crates/**'
+      - 'assets/branding/**'
+      - 'scripts/package*.ps1'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -43,22 +47,13 @@ jobs:
       - name: Assemble development preview
         shell: pwsh
         run: |
-          ./scripts/package.ps1 -Exe target/release/aurora-viewer.exe -Out Waters-Roux-Viewer-Preview
-          @'
-          WATERS ROUX VIEWER — DEVELOPMENT PREVIEW
-
-          This is NOT a production release. It uses the inherited Aurora
-          executable name and packaging metadata until independent
-          packaging, app identification, and all supplied art are integrated.
-
-          Use a test profile; do not rely on this build for critical work.
-          No installer or automatic update is included.
-          See LICENSE and NOTICE.md for redistributed source notices.
-          '@ | Set-Content -LiteralPath Waters-Roux-Viewer-Preview/DEVELOPMENT-PREVIEW.txt -Encoding utf8
+          $folder = "Waters-Roux-Beta-${{ github.run_number }}-${{ github.sha }}"
+          ./scripts/package-waters-roux-preview.ps1 -Exe target/release/aurora-viewer.exe -Out $folder
+          Compress-Archive -LiteralPath $folder -DestinationPath Waters-Roux-Windows-Beta.zip
       - name: Upload portable preview
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Waters-Roux-Viewer-Windows-Preview
-          path: Waters-Roux-Viewer-Preview/
-          retention-days: 7
+          name: Waters-Roux-Windows-Beta-${{ github.run_number }}
+          path: Waters-Roux-Windows-Beta.zip
+          retention-days: 14
           compression-level: 6

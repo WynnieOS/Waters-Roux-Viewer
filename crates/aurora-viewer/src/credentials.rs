@@ -3,8 +3,8 @@
 //! the system credential store (Windows Credential Manager, protected by the
 //! user's session) instead of Firestorm's bin_conf.dat file.
 
-const SERVICE: &str = "Aurora Viewer";
-const MFA_SERVICE: &str = "Aurora Viewer MFA";
+const SERVICE: &str = "Waters Roux Viewer Beta";
+const MFA_SERVICE: &str = "Waters Roux Viewer Beta MFA";
 const MFA_LIFETIME: u64 = 30 * 24 * 60 * 60;
 
 /// Firestorm LLLoginInstance::saveMFAHash: separate protected map per user/grid.
@@ -37,7 +37,13 @@ pub fn now() -> u64 {
 
 /// Credential name: the grid and the user name (case-insensitive).
 fn account(grid: &str, username: &str) -> String {
-    format!("{}|{}", grid.trim(), username.trim().to_lowercase())
+    let identity = format!("{}|{}", grid.trim(), username.trim().to_lowercase());
+    if let Some(root) = crate::settings::portable_root() {
+        let scope = md5::compute(root.to_string_lossy().as_bytes());
+        format!("{identity}|{scope:x}")
+    } else {
+        identity
+    }
 }
 
 /// The credential store's entries of one saved login, as (service, account):

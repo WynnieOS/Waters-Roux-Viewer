@@ -1,3 +1,24 @@
+# Waters Roux Viewer — Windows development beta
+
+This is the Waters Roux derivative of Aurora Viewer. The upstream viewer,
+authors and licenses are acknowledged below and in NOTICE.md.
+
+For the new portable Windows beta, download the artifact from the beta branch's
+**Waters Roux — Windows preview** Actions run, extract its inner ZIP into a new
+writable folder, and open **Launch Waters Roux.cmd**. The executable is
+`waters-roux-viewer.exe`; this package stores its profile beside itself and
+does not migrate or overwrite the preceding preview's settings. See
+`START-HERE.txt` and `BUILD-INFO.txt` in the download for build-specific details.
+This is a development preview, not a production release.
+
+Glass opacity: **Preferences → Appearance → Skin**, 10–100%, applied live and
+saved on exit. **Preferences → Accessibility → High Contrast** gives opaque
+panels. The login uses temporary bayou dusk art until the approved standalone
+background is supplied. Missing original-logo PNG/ICO files are explicitly
+reported in `MISSING-ARTWORK.txt`; no substitute logo is used.
+
+---
+
 <div align="center">
 
 <img src="assets/branding/aurora-logo.svg" alt="Aurora Viewer" width="180">
