@@ -17,6 +17,7 @@ pub enum Mode {
 }
 
 impl Mode {
+    #[cfg(test)]
     pub const ALL: [Mode; 3] = [Mode::Everyday, Mode::Studio, Mode::Creator];
 
     pub fn slug(self) -> &'static str {
