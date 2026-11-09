@@ -29,7 +29,9 @@ pub fn sidebar(ctx: &Context, p: &Palette, icons: &Icons, info: &LoginInfo, card
 
 fn version(ui: &mut egui::Ui, p: &Palette) {
     let label = format!("Waters Roux Viewer v{}", aurora_version::version());
-    ui.label(RichText::new(label).size(11.5).color(p.muted_dim));
+    super::card(ui, p, 6, false, |ui| {
+        ui.label(RichText::new(label).size(11.5).color(p.ink));
+    });
 }
 
 pub fn footer(ctx: &Context, p: &Palette, icons: &Icons, info: &LoginInfo, sidebar_visible: bool, form: &mut LoginForm) -> LoginAction {
@@ -65,7 +67,7 @@ pub fn footer(ctx: &Context, p: &Palette, icons: &Icons, info: &LoginInfo, sideb
             ui.label(
                 RichText::new(aurora_i18n::tr!("ui-login-join-the-community"))
                     .size(11.5)
-                    .color(p.muted),
+                    .color(if p.high_contrast { p.ink } else { p.field }),
             );
             ui.add_space(4.0);
             ui.horizontal(|ui| {

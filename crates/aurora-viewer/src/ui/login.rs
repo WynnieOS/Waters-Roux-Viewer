@@ -131,8 +131,12 @@ pub enum LoginAction {
     Accessibility,
 }
 
-/// "Second Life client · Rust · <graphics API>" under the name (login
-/// screen, its carousel, About), with the API this build draws with.
+/// Public-facing identity under the name on the login screen.
+pub(crate) fn login_tagline() -> &'static str {
+    aurora_i18n::tr!("waters-roux-tagline")
+}
+
+/// Technical build description retained in About.
 pub(crate) fn client_tagline() -> &'static str {
     if cfg!(target_os = "macos") {
         aurora_i18n::tr!("ui-login-second-life-client-rust-metal")
@@ -551,9 +555,15 @@ fn glass_card<R>(
         } else {
             super::aurora_bg::frosted_pane(p, ctx.content_rect(), ctx.input(|i| i.time) as f32, rect, lights)
         };
-        let top = |height: f32| egui::Rect::from_min_size(rect.min, Vec2::new(rect.width(), height));
+        let inset = f32::from(frame.corner_radius.nw.max(frame.corner_radius.ne));
+        let top = |height: f32| {
+            egui::Rect::from_min_size(
+                rect.min + Vec2::new(inset, 0.0),
+                Vec2::new((rect.width() - 2.0 * inset).max(0.0), height),
+            )
+        };
         if accent {
-            shapes.push(strip(top(2.0), &[(0.0, p.violet), (1.0, p.teal)]));
+            shapes.push(strip(top(2.0), &[(0.0, p.amber), (1.0, p.rose)]));
         } else {
             let lit = p.ink.gamma_multiply(0.30);
             shapes.push(strip(
@@ -752,7 +762,7 @@ pub fn show(
                 }
                 ui.add_space(2.0);
                 ui.label(RichText::new(aurora_i18n::tr!("waters-roux-name")).size(34.0).strong().color(p.ink));
-                ui.label(RichText::new(client_tagline()).size(13.0).color(p.violet_pale));
+                ui.label(RichText::new(login_tagline()).size(13.0).color(p.violet_pale));
                 ui.add_space(18.0);
             });
             login_card = card(ui, p, 24, true, |ui| {

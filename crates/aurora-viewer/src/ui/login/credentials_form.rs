@@ -33,17 +33,19 @@ pub fn content(
     let enter = !grids_open && !egui::Popup::is_any_open(ui.ctx()) && widgets::enter_pressed(ui);
     let can = ui
         .add_enabled_ui(!form.busy && !grids_open, |ui| {
-            ui.label(
-                RichText::new(if new_account {
-                    aurora_i18n::tr!("login-accounts-add")
-                } else {
-                    &settings.username
-                })
-                .size(20.0)
-                .strong()
-                .color(p.ink),
-            );
-            ui.add_space(10.0);
+            if !new_account || !form.accounts.is_empty() {
+                ui.label(
+                    RichText::new(if new_account {
+                        aurora_i18n::tr!("login-accounts-add")
+                    } else {
+                        &settings.username
+                    })
+                    .size(20.0)
+                    .strong()
+                    .color(p.ink),
+                );
+                ui.add_space(10.0);
+            }
             let user = if new_account {
                 let mut options = Account::from_settings(settings, form.remember_mfa, None);
                 // the name typed so far: an account stored here offers its

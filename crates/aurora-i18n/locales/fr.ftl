@@ -13460,3 +13460,4 @@ waters-roux-name = Waters Roux Viewer
 waters-roux-upstream = Basé sur Aurora Viewer. Les mentions de droits et de licences sont conservées ci-dessous.
 waters-roux-glass-opacity = Opacité du verre
 waters-roux-glass-help = Les modifications sont immédiates. Activez Contraste élevé dans Accessibilité pour des panneaux opaques et lisibles.
+waters-roux-tagline = Visionneuse Second Life

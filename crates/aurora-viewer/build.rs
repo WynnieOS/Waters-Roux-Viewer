@@ -25,10 +25,15 @@ fn main() {
     // Keep the exact approved bytes in the executable as well as the package.
     let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("Cargo supplies CARGO_MANIFEST_DIR");
     let logo = Path::new(&manifest).join("../../assets/branding/waters-roux-logo.png");
-    println!("cargo:rerun-if-changed={}", logo.display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        Path::new(&manifest).join("../../assets/branding").display()
+    );
     let embedded = Path::new(&out).join("waters-roux-logo.png");
     let bytes = std::fs::read(&logo).unwrap_or_default();
-    std::fs::write(embedded, bytes).expect("the build folder is writable");
+    if std::fs::read(&embedded).ok().as_deref() != Some(bytes.as_slice()) {
+        std::fs::write(embedded, bytes).expect("the build folder is writable");
+    }
 
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         windows_resources();
@@ -82,7 +87,10 @@ fn dictionaries() {
 fn windows_resources() {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("Cargo supplies CARGO_MANIFEST_DIR");
     let icon = Path::new(&manifest).join("../../assets/branding/waters-roux.ico");
-    println!("cargo:rerun-if-changed={}", icon.display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        Path::new(&manifest).join("../../assets/branding").display()
+    );
 
     let display = std::env::var("DEP_AURORA_VERSION_DISPLAY").expect("aurora-version's build script supplies the version");
     let numeric = std::env::var("DEP_AURORA_VERSION_NUMERIC").expect("aurora-version's build script supplies the version");

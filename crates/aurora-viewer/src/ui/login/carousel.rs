@@ -221,7 +221,7 @@ pub fn show(
                                     .color(p.ink),
                             );
                             ui.label(
-                                RichText::new(crate::ui::login::client_tagline())
+                                RichText::new(crate::ui::login::login_tagline())
                                     .size(13.0 * layout.text_scale)
                                     .color(p.violet_pale),
                             );
@@ -1868,7 +1868,7 @@ mod tests {
                 aurora_i18n::tr!("ui-login-join-the-community"),
                 aurora_i18n::tr!("ui-login-version"),
                 aurora_i18n::tr!("ui-login-news"),
-                crate::ui::login::client_tagline(),
+                crate::ui::login::login_tagline(),
             ] {
                 assert!(text_rect(&output, label).is_some(), "missing {label}");
             }

@@ -68,3 +68,6 @@ jobs:
           cargo test --locked --profile ci --workspace ui::quick_prefs
           cargo test --locked --profile ci --workspace cli::tests
           cargo test --locked --profile ci --workspace ui::about
+          cargo test --locked --profile ci --workspace high_contrast
+          cargo test --locked --profile ci --workspace uninstall
+          cargo test --locked --profile ci --workspace ui::news

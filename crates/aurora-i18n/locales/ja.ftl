@@ -13437,3 +13437,4 @@ waters-roux-name = Waters Roux Viewer
 waters-roux-upstream = Aurora Viewer を基に開発。著作権とライセンスの表示は以下に保持されています。
 waters-roux-glass-opacity = ガラスの不透明度
 waters-roux-glass-help = 変更はすぐに反映されます。読みやすい不透明なパネルには、アクセシビリティのハイコントラストを使用してください。
+waters-roux-tagline = Second Life ビューアー
