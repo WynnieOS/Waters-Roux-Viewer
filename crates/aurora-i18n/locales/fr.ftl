@@ -13454,3 +13454,11 @@ ui-options-attached-particles-hint = Affiche les particules de ce que portent le
 # Preferences › Graphics: progressive draw distance (FSRenderFarClipStepping)
 ui-options-draw-distance-stepping = Distance d'affichage progressive
 ui-options-draw-distance-stepping-hint = Après la connexion et après une téléportation vers une autre région, la distance d'affichage part de 32 m et double jusqu'à la vôtre, pour que ce qui est proche se charge d'abord.
+
+# Modes d'espace de travail Waters Roux (Préférences > Disposition)
+waters-roux-workspaces = Espaces de travail Waters Roux
+waters-roux-workspace = Espace de travail actif
+waters-roux-workspace-help = Passez à une disposition enregistrée. Chaque mode conserve la position de ses fenêtres et ses panneaux ouverts.
+waters-roux-everyday = Quotidien
+waters-roux-studio = Studio
+waters-roux-creator = Création
