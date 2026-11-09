@@ -474,8 +474,8 @@ mod tests {
             ("http://localhost:8123/news/", "http://localhost:8123/news/", true),
             ("http://[::1]:8123/news", "http://[::1]:8123/news/", true),
             (
-                " https://raw.githubusercontent.com/Aurora-Viewer/Aurora-Viewer/feat/actualites-md/news ",
-                "https://raw.githubusercontent.com/Aurora-Viewer/Aurora-Viewer/feat/actualites-md/news/",
+                " https://raw.githubusercontent.com/WynnieOS/Waters-Roux-Viewer/feat/actualites-md/news ",
+                "https://raw.githubusercontent.com/WynnieOS/Waters-Roux-Viewer/feat/actualites-md/news/",
                 false,
             ),
         ] {

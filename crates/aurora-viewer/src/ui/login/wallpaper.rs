@@ -5,7 +5,7 @@
 //! There is no fabricated grid state, account detail or login form in this art.
 //! A simple palette-based bayou dusk illustration is the temporary fallback.
 use crate::theme::Palette;
-use egui::{Color32, Context, Id, Painter, Pos2, Rect, Shape, TextureHandle, TextureOptions};
+use egui::{Context, Id, Painter, Pos2, Rect, Shape, TextureHandle, TextureOptions};
 use std::path::PathBuf;
 
 const FILE: &str = "waters-roux-background.png";
@@ -130,7 +130,7 @@ impl Wallpaper {
         if let Some(frosted) = &self.frosted {
             ctx.data_mut(|data| data.insert_temp(context_id(), frosted.clone()));
         }
-        painter.image(image.id(), screen, cover_uv(image.size(), screen), Color32::WHITE);
+        painter.image(image.id(), screen, cover_uv(image.size(), screen), crate::ui::widgets::PICTURE_TINT);
         true
     }
 }
@@ -148,7 +148,7 @@ pub fn frosted_shape(ctx: &Context, screen: Rect, pane: Rect, radius: egui::Corn
     };
     let uv = Rect::from_min_max(at(pane.min), at(pane.max));
     Some(
-        egui::epaint::RectShape::filled(pane, radius, Color32::WHITE)
+        egui::epaint::RectShape::filled(pane, radius, crate::ui::widgets::PICTURE_TINT)
             .with_texture(texture.id(), uv)
             .into(),
     )

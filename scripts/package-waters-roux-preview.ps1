@@ -12,6 +12,7 @@ if (-not (Test-Path $logo) -or -not (Test-Path $icon)) {
 }
 if (Test-Path -LiteralPath $Out) { throw 'Choose a new output folder; existing previews are never overwritten.' }
 & (Join-Path $PSScriptRoot 'package.ps1') -Exe $Exe -Out $Out
+New-Item -ItemType Directory -Force -Path (Join-Path $Out 'assets/branding') | Out-Null
 Move-Item -LiteralPath (Join-Path $Out 'aurora-viewer.exe') -Destination (Join-Path $Out 'waters-roux-viewer.exe')
 if (Test-Path $icon) { Copy-Item -LiteralPath $icon -Destination (Join-Path $Out 'assets/branding/waters-roux.ico') }
 'Waters Roux portable development profile v1' | Set-Content -LiteralPath (Join-Path $Out 'waters-roux-portable.txt') -Encoding utf8

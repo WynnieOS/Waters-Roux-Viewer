@@ -12,7 +12,7 @@
 use aurora_assets::sealed::Key;
 use std::path::Path;
 
-const SERVICE: &str = "Aurora Viewer cache";
+const SERVICE: &str = "Waters Roux Viewer Beta cache";
 const ACCOUNT: &str = "disk cache key v1";
 const FILE: &str = "cache.key";
 /// The credential store's entry of the key (service, account), for the
@@ -25,7 +25,8 @@ pub fn load() -> Key {
         return Key::random().unwrap_or_else(|| Key::from_bytes([0x5a; 32]));
     }
     let started = std::time::Instant::now();
-    if aurora_updater::test_environment().is_none()
+    if crate::settings::portable_root().is_none()
+        && aurora_updater::test_environment().is_none()
         && let Some(key) = from_store()
     {
         log::info!("cache key: credential store ({} ms)", started.elapsed().as_millis());
