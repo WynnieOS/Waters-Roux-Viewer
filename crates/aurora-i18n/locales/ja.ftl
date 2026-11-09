@@ -13431,3 +13431,11 @@ ui-options-attached-particles-hint = アバターが装着しているものの�
 # Preferences › Graphics: progressive draw distance (FSRenderFarClipStepping)
 ui-options-draw-distance-stepping = 描画距離を段階的に広げる
 ui-options-draw-distance-stepping-hint = ログイン後と別のリージョンへのテレポート後、描画距離を32mから始めて設定値まで倍々に広げ、近くのものから読み込みます。
+
+# Waters Roux ワークスペース（環境設定 > レイアウト）
+waters-roux-workspaces = Waters Roux ワークスペース
+waters-roux-workspace = 現在のワークスペース
+waters-roux-workspace-help = 保存されたレイアウトに切り替えます。モードごとにウィンドウの配置と開いているパネルを記憶します。
+waters-roux-everyday = 日常
+waters-roux-studio = スタジオ
+waters-roux-creator = 制作

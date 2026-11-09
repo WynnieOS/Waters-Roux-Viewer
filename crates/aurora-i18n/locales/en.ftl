@@ -13458,3 +13458,11 @@ ui-options-attached-particles-hint = Draw the particles of what avatars wear: sp
 # Preferences › Graphics: progressive draw distance (FSRenderFarClipStepping)
 ui-options-draw-distance-stepping = Progressive draw distance
 ui-options-draw-distance-stepping-hint = After logging in and after a teleport to another region, the draw distance starts at 32 m and doubles back up to yours, so that what is near loads first.
+
+# Waters Roux workspace modes (Preferences > Layout)
+waters-roux-workspaces = Waters Roux workspaces
+waters-roux-workspace = Active workspace
+waters-roux-workspace-help = Switch to a saved arrangement. Each mode remembers its own window positions and relevant open panels.
+waters-roux-everyday = Everyday
+waters-roux-studio = Studio
+waters-roux-creator = Creator
