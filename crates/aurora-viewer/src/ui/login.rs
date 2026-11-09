@@ -494,6 +494,11 @@ fn glass_card<R>(
     let behind = (ui.painter().clone(), ui.painter().add(egui::Shape::Noop));
     let mut pane = None;
     let mut frame = widgets::overlay_frame(ui.ctx(), p);
+    if p.panel_alpha < 255 {
+        // The frosted image is tinted below at the selected opacity.
+        // Do not tint the frame a second time and obscure the scenery.
+        frame.fill = Color32::TRANSPARENT;
+    }
     frame.stroke.color = edge.unwrap_or_else(|| frame.stroke.color.lerp_to_gamma(p.violet_pale, hover * 0.7));
     let response = frame.inner_margin(Margin::same(margin)).show(ui, |ui| {
         pane = Some((ui.painter().clone(), ui.painter().add(egui::Shape::Noop)));
