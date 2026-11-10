@@ -13658,6 +13658,17 @@ impl App {
                 self.ik_editor.open_poser();
                 ui::widgets::open_floater(&self.egui_ctx, "poser", &mut self.ik_editor.open);
             }
+            BarAction::PoseStand => {
+                if !self.in_world() || self.world.agent.is_sitting() {
+                    self.world.system_message("Stand up before starting Pose Stand.".to_owned());
+                } else {
+                    // A self-only pose entry point, deliberately distinct
+                    // from the general Poser which may target consenting peers.
+                    self.ik_editor.open_poser();
+                    self.ik_editor.select_pose_subject(&self.world, self.world.agent_id);
+                    ui::widgets::open_floater(&self.egui_ctx, "poser", &mut self.ik_editor.open);
+                }
+            }
             // a minimized poser expands, a shown one closes as its cross
             // does (FSFloaterPoser::onClose)
             BarAction::TogglePoser => {
