@@ -208,7 +208,13 @@ pub fn show(
                     let brand = |ui: &mut egui::Ui| {
                         ui.vertical_centered(|ui| {
                             if logo.is_some() {
-                                let height = (screen.height() * 0.22).clamp(100.0, 220.0);
+                                // Compact headers keep the login/MFA submit and saved-card
+                                // controls visible before the bottom action bar.
+                                let height = if screen.height() < 800.0 {
+                                    112.0
+                                } else {
+                                    (screen.height() * 0.22).clamp(100.0, 220.0)
+                                };
                                 let (bounds, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), height), egui::Sense::hover());
                                 super::super::branding_runtime::paint_logo(ui.ctx(), ui.painter(), bounds, false, logo, 1.0);
                             }
@@ -1608,7 +1614,9 @@ mod tests {
         fn strips(shape: &egui::Shape, result: &mut Vec<Rect>) {
             match shape {
                 egui::Shape::Vec(shapes) => shapes.iter().for_each(|shape| strips(shape, result)),
-                egui::Shape::Mesh(mesh) if mesh.vertices.len() == 4 && (mesh.calc_bounds().height() - 2.0).abs() < 0.1 => {
+                egui::Shape::Mesh(mesh)
+                    if mesh.vertices.len() == 6 && (mesh.calc_bounds().height() - 1.0).abs() < 0.1 && mesh.vertices[0].color.a() > 0 =>
+                {
                     result.push(mesh.calc_bounds());
                 }
                 _ => {}

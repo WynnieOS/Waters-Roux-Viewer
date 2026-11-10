@@ -516,7 +516,10 @@ fn glass_card<R>(
         if p.high_contrast {
             frame.stroke.color
         } else {
-            p.field.lerp_to_gamma(p.bar, 0.4 + hover * 0.2).gamma_multiply(0.25 + glow * 0.4)
+            p.field
+                .lerp_to_gamma(p.bar, 0.4)
+                .lerp_to_gamma(p.ink, hover * 0.15)
+                .gamma_multiply(0.25 + glow * 0.4)
         }
     });
     let response = frame.inner_margin(Margin::same(margin)).show(ui, |ui| {

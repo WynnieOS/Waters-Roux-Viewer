@@ -248,7 +248,7 @@ impl QuickPrefsUi {
                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
                 // The user may show, hide and reorder optional rows. Core
                 // controls below remain visible in every configuration.
-                self.row_editor.show(ui);
+                self.row_editor.show(ui, p);
                 for slot in self.row_editor.visible.iter().copied() {
                     out.changed |= slot_row(ui, p, settings, slot);
                 }
@@ -507,11 +507,11 @@ mod tests {
         assert_eq!(NameTags::of(&s), NameTags::On);
     }
 
-    /// The window keeps its size, the environment block's status line, its
-    /// last text, inside it.
+    /// The window keeps its size and the environment block's final action
+    /// visible, including when large text hides the optional status line.
     #[test]
     fn the_window_keeps_its_size() {
-        let status = aurora_i18n::tr!("ui-environment-skies-waters-day-cycles", value0 = "0", value1 = "0", value2 = "0");
+        let status = aurora_i18n::tr!("common-personal-lighting");
         crate::ui::widgets::steady_tests::assert_window_steady(
             WINDOW,
             &[egui::vec2(WIDTH, 420.0)],

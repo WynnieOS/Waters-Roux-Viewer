@@ -22,7 +22,8 @@ permissions:
 
 concurrency:
   group: waters-roux-preview-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/feat/waters-roux-beta27' }}
+  # Finish the current portable build so a follow-up can reuse its release cache.
+  cancel-in-progress: false
 
 jobs:
   preview:
