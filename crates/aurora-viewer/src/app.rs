@@ -17242,6 +17242,19 @@ impl App {
                         }
                     }
                 }
+                if let Some(action) =
+                    ui::region_tracker::show(&ctx, &p, &mut self.panels.region_tracker, self.world.tp_history.session())
+                {
+                    match action {
+                        ui::region_tracker::Action::OpenHistory => {
+                            self.panels.places = true;
+                            self.places_ui.open_tab(ui::places::TAB_HISTORY);
+                        }
+                        ui::region_tracker::Action::OpenMap => {
+                            ui::widgets::open_floater(&ctx, "worldmap", &mut self.panels.world_map);
+                        }
+                    }
+                }
                 self.movelock_window(&ctx, &p);
                 self.follow_window(&ctx, &p);
                 self.portals_window(&ctx, &p);
