@@ -1,4 +1,4 @@
-<# Waters Roux Viewer Beta 27 portable development packaging; never a production release. #>
+﻿<# Waters Roux Viewer Beta 27 portable development packaging; never a production release. #>
 param(
     [Parameter(Mandatory)][string]$Exe,
     [Parameter(Mandatory)][string]$Out
