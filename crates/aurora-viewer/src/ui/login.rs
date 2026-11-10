@@ -564,7 +564,14 @@ fn glass_card<R>(
             )
         };
         if accent {
-            shapes.push(strip(top(2.0), &[(0.0, p.amber), (1.0, p.rose)]));
+            shapes.push(strip(
+                top(1.0),
+                &[
+                    (0.0, p.rose.gamma_multiply(0.45)),
+                    (0.5, p.field.gamma_multiply(0.65)),
+                    (1.0, p.bar.gamma_multiply(0.45)),
+                ],
+            ));
         } else {
             let lit = p.ink.gamma_multiply(0.30);
             shapes.push(strip(
@@ -756,9 +763,8 @@ pub fn show(
             ui.set_width(card_w);
             ui.vertical_centered(|ui| {
                 if let Some(l) = logo {
-                    let r = ui
-                        .add(egui::Image::new(l).fit_to_exact_size(Vec2::new(logo_size * l.aspect_ratio(), logo_size)))
-                        .rect;
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(card_w, logo_size), Sense::hover());
+                    super::branding_runtime::paint_logo(&ctx, ui.painter(), r, false, Some(l), 1.0);
                     // soft light behind the logo (additive)
                     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::unique("halo")));
                     super::aurora_bg::radial_glow(&painter, r.center(), 150.0, p.violet, 0.42);
