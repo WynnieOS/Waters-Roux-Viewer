@@ -503,6 +503,7 @@ fn glass_card<R>(
     edge: Option<Color32>,
     body: impl FnOnce(&mut egui::Ui) -> R,
 ) -> egui::InnerResponse<R> {
+    let glow = super::branding_runtime::current(ui.ctx()).glass.glow;
     let behind = (ui.painter().clone(), ui.painter().add(egui::Shape::Noop));
     let mut pane = None;
     let mut frame = widgets::overlay_frame(ui.ctx(), p);
@@ -515,7 +516,7 @@ fn glass_card<R>(
         if p.high_contrast {
             frame.stroke.color
         } else {
-            p.amber.lerp_to_gamma(p.rose, hover * 0.5)
+            p.field.lerp_to_gamma(p.bar, 0.4 + hover * 0.2).gamma_multiply(0.25 + glow * 0.4)
         }
     });
     let response = frame.inner_margin(Margin::same(margin)).show(ui, |ui| {
@@ -527,19 +528,19 @@ fn glass_card<R>(
         let outer = response.response.rect;
         // inside the border of the frame
         let rect = outer.shrink(1.0);
-        let strength = if accent { 1.0 } else { 0.6 } + hover * 0.45;
+        let strength = (if accent { 1.0 } else { 0.6 } + hover * 0.45) * glow;
         let lights = vec![
             super::aurora_bg::radial_glow_shape(
                 outer.left_top() + Vec2::new(outer.width() * 0.18, outer.height() * 0.12),
                 outer.width() * 0.95,
-                p.violet,
-                0.24 * strength,
+                p.rose,
+                0.10 * strength,
             ),
             super::aurora_bg::radial_glow_shape(
                 outer.right_bottom() - Vec2::new(outer.width() * 0.12, outer.height() * 0.14),
                 outer.width() * 0.8,
-                p.teal,
-                0.13 * strength,
+                p.bar,
+                0.10 * strength,
             ),
         ];
         behind.0.set(behind.1, egui::Shape::Vec(lights.clone()));
@@ -713,6 +714,8 @@ pub fn show(
     info: &LoginInfo,
     progress: Option<(&str, f32)>,
 ) -> LoginAction {
+    let selected_logo = super::branding_runtime::logo(ui.ctx(), false, logo);
+    let logo = selected_logo.as_ref();
     if form.accounts_loaded {
         return carousel::show(ui, p, icons, logo, settings, form, info, progress);
     }

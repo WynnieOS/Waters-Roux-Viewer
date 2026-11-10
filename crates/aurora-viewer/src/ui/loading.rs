@@ -124,6 +124,9 @@ pub const FADE_SECONDS: f32 = 0.7;
 pub fn draw_backdrop(ui: &egui::Ui, p: &Palette, backdrop: Option<&super::backdrop::Backdrop>) {
     let rect = ui.ctx().content_rect();
     let painter = ui.ctx().layer_painter(egui::LayerId::background());
+    if super::branding_runtime::paint_background(ui.ctx(), &painter, rect, p, true) {
+        return;
+    }
     if !backdrop.is_some_and(|b| b.paint(&painter, p, rect, 1.0)) {
         super::login::draw_background(ui, p);
     }
@@ -287,19 +290,22 @@ fn banner(
 
     // brand, top left
     let brand = Pos2::new(screen.left() + margin, screen.top() + margin * 0.85);
-    let mut brand_text = brand.x;
-    if let Some(l) = logo {
-        let size = 40.0 * k;
-        let rect = Rect::from_min_size(Pos2::new(brand.x, brand.y - size / 2.0), Vec2::new(size * l.aspect_ratio(), size));
+    let brand_text = brand.x;
+    let selected_logo = super::branding_runtime::logo(ctx, true, logo);
+    if let Some(l) = selected_logo.as_ref() {
+        let logo_bounds = Rect::from_min_max(
+            screen.min + Vec2::new(margin, margin * 1.5),
+            Pos2::new(screen.right() - margin, screen.top() + screen.height() * 0.60),
+        );
+        let rect = super::branding_runtime::logo_rect(ctx, true, logo_bounds, l);
         let breathe = 0.85 + 0.15 * (t * 1.4).sin();
-        super::aurora_bg::radial_glow(painter, rect.center(), size * 1.1, p.violet, 0.4 * breathe * a);
+        super::aurora_bg::radial_glow(painter, rect.center(), rect.height() * 1.1, p.violet, 0.4 * breathe * a);
         painter.image(
             l.id(),
             rect,
             Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
             super::widgets::PICTURE_TINT.gamma_multiply(a),
         );
-        brand_text = rect.right() + 12.0 * k;
     }
     painter.text(
         Pos2::new(brand_text, brand.y),
@@ -528,7 +534,9 @@ pub fn teleport_overlay(
     // new area for its first frame (sizing pass), and the world showed for
     // that frame between the loading screen and its fade out.
     let painter = ctx.layer_painter(layer).with_clip_rect(rect);
-    if !backdrop.is_some_and(|b| b.paint(&painter, p, rect, a)) {
+    if !super::branding_runtime::paint_background_alpha(ctx, &painter, rect, p, true, a)
+        && !backdrop.is_some_and(|b| b.paint(&painter, p, rect, a))
+    {
         super::aurora_bg::paint(&painter, p, rect, t, a);
     }
     banner(ctx, &painter, p, rect, logo, title, dest, detail, fraction, place, t, a);

@@ -12468,3 +12468,7 @@ before linking, for manual Ctrl+L and button checks. `link-denied,0,0` leaves on
 prim without Modify and attempts the same link: the refusal dialog must appear
 and both prims stay separate. Use `AURORA_DEMO_BUILD_STYLE=aurora|legacy` to
 compare the layouts and capture at frame 720 or later. These use no grid assets.
+
+### Waters Roux appearance editor
+
+`AURORA_DEMO_BRANDING=1` opens the real Login Appearance / Branding editor in offline demo mode. Combine with `AURORA_DEMO_LOGIN=first` to inspect it before authentication. This does not simulate a native file-picker result: choose images using the actual dialog, then test Preview, Apply, Cancel, Reset and restart persistence. See WATERS_ROUX_BETA27.md for the acceptance matrix.

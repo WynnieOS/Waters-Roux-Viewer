@@ -13,6 +13,8 @@ pub mod backdrop;
 pub mod bars;
 pub mod bidi;
 pub mod blacklist;
+pub mod branding;
+pub mod branding_runtime;
 pub mod bumps;
 pub mod sound_explorer;
 pub mod voice_controls;

@@ -4,13 +4,14 @@ name: Waters Roux — Windows verification
 # No credentials, login, releases or downloads; it never connects to a grid.
 on:
   push:
-    branches: [feat/waters-roux-branded-beta]
+    branches: [feat/waters-roux-branded-beta, feat/waters-roux-beta27]
   pull_request:
     paths:
       - '.github/workflows/waters-roux-verify.yml'
       - 'crates/**'
       - 'assets/branding/**'
       - 'scripts/package*.ps1'
+      - 'scripts/prepare-waters-roux-icon.ps1'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -58,6 +59,9 @@ jobs:
       - name: Run Waters Roux brand and glass tests
         shell: pwsh
         run: cargo test --locked --profile ci --workspace waters_roux_
+      - name: Independent artwork, validation and appearance transaction tests
+        shell: pwsh
+        run: cargo test --locked --profile ci --workspace branding
       - name: Login, glass and profile regression tests
         shell: pwsh
         run: |

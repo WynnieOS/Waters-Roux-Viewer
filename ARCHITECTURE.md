@@ -4564,3 +4564,7 @@ the portable root's digest. Extracting to a new folder cannot overwrite the
 previous preview's settings. Internal crate names and compatible file formats
 remain unchanged. Windows preview/verification workflows run on this beta
 branch without publishing a release or merging main.
+
+## Beta 27 artwork customization
+
+`branding.rs` owns four independent local image choices, bounded validation, exact-byte managed imports and atomic appearance persistence. `ui/branding.rs` provides the pre-login/in-world transactional editor; `ui/branding_runtime.rs` caches worker-decoded textures, draft previews, layout transforms and frosted image sources. Custom screen logos do not change official executable/About branding. Login and loading slots are separate; unavailable loading art retains the captured-world fallback.

@@ -24,7 +24,7 @@ Copy-Item -LiteralPath $Exe -Destination $Out -ErrorAction Stop
 # source tree. Optional in development previews, mandatory before release.
 $brandingSource = Join-Path $Source 'assets/branding'
 $brandingOut = Join-Path $Out 'assets/branding'
-foreach ($name in @('waters-roux-logo.png', 'waters-roux-background.png')) {
+foreach ($name in @('waters-roux-logo.png', 'waters-roux-background.png', 'waters-roux-loading-background.png')) {
     $asset = Join-Path $brandingSource $name
     if (Test-Path -LiteralPath $asset -PathType Leaf) {
         New-Item -ItemType Directory -Force -Path $brandingOut -ErrorAction Stop | Out-Null

@@ -207,12 +207,10 @@ pub fn show(
                 .show(ui, |ui| {
                     let brand = |ui: &mut egui::Ui| {
                         ui.vertical_centered(|ui| {
-                            if let Some(logo) = logo {
-                                ui.add(egui::Image::new(logo).fit_to_exact_size(
-                                    Vec2::new(logo.aspect_ratio(), 1.0)
-                                        * (if screen.height() < 800.0 { 86.0 } else { 138.0 })
-                                        * layout.scale,
-                                ));
+                            if logo.is_some() {
+                                let height = (screen.height() * 0.22).clamp(100.0, 220.0);
+                                let (bounds, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), height), egui::Sense::hover());
+                                super::super::branding_runtime::paint_logo(ui.ctx(), ui.painter(), bounds, false, logo, 1.0);
                             }
                             ui.label(
                                 RichText::new(aurora_i18n::tr!("waters-roux-name"))
