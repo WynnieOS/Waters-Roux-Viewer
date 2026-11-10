@@ -74,9 +74,9 @@ pub const COMMANDS: &[Command] = commands![
     // Aurora's own: the photo reel's quick view, the session's photos
     "photo_roll", "carousel-horizontal-filled", "toolbar-command-photo-roll", true;
     // Firestorm's, not in Aurora yet
-    "avatar", "user-circle", "toolbar-command-avatar", false;
-    "destinations", "map-2", "toolbar-command-destinations", false;
-    "howto", "Command_HowTo_Icon", "toolbar-command-howto", false;
+    "avatar", "user-circle", "toolbar-command-avatar", true;
+    "destinations", "map-2", "toolbar-command-destinations", true;
+    "howto", "Command_HowTo_Icon", "toolbar-command-howto", true;
     "picks", "heart-filled", "toolbar-command-picks", true;
     "poser", "wand", "toolbar-command-poser", true;
     "flickr", "brand-flickr", "toolbar-command-flickr", false;
@@ -95,7 +95,7 @@ pub const COMMANDS: &[Command] = commands![
     "phototools", "camera-cog", "toolbar-command-phototools", true;
     "phototools_view", "video-filled", "toolbar-command-phototools-camera", true;
     "pose_stand", "man-filled", "toolbar-command-pose-stand", false;
-    "conversation_log", "file-text-filled", "toolbar-command-conversation-log", false;
+    "conversation_log", "file-text-filled", "toolbar-command-conversation-log", true;
     "movelock", "lock-filled", "movelock-title", true;
     "water_walk", "walk", "movement-water-walk", true;
     "resync_animations", "refresh", "toolbar-command-resync-animations", true;
