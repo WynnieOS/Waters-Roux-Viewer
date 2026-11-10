@@ -79,8 +79,8 @@ pub const COMMANDS: &[Command] = commands![
     "howto", "Command_HowTo_Icon", "toolbar-command-howto", true;
     "picks", "heart-filled", "toolbar-command-picks", true;
     "poser", "wand", "toolbar-command-poser", true;
-    "flickr", "brand-flickr", "toolbar-command-flickr", false;
-    "primfeed", "rss", "toolbar-command-primfeed", false;
+    "flickr", "brand-flickr", "toolbar-command-flickr", true;
+    "primfeed", "rss", "toolbar-command-primfeed", true;
     "RFO", "user-check", "toolbar-command-friends-only", true;
     "gridstatus", "building-broadcast-tower-filled", "toolbar-command-grid-status", true;
     "voice", "Command_Voice_Icon", "toolbar-command-voice", true;
@@ -102,7 +102,7 @@ pub const COMMANDS: &[Command] = commands![
     "regiontracker", "location-filled", "toolbar-command-region-tracker", false;
     "group_titles", "tags-filled", "toolbar-command-group-titles", true;
     "wearable_favorites", "hanger-2-filled", "toolbar-command-wearable-favorites", false;
-    "discord", "brand-discord-filled", "toolbar-command-discord", false;
+    "discord", "brand-discord-filled", "toolbar-command-discord", true;
     "360capture", "panorama-horizontal-filled", "toolbar-command-360-snapshot", false;
     "omnifilter", "filter-filled", "toolbar-command-omnifilter", true;
     "avatar_align", "user-scan", "toolbar-command-avatar-align", false;
