@@ -2120,7 +2120,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         // the Legacy Viewer's Statistics (Floater.Toggle stats) opens
         // Aurora's Performance window
         "performance" | "statistics" => toggle("perf", &mut panels.perf),
-        "snapshot" => toggle(super::snapshot::WINDOW, &mut panels.snapshot),
+        "snapshot" | "phototools" => toggle(super::snapshot::WINDOW, &mut panels.snapshot),
         // File.TakeSnapshotToDisk: a photo saved with the last settings,
         // without the window (the keyboard's Save to disk)
         "snapshot_to_disk" => return BarAction::PhotoToDisk,
@@ -2144,7 +2144,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
                 toggle: true,
             };
         }
-        "view" => {
+        "view" | "phototools_view" => {
             return BarAction::Controls {
                 movement: false,
                 toggle: true,
@@ -2218,13 +2218,13 @@ fn command_active(cmd: &str, panels: &Panels, flying: bool, seated: bool, mousel
         "webbrowser" => panels.web_browser,
         "voice" => panels.voice_controls,
         "performance" | "statistics" => panels.perf,
-        "snapshot" => panels.snapshot,
+        "snapshot" | "phototools" => panels.snapshot,
         "beacons" => panels.beacons,
         "quickprefs" => panels.quick_prefs,
         "settings_debug" => panels.debug_settings,
         "preferences" => panels.settings,
         "move" => panels.movement_controls,
-        "view" => panels.camera_controls,
+        "view" | "phototools_view" => panels.camera_controls,
         "fly" => flying,
         "sit" => seated,
         "mouselook" => mouselook,
@@ -3688,6 +3688,32 @@ mod tests {
         assert!(matches!(run_command(&ctx, "movement", &mut panels), BarAction::ToggleSwimming));
         assert!(matches!(run_command(&ctx, "water_walk", &mut panels), BarAction::ToggleWaterWalk));
         assert!(!panels.ao);
+    }
+
+    #[test]
+    fn photo_tools_toolbar_commands_open_existing_working_controls() {
+        let ctx = egui::Context::default();
+        let mut panels = Panels::from_settings(&crate::settings::Settings::default());
+        assert!(super::super::toolbar::ready("phototools"));
+        assert!(super::super::toolbar::ready("phototools_view"));
+
+        // Both snapshot and Photo Tools use the existing photography window.
+        panels.snapshot = false;
+        assert!(matches!(run_command(&ctx, "phototools", &mut panels), BarAction::None));
+        assert!(panels.snapshot);
+        assert!(command_active("phototools", &panels, false, false, false));
+        assert!(command_active("snapshot", &panels, false, false, false));
+        run_command(&ctx, "phototools", &mut panels);
+        assert!(!panels.snapshot);
+
+        // The separate camera command must use the established Controls
+        // action, which the app dispatches through request_controls().
+        assert!(matches!(
+            run_command(&ctx, "phototools_view", &mut panels),
+            BarAction::Controls { movement: false, toggle: true }
+        ));
+        panels.camera_controls = true;
+        assert!(command_active("phototools_view", &panels, false, false, false));
     }
 
     #[test]
