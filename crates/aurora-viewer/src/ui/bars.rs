@@ -28,6 +28,8 @@ pub enum BarAction {
     ToggleVr,
     IkEdit,
     Poser,
+    /// Enter the existing pose editor with the local avatar selected.
+    PoseStand,
     /// Build › Edit particles (Object.EditParticles).
     EditParticles,
     Portals,
@@ -2205,6 +2207,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         "build" => return BarAction::Build(0),
         "ik_edit" => return BarAction::IkEdit,
         "poser" => return BarAction::TogglePoser,
+        "pose_stand" => return BarAction::PoseStand,
         "profile" => return BarAction::ToggleMyProfile,
         "reporter" => return BarAction::ToggleReportAbuse,
         "teleport_history" => return BarAction::TeleportHistory,
@@ -3756,6 +3759,8 @@ mod tests {
             run_command(&ctx, "face_nearest_avatar", &mut panels),
             BarAction::FaceNearestAvatar
         ));
+        assert!(super::super::toolbar::ready("pose_stand"));
+        assert!(matches!(run_command(&ctx, "pose_stand", &mut panels), BarAction::PoseStand));
         assert!(super::super::toolbar::ready("wearable_favorites"));
         assert!(matches!(run_command(&ctx, "wearable_favorites", &mut panels), BarAction::WearableFavorites));
         assert!(super::super::toolbar::ready("omnifilter"));
