@@ -13836,6 +13836,12 @@ impl App {
                 // The advanced Find filters already exist in InventoryUi.
                 self.inventory_ui.filters_open = true;
             }
+            BarAction::WearableFavorites => {
+                self.settings.inventory.show_favorites = true;
+                self.inventory_ui.open_wearable_favorites(&self.settings.inventory);
+                ui::widgets::open_floater(&self.egui_ctx, "inventory", &mut self.panels.inventory);
+                self.settings.save();
+            }
             BarAction::ExternalService(url) => {
                 // Authentication remains with the service in the user's
                 // normal browser, never in an unofficial viewer widget.
