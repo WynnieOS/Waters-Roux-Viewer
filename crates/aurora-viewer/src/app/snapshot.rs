@@ -49,6 +49,8 @@ pub(super) enum Purpose {
     Profile,
     /// By e-mail.
     Postcard,
+    /// Six independent cube faces projected to an equirectangular PNG.
+    Panorama,
 }
 
 /// A photo on its way to the inventory or the profile feed.
@@ -97,6 +99,8 @@ struct Job {
     waited: u32,
     waiting: Option<Instant>,
     pixels: Vec<u8>,
+    /// Fixed camera eye during all six 360-degree face renders.
+    panorama_eye: Option<glam::Vec3>,
     interface: bool,
     huds: bool,
     started: Instant,
@@ -144,6 +148,8 @@ pub(super) struct PhotoFrame {
     /// Its look, placed for the part drawn.
     pub look: Option<aurora_render::looks::PhotoLook>,
     pub context: aurora_render::PhotoContext,
+    /// A separate camera orientation and 90° projection for cubemap faces.
+    pub panorama: Option<snapshot::panorama::FaceView>,
 }
 
 type Thumb = (PathBuf, Option<(u32, u32, Vec<u8>)>);
@@ -183,6 +189,10 @@ pub(super) struct Snapshots {
     /// A photo to disk asked while the renderer draws the frame (the
     /// toolbar's Snapshot to disk): taken by the next `photo_update`.
     to_disk: bool,
+    /// Toolbar request, consumed in the next drawing frame.
+    panorama_requested: bool,
+    /// CPU-side 6-face reprojection, completed on a worker before PNG saving.
+    panorama_processing: Option<crossbeam_channel::Receiver<Result<((u32, u32), Vec<u8>), String>>>,
     /// The price to confirm before the upload.
     pub(super) confirm: Option<i32>,
     /// The price the balance cannot pay.
@@ -423,6 +433,8 @@ impl Default for Snapshots {
             look_focus: None,
             quiet: false,
             to_disk: false,
+            panorama_requested: false,
+            panorama_processing: None,
             confirm: None,
             short: None,
             quality_ask: false,
@@ -604,6 +616,7 @@ impl App {
                 scale,
                 look: None,
                 context: aurora_render::PhotoContext::Record,
+                panorama: None,
             });
         }
         let tile = job.tiles[job.next].draw;
@@ -630,7 +643,7 @@ impl App {
         let look = looks::frame_look(&job.looks, place, None, !single, job.focus);
         Some(PhotoFrame {
             aspect: job.size.0 as f32 / job.size.1.max(1) as f32,
-            tile: if single {
+            tile: if single || job.purpose == Purpose::Panorama {
                 Mat4::IDENTITY
             } else {
                 snapshot::tile_matrix(job.size, tile)
@@ -643,6 +656,8 @@ impl App {
             } else {
                 aurora_render::PhotoContext::None
             },
+            panorama: (job.purpose == Purpose::Panorama)
+                .then(|| snapshot::panorama::face_view(job.panorama_eye.unwrap_or(self.camera.position), self.camera.near, job.next)),
         })
     }
 
@@ -705,6 +720,7 @@ impl App {
         // black for real (a dark scene, a look's bars): kept. A cut-out
         // photo is black where nothing is drawn: not checked.
         if !job.cutout
+            && job.purpose != Purpose::Panorama
             && snapshot::blank(&pixels)
             && self
                 .snapshots
@@ -730,7 +746,9 @@ impl App {
             }
             return;
         }
-        if job.tiles.len() == 1 {
+        if job.purpose == Purpose::Panorama {
+            job.pixels.extend_from_slice(&pixels);
+        } else if job.tiles.len() == 1 {
             job.pixels = pixels;
         } else {
             if job.pixels.is_empty() {
@@ -777,6 +795,19 @@ impl App {
             Purpose::Inventory(cost) => self.photo_encode(job.size, job.pixels, cost, job.cutout),
             Purpose::Profile => self.photo_post(job.size, job.pixels, job.cutout),
             Purpose::Postcard => self.photo_postcard(job.size, job.pixels, job.cutout),
+            Purpose::Panorama => {
+                let (tx, rx) = crossbeam_channel::bounded(1);
+                let face = job.size.0;
+                let pixels = job.pixels;
+                match std::thread::Builder::new().name("aurora-panorama".into()).spawn(move || {
+                    let _ = tx.send(snapshot::panorama::equirectangular(face, &pixels));
+                }) {
+                    Ok(_) => self.snapshots.panorama_processing = Some(rx),
+                    Err(error) => {
+                        self.snapshots.message = Some((format!("360 panorama conversion could not start: {error}"), true));
+                    }
+                }
+            }
         }
     }
 
@@ -1125,6 +1156,7 @@ impl App {
             waited: 0,
             waiting: None,
             pixels: Vec::new(),
+            panorama_eye: None,
             interface,
             huds: s.huds,
             started: Instant::now(),
@@ -1282,7 +1314,11 @@ impl App {
     /// A photo is being taken, saved or uploaded.
     pub(super) fn photo_busy(&self) -> bool {
         let s = &self.snapshots;
-        s.saving.is_some() || s.upload.is_some() || s.detail_wait.is_some() || s.job.as_ref().is_some_and(|j| j.purpose != Purpose::Preview)
+        s.saving.is_some()
+            || s.upload.is_some()
+            || s.detail_wait.is_some()
+            || s.panorama_processing.is_some()
+            || s.job.as_ref().is_some_and(|j| j.purpose != Purpose::Preview)
     }
 
     /// Upload prices: the account's benefits (texture_upload_cost, by area
@@ -1523,8 +1559,110 @@ impl App {
         self.gfx = Some(gfx);
     }
 
+    /// The 360 toolbar command queues six real 90-degree offscreen renders.
+    /// No normal screenshot is repackaged as a panorama.
+    pub(super) fn photo_panorama_to_disk(&mut self) {
+        if self.photo_busy() {
+            self.world
+                .system_message("Finish the current photo before starting 360 Capture.".to_owned());
+        } else if !self.in_world() {
+            self.world
+                .system_message("360 Capture is available only while in-world.".to_owned());
+        } else if self.world.rlva.camera_preset_locked(Uuid::nil())
+            || self.world.rlva.camera_fov_limits(1.0).is_some()
+            || self.world.rlva.has("camunlock")
+        {
+            // A six-face view would otherwise ignore an attachment's
+            // camera ownership, focus offset or lens restriction.
+            self.world
+                .system_message("360 Capture is unavailable while in-world camera restrictions are active.".to_owned());
+        } else {
+            self.snapshots.panorama_requested = true;
+        }
+    }
+
+    fn photo_panorama_job(&mut self, renderer: &Renderer) {
+        if self.photo_busy() || !self.in_world() {
+            return;
+        }
+        let max_pixels = self.photo_max_pixels(renderer).isqrt() as u32;
+        let face = snapshot::panorama::DEFAULT_FACE_SIZE
+            .min(self.photo_max_side(renderer))
+            .min(max_pixels)
+            / 64
+            * 64;
+        if face < snapshot::panorama::MIN_FACE_SIZE {
+            self.snapshots.message = Some(("Not enough GPU memory for 360 Capture.".into(), true));
+            self.world
+                .system_message("360 Capture could not start: insufficient GPU memory.".to_owned());
+            return;
+        }
+        let passes = self.photo_tiles(renderer, (face, face));
+        if passes.len() != 1 || passes[0].keep.width != face || passes[0].keep.height != face {
+            self.snapshots.message = Some(("360 Capture needs a full square render pass.".into(), true));
+            return;
+        }
+        self.world.photo_isolation.set_picking(false);
+        self.snapshots.gpu_cost.new_photo();
+        self.snapshots.job = Some(Job {
+            purpose: Purpose::Panorama,
+            size: (face, face),
+            tiles: vec![passes[0]; snapshot::panorama::FACES],
+            next: 0,
+            asked: false,
+            waited: 0,
+            waiting: None,
+            pixels: Vec::with_capacity(face as usize * face as usize * 4 * snapshot::panorama::FACES),
+            panorama_eye: Some(self.camera.position),
+            interface: false,
+            huds: false,
+            started: Instant::now(),
+            supersample: 1,
+            cutout: false,
+            looks: Vec::new(),
+            focus: None,
+            photo: (face, face),
+            hold: None,
+            context: ContextPass::None,
+            paused: Default::default(),
+        });
+        self.world
+            .system_message(format!("360 Capture started: six {face} × {face} views."));
+    }
+
+    fn photo_save_panorama(&mut self, size: (u32, u32), rgba: Vec<u8>) {
+        let options = &self.settings.snapshot;
+        let base = format!("{}_360", options.base_name);
+        let stamp = options.timestamp_names.then(snapshot::local_stamp);
+        let path = snapshot::free_path(&options.folder(), &base, stamp.as_deref(), snapshot::FileFormat::Png);
+        self.world
+            .system_message(format!("360 panorama rendered: {} × {}. Saving PNG.", size.0, size.1));
+        self.photo_save(size, rgba, Some(path), false);
+    }
+
     /// Every frame: the saves, thumbnails, dialogs and preview to follow.
     pub(super) fn photo_update(&mut self, renderer: &Renderer) {
+        if std::mem::take(&mut self.snapshots.panorama_requested) {
+            self.photo_panorama_job(renderer);
+        }
+        if let Some(receiver) = &self.snapshots.panorama_processing {
+            match receiver.try_recv() {
+                Ok(Ok((size, rgba))) => {
+                    self.snapshots.panorama_processing = None;
+                    self.photo_save_panorama(size, rgba);
+                }
+                Ok(Err(error)) => {
+                    self.snapshots.panorama_processing = None;
+                    self.snapshots.message = Some((format!("360 panorama conversion failed: {error}"), true));
+                    self.world.system_message(format!("360 Capture failed: {error}"));
+                }
+                Err(crossbeam_channel::TryRecvError::Disconnected) => {
+                    self.snapshots.panorama_processing = None;
+                    self.snapshots.message = Some(("360 panorama processing stopped unexpectedly.".into(), true));
+                }
+                Err(crossbeam_channel::TryRecvError::Empty) => {}
+            }
+        }
         if std::mem::take(&mut self.snapshots.to_disk) {
             self.snapshots.quiet = !self.panels.snapshot;
             self.photo_take(renderer, None);
