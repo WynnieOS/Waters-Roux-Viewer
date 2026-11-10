@@ -241,7 +241,13 @@ mod face_nearest_avatar_tests {
             origin + Vec3::new(-3.0, 0.0, 0.0),
             origin + Vec3::new(0.0, 5.0, 0.0),
         ];
-        assert_eq!(nearest_avatar_direction(origin, targets.into_iter()), Some(Vec3::new(-3.0, 0.0, 0.0)));
-        assert_eq!(nearest_avatar_direction(origin, [origin, origin + Vec3::X * 25.0].into_iter()), None);
+        assert_eq!(
+            nearest_avatar_direction(origin, targets.into_iter()),
+            Some(Vec3::new(-3.0, 0.0, 0.0))
+        );
+        assert_eq!(
+            nearest_avatar_direction(origin, [origin, origin + Vec3::X * 25.0].into_iter()),
+            None
+        );
     }
 }
