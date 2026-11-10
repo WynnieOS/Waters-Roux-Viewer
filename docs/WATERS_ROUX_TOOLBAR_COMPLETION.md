@@ -27,11 +27,19 @@ These commands require CI approval and a Windows in-world smoke test before rele
 - [x] `wearable_favorites` — opens the existing inventory Favorites tab filtered to wearable clothing/body items and objects, supporting ordinary wear/attach.
 - [x] `pose_stand` — enters the existing poser with the local avatar as the selected subject, allowing a self-pose session.
 
-## Still to implement
+- [x] `360capture` — native six-face (90° per face) scene capture at a fixed eye, CPU equirectangular reprojection on a worker, and unique `*_360_*.png` export. Selects a GPU-safe square face resolution up to 1024 px, yielding up to 4096 × 2048. **Requires visual verification inside Second Life; do not yet release.**
 
-| ID | Intended behavior / investigation | Status |
-| --- | --- | --- |
-| `360capture` | Render and export a genuine panoramic screenshot | Rendering feature |
+## Remaining release blockers
+
+The catalogue's 16 deliberately unavailable commands now have source handlers; none remain flagged `ready: false`. This does **not** certify that the viewer is feature complete, or that conditional disabling should be removed.
+
+- [ ] Confirm Windows format/lint/test CI is green at the latest commit.
+- [ ] Install a Windows build and check every new command with a real Second Life login.
+- [ ] Verify six unique panorama directions, correct north/south/east/west and zenith/nadir, and no swapped/mirrored cubemap faces.
+- [ ] Inspect the resulting 2:1 PNG for visible face seams, black faces, ghosting, missing mesh/avatars, and correct sky, water and lighting.
+- [ ] Test VRAM-pressure fallback, an active existing photo, no world connection, teleport/relog, GPU reset and other failure paths.
+- [ ] Verify that camera orientation and the avatar are unchanged by panorama capture and that any simulator-imposed camera/vision restrictions remain honored.
+- [ ] Validate native 360 image metadata/export workflow before any public release.
 
 ## Other greyed-out controls
 
@@ -48,8 +56,8 @@ A grey appearance is not always an unfinished feature. Some existing commands ar
 
 ## Development priorities
 
-1. Finish CI and in-world verification for the fifteen commands enabled in this draft.
+1. Finish CI and in-world verification for all sixteen connected commands in this draft.
 2. Resolve selection outline/picking and move/rotate/scale gizmo visibility.
-3. Implement genuine `360capture` rendering and panorama export without merely aliasing a normal screenshot.
+3. Validate genuine `360capture` output and improve speed, progress/cancel UX and panorama preview based on real in-world tests.
 4. Test Region Tracker, Wearable Favorites and self Pose Stand against real in-world states and permission restrictions.
 5. Upgrade external social links to actual opt-in integrations only if supported, with separate feature acceptance tests.
