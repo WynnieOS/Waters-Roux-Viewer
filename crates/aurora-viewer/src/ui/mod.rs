@@ -8,6 +8,7 @@ pub mod area_search;
 pub mod audio;
 pub mod aurora_bg;
 pub mod avatar_picker;
+pub mod avatar_align;
 pub mod avatar_render_settings;
 pub mod backdrop;
 pub mod bars;
@@ -220,6 +221,8 @@ pub struct Panels {
     /// with Preferences › Aurora), and on its Movement tab (the movement
     /// window).
     pub camera_controls: bool,
+    /// Compass for turning the local avatar to cardinal/diagonal bearings.
+    pub avatar_align: bool,
     pub movement_controls: bool,
     /// Navigation bar location being edited (text) and "just opened" (select all).
     pub nav_edit: Option<String>,
@@ -277,6 +280,7 @@ impl Panels {
             stream_title: settings.audio.stream_title_window,
             stream_title_history: false,
             camera_controls: settings.show_camera_controls,
+            avatar_align: false,
             movement_controls: settings.show_movement_controls,
             nav_edit: None,
             nav_edit_new: false,
