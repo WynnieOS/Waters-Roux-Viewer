@@ -515,7 +515,7 @@ mod tests {
         crate::ui::widgets::steady_tests::assert_window_steady(
             WINDOW,
             &[egui::vec2(WIDTH, 420.0)],
-            &status,
+            status,
             || {
                 (
                     QuickPrefsUi::default(),
