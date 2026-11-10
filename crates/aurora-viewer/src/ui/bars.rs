@@ -70,6 +70,8 @@ pub enum BarAction {
     ToggleFlyOverride,
     /// The toolbar's Snapshot to disk (File.TakeSnapshotToDisk).
     PhotoToDisk,
+    /// Real 360° six-face capture to a 2:1 equirectangular PNG.
+    CapturePanorama,
     /// The toolbar's Photo roll: the reel's quick view on its newest photo.
     PhotoRoll,
     /// Explore Second Life destinations in the built-in browser.
@@ -2141,6 +2143,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         // File.TakeSnapshotToDisk: a photo saved with the last settings,
         // without the window (the keyboard's Save to disk)
         "snapshot_to_disk" => return BarAction::PhotoToDisk,
+        "360capture" => return BarAction::CapturePanorama,
         "photo_roll" => return BarAction::PhotoRoll,
         "destinations" => return BarAction::Destinations,
         "howto" => return BarAction::HowTo,
@@ -3814,6 +3817,8 @@ mod tests {
         panels.snapshot = false;
         assert!(super::super::toolbar::ready("snapshot_to_disk"));
         assert!(matches!(run_command(&ctx, "snapshot_to_disk", &mut panels), BarAction::PhotoToDisk));
+        assert!(super::super::toolbar::ready("360capture"));
+        assert!(matches!(run_command(&ctx, "360capture", &mut panels), BarAction::CapturePanorama));
         assert!(!panels.snapshot);
     }
 
