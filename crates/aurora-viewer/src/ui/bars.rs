@@ -70,6 +70,12 @@ pub enum BarAction {
     PhotoToDisk,
     /// The toolbar's Photo roll: the reel's quick view on its newest photo.
     PhotoRoll,
+    /// Explore Second Life destinations in the built-in browser.
+    Destinations,
+    /// Open official Second Life help and how-to guides.
+    HowTo,
+    /// The selected conversation's real persisted transcript.
+    ConversationLog,
     /// Our profile on its Picks tab, or closed when Picks is shown
     /// (Avatar.TogglePicks, llviewermenu.cpp).
     MyPicks,
@@ -2102,7 +2108,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         "inventory" => toggle("inventory", &mut panels.inventory),
         "texture_library" => toggle(panels.texture_library_presentation.window(), &mut panels.texture_library),
         "gestures" => toggle("gestures", &mut panels.gestures),
-        "appearance" => toggle("appearance", &mut panels.appearance),
+        "appearance" | "avatar" => toggle("appearance", &mut panels.appearance),
         "ao" => toggle("ao", &mut panels.ao),
         "minimap" => panels.minimap = !panels.minimap,
         "worldmap" => toggle("worldmap", &mut panels.world_map),
@@ -2125,6 +2131,9 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         // without the window (the keyboard's Save to disk)
         "snapshot_to_disk" => return BarAction::PhotoToDisk,
         "photo_roll" => return BarAction::PhotoRoll,
+        "destinations" => return BarAction::Destinations,
+        "howto" => return BarAction::HowTo,
+        "conversation_log" => return BarAction::ConversationLog,
         "beacons" => toggle(super::beacons::WINDOW, &mut panels.beacons),
         // Floater.Toggle quickprefs
         "quickprefs" => toggle(super::quick_prefs::WINDOW, &mut panels.quick_prefs),
@@ -2205,7 +2214,7 @@ fn command_active(cmd: &str, panels: &Panels, flying: bool, seated: bool, mousel
         "inventory" => panels.inventory,
         "texture_library" => panels.texture_library,
         "gestures" => panels.gestures,
-        "appearance" => panels.appearance,
+        "appearance" | "avatar" => panels.appearance,
         "minimap" => panels.minimap,
         "worldmap" => panels.world_map,
         "places" => panels.places,
@@ -3688,6 +3697,25 @@ mod tests {
         assert!(matches!(run_command(&ctx, "movement", &mut panels), BarAction::ToggleSwimming));
         assert!(matches!(run_command(&ctx, "water_walk", &mut panels), BarAction::ToggleWaterWalk));
         assert!(!panels.ao);
+    }
+
+    #[test]
+    fn avatar_destinations_help_and_conversation_history_dispatch_real_actions() {
+        let ctx = egui::Context::default();
+        let mut panels = Panels::from_settings(&crate::settings::Settings::default());
+        for command in ["avatar", "destinations", "howto", "conversation_log"] {
+            assert!(super::super::toolbar::ready(command), "{command} must be usable");
+        }
+        panels.appearance = false;
+        run_command(&ctx, "avatar", &mut panels);
+        assert!(panels.appearance);
+        assert!(command_active("avatar", &panels, false, false, false));
+        run_command(&ctx, "avatar", &mut panels);
+        assert!(!panels.appearance);
+
+        assert!(matches!(run_command(&ctx, "destinations", &mut panels), BarAction::Destinations));
+        assert!(matches!(run_command(&ctx, "howto", &mut panels), BarAction::HowTo));
+        assert!(matches!(run_command(&ctx, "conversation_log", &mut panels), BarAction::ConversationLog));
     }
 
     #[test]
