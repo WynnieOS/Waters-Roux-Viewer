@@ -2580,7 +2580,15 @@ impl BuildTool {
     ) {
         let Some(key) = self.selection.first().copied() else { return };
         let Some(idx) = world.objects.index_of(&key) else { return };
-        let mode = if size.is_some() { EditMode::Stretch } else { EditMode::Move };
+        // The permission check must match the operation requested by the
+        // Object editor. Rotation-only edits are not movement operations.
+        let mode = if size.is_some() {
+            EditMode::Stretch
+        } else if rot.is_some() {
+            EditMode::Rotate
+        } else {
+            EditMode::Move
+        };
         if !can_transform(world, idx, s.edit_linked, mode) {
             return;
         }
