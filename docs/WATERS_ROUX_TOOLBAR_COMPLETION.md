@@ -23,14 +23,14 @@ These commands require CI approval and a Windows in-world smoke test before rele
 - [x] `discord` — opens the Discord web app; an official Waters Roux community invite is **not configured**.
 - [x] `face_nearest_avatar` — turns our own avatar toward the closest avatar within 20 metres in the current region, with local-control and sitting checks.
 - [x] `avatar_align` — opens a compass for local heading changes, increments and nearest-avatar facing.
+- [x] `regiontracker` — dedicated UI showing live current session region and distinct visited regions from actual teleport history.
+- [x] `wearable_favorites` — opens the existing inventory Favorites tab filtered to wearable clothing/body items and objects, supporting ordinary wear/attach.
+- [x] `pose_stand` — enters the existing poser with the local avatar as the selected subject, allowing a self-pose session.
 
 ## Still to implement
 
 | ID | Intended behavior / investigation | Status |
 | --- | --- | --- |
-| `pose_stand` | Implement a pose stand with self-avatar pose controls | Missing |
-| `regiontracker` | Implement region tracking UI and behavior | Missing |
-| `wearable_favorites` | Implement wearable favorites management | Missing |
 | `360capture` | Render and export a genuine panoramic screenshot | Rendering feature |
 
 ## Other greyed-out controls
@@ -48,8 +48,8 @@ A grey appearance is not always an unfinished feature. Some existing commands ar
 
 ## Development priorities
 
-1. Finish CI and in-world verification for the twelve commands enabled in this draft.
+1. Finish CI and in-world verification for the fifteen commands enabled in this draft.
 2. Resolve selection outline/picking and move/rotate/scale gizmo visibility.
-3. Implement and verify `pose_stand` and genuine `360capture` rendering/export.
-4. Implement real `regiontracker` and `wearable_favorites` interfaces and data integration.
+3. Implement genuine `360capture` rendering and panorama export without merely aliasing a normal screenshot.
+4. Test Region Tracker, Wearable Favorites and self Pose Stand against real in-world states and permission restrictions.
 5. Upgrade external social links to actual opt-in integrations only if supported, with separate feature acceptance tests.
