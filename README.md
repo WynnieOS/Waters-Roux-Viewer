@@ -22,11 +22,17 @@ frosted card. The checkerboard is NOT an official logo, approved artwork,
 proposed visual design, or the build's default. Loading choices were separately
 imported and reloaded by the same smoke test; live teleport still needs a human.
 
+`diagnostic-high-contrast.png` captures the same diagnostic profile in High
+Contrast mode: the card becomes opaque black with readable white labels while
+the background remains visible outside it. Human keyboard/assistive-technology
+testing remains required.
+
 ## Dimensions
 
 - [login-1920x1080.png](login-1920x1080.png): 1920 × 1080
 - [login-1600x900.png](login-1600x900.png): 1600 × 900
 - [login-1366x768.png](login-1366x768.png): 1366 × 768
 - [login-800x1100.png](login-800x1100.png): 800 × 1100
+- [diagnostic-high-contrast.png](diagnostic-high-contrast.png): 1366 × 768
 - [appearance-editor.png](appearance-editor.png): 1280 × 900
 - [diagnostic-custom-images.png](diagnostic-custom-images.png): 1366 × 768
