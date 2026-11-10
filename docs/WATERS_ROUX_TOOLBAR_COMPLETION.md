@@ -17,6 +17,7 @@ Both need CI approval and a Windows in-world smoke test before release.
 - [x] `destinations` — opens the official Second Life Destination Guide in the built-in browser.
 - [x] `howto` — opens the official Second Life Knowledge Base in the built-in browser.
 - [x] `conversation_log` — opens the real local transcript of the selected conversation (Nearby Chat when no IM is selected).
+- [x] `omnifilter` — opens Inventory's existing advanced filtering controls.
 
 ## Still to implement
 
@@ -29,7 +30,6 @@ Both need CI approval and a Windows in-world smoke test before release.
 | `wearable_favorites` | Implement wearable favorites management | Missing |
 | `discord` | Configure an official community target instead of using upstream Aurora's link | Branding dependency |
 | `360capture` | Render and export a genuine panoramic screenshot | Rendering feature |
-| `omnifilter` | Implement the intended unified filtering UI | Missing |
 | `avatar_align` | Implement safe avatar alignment controls with consent where appropriate | Avatar feature |
 | `face_nearest_avatar` | Implement safe facing controls with appropriate restrictions | Avatar feature |
 
