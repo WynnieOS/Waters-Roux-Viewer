@@ -9626,11 +9626,8 @@ impl App {
         let mut proj = frame_proj(&self.camera);
         let mut vp = proj * view;
         let camera_fast = self.texture_motion.update(render_eye, render_forward, dt);
-        let mut cull = CullView::new(vp, render_eye, lod_height as f32, render_fov).with_texture_camera(
-            render_forward,
-            aspect,
-            camera_fast,
-        );
+        let mut cull =
+            CullView::new(vp, render_eye, lod_height as f32, render_fov).with_texture_camera(render_forward, aspect, camera_fast);
         // The experimental XR worker can look in any direction after these
         // CPU lists are prepared; per-eye GPU culling still uses the real frusta.
         if gfx.renderer.vr_engaged() || (self.demo && std::env::var_os("AURORA_DEMO_XR_WORLD").is_some()) {
@@ -9948,11 +9945,8 @@ impl App {
                 view = panorama.map_or_else(|| self.camera.view(), |face| face.view);
                 proj = frame_proj(&self.camera);
                 vp = proj * view;
-                cull = CullView::new(vp, render_eye, lod_height as f32, render_fov).with_texture_camera(
-                    render_forward,
-                    aspect,
-                    camera_fast,
-                );
+                cull =
+                    CullView::new(vp, render_eye, lod_height as f32, render_fov).with_texture_camera(render_forward, aspect, camera_fast);
                 if self.settings.debug.freeze_culling {
                     cull = *self.frozen_cull.get_or_insert(cull);
                 }

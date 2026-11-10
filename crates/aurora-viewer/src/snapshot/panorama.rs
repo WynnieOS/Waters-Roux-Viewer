@@ -39,11 +39,7 @@ pub fn face_view(eye: Vec3, near: f32, face: usize) -> FaceView {
         eye,
         forward,
         view: glam::camera::rh::view::look_to_mat4(eye, forward, up),
-        projection: glam::camera::rh::proj::directx::perspective_infinite_reverse(
-            std::f32::consts::FRAC_PI_2,
-            1.0,
-            near.max(0.001),
-        ),
+        projection: glam::camera::rh::proj::directx::perspective_infinite_reverse(std::f32::consts::FRAC_PI_2, 1.0, near.max(0.001)),
     }
 }
 
@@ -102,12 +98,10 @@ pub fn equirectangular(face: u32, faces: &[u8]) -> Result<((u32, u32), Vec<u8>),
     let (width, height) = (face * 4, face * 2);
     let mut output = vec![0u8; width as usize * height as usize * 4];
     for y in 0..height {
-        let latitude = std::f32::consts::FRAC_PI_2
-            - std::f32::consts::PI * (y as f32 + 0.5) / height as f32;
+        let latitude = std::f32::consts::FRAC_PI_2 - std::f32::consts::PI * (y as f32 + 0.5) / height as f32;
         let (sin_lat, cos_lat) = latitude.sin_cos();
         for x in 0..width {
-            let longitude = std::f32::consts::TAU * (x as f32 + 0.5) / width as f32
-                - std::f32::consts::PI;
+            let longitude = std::f32::consts::TAU * (x as f32 + 0.5) / width as f32 - std::f32::consts::PI;
             let (sin_lon, cos_lon) = longitude.sin_cos();
             let direction = Vec3::new(cos_lat * cos_lon, cos_lat * sin_lon, sin_lat);
             let color = sample(face, faces, direction);
@@ -152,6 +146,9 @@ mod tests {
         assert_eq!(pixel(0, h / 2), 2, "-X at seam");
         assert_eq!(pixel(w / 2, 0), 5, "+Z at zenith");
         assert_eq!(pixel(w / 2, h - 1), 6, "-Z at nadir");
-        assert_eq!(equirectangular(256, &faces[..100]), Err("Expected 1572864 bytes across six cube faces, got 100".into()));
+        assert_eq!(
+            equirectangular(256, &faces[..100]),
+            Err("Expected 1572864 bytes across six cube faces, got 100".into())
+        );
     }
 }

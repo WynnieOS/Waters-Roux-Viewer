@@ -656,9 +656,8 @@ impl App {
             } else {
                 aurora_render::PhotoContext::None
             },
-            panorama: (job.purpose == Purpose::Panorama).then(|| {
-                snapshot::panorama::face_view(job.panorama_eye.unwrap_or(self.camera.position), self.camera.near, job.next)
-            }),
+            panorama: (job.purpose == Purpose::Panorama)
+                .then(|| snapshot::panorama::face_view(job.panorama_eye.unwrap_or(self.camera.position), self.camera.near, job.next)),
         })
     }
 
@@ -808,7 +807,7 @@ impl App {
                         self.snapshots.message = Some((format!("360 panorama conversion could not start: {error}"), true));
                     }
                 }
-            },
+            }
         }
     }
 
@@ -1315,7 +1314,11 @@ impl App {
     /// A photo is being taken, saved or uploaded.
     pub(super) fn photo_busy(&self) -> bool {
         let s = &self.snapshots;
-        s.saving.is_some() || s.upload.is_some() || s.detail_wait.is_some() || s.panorama_processing.is_some() || s.job.as_ref().is_some_and(|j| j.purpose != Purpose::Preview)
+        s.saving.is_some()
+            || s.upload.is_some()
+            || s.detail_wait.is_some()
+            || s.panorama_processing.is_some()
+            || s.job.as_ref().is_some_and(|j| j.purpose != Purpose::Preview)
     }
 
     /// Upload prices: the account's benefits (texture_upload_cost, by area
@@ -1560,9 +1563,11 @@ impl App {
     /// No normal screenshot is repackaged as a panorama.
     pub(super) fn photo_panorama_to_disk(&mut self) {
         if self.photo_busy() {
-            self.world.system_message("Finish the current photo before starting 360 Capture.".to_owned());
+            self.world
+                .system_message("Finish the current photo before starting 360 Capture.".to_owned());
         } else if !self.in_world() {
-            self.world.system_message("360 Capture is available only while in-world.".to_owned());
+            self.world
+                .system_message("360 Capture is available only while in-world.".to_owned());
         } else {
             self.snapshots.panorama_requested = true;
         }
@@ -1575,10 +1580,13 @@ impl App {
         let max_pixels = self.photo_max_pixels(renderer).isqrt() as u32;
         let face = snapshot::panorama::DEFAULT_FACE_SIZE
             .min(self.photo_max_side(renderer))
-            .min(max_pixels) / 64 * 64;
+            .min(max_pixels)
+            / 64
+            * 64;
         if face < snapshot::panorama::MIN_FACE_SIZE {
             self.snapshots.message = Some(("Not enough GPU memory for 360 Capture.".into(), true));
-            self.world.system_message("360 Capture could not start: insufficient GPU memory.".to_owned());
+            self.world
+                .system_message("360 Capture could not start: insufficient GPU memory.".to_owned());
             return;
         }
         let passes = self.photo_tiles(renderer, (face, face));
@@ -1610,7 +1618,8 @@ impl App {
             context: ContextPass::None,
             paused: Default::default(),
         });
-        self.world.system_message(format!("360 Capture started: six {face} × {face} views."));
+        self.world
+            .system_message(format!("360 Capture started: six {face} × {face} views."));
     }
 
     fn photo_save_panorama(&mut self, size: (u32, u32), rgba: Vec<u8>) {
@@ -1618,7 +1627,8 @@ impl App {
         let base = format!("{}_360", options.base_name);
         let stamp = options.timestamp_names.then(snapshot::local_stamp);
         let path = snapshot::free_path(&options.folder(), &base, stamp.as_deref(), snapshot::FileFormat::Png);
-        self.world.system_message(format!("360 panorama rendered: {} × {}. Saving PNG.", size.0, size.1));
+        self.world
+            .system_message(format!("360 panorama rendered: {} × {}. Saving PNG.", size.0, size.1));
         self.photo_save(size, rgba, Some(path), false);
     }
 
