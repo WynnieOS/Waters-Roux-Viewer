@@ -87,7 +87,7 @@ fn sample(face: u32, faces: &[u8], direction: Vec3) -> [u8; 4] {
 /// full-sphere equirectangular image. Caller supplies actual rendered faces,
 /// never a duplicated or rotated ordinary screenshot.
 pub fn equirectangular(face: u32, faces: &[u8]) -> Result<((u32, u32), Vec<u8>), String> {
-    if face < MIN_FACE_SIZE || face > 2048 {
+    if !(MIN_FACE_SIZE..=2048).contains(&face) {
         return Err(format!("Unsupported panorama face size: {face}"));
     }
     let side = face as usize;
@@ -133,7 +133,7 @@ mod tests {
         let side = MIN_FACE_SIZE as usize;
         let mut faces = vec![0u8; side * side * 4 * FACES];
         for i in 0..FACES {
-            for px in faces[i * side * side * 4..(i + 1) * side * side * 4].chunks_exact_mut(4) {
+            for px in faces[i * side * side * 4..(i + 1) * side * side * 4].as_chunks_mut::<4>().0 {
                 px.copy_from_slice(&[(i + 1) as u8, 20, 30, 255]);
             }
         }
