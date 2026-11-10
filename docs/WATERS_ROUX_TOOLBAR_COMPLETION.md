@@ -11,17 +11,20 @@ This is the implementation backlog for toolbar buttons deliberately marked unava
 
 Both need CI approval and a Windows in-world smoke test before release.
 
+## Implemented in the current draft (pending CI and live-grid validation)
+
+- [x] `avatar` — opens the existing Appearance floater.
+- [x] `destinations` — opens the official Second Life Destination Guide in the built-in browser.
+- [x] `howto` — opens the official Second Life Knowledge Base in the built-in browser.
+- [x] `conversation_log` — opens the real local transcript of the selected conversation (Nearby Chat when no IM is selected).
+
 ## Still to implement
 
 | ID | Intended behavior / investigation | Status |
 | --- | --- | --- |
-| `avatar` | Identify intended Avatar panel; implement correct UI/action | Missing |
-| `destinations` | Open a real destination-discovery workflow | Missing |
-| `howto` | Open usable viewer help/onboarding | Missing |
 | `flickr` | Implement supported authenticated photo publishing, if API and permissions permit | External integration |
 | `primfeed` | Verify service/API still exists and is appropriate before building | External integration |
 | `pose_stand` | Implement a pose stand with self-avatar pose controls | Missing |
-| `conversation_log` | Open stored conversation history with privacy safeguards | Missing |
 | `regiontracker` | Implement region tracking UI and behavior | Missing |
 | `wearable_favorites` | Implement wearable favorites management | Missing |
 | `discord` | Configure an official community target instead of using upstream Aurora's link | Branding dependency |
@@ -45,7 +48,7 @@ A grey appearance is not always an unfinished feature. Some existing commands ar
 
 ## Development priorities
 
-1. Finish Photo Tools PR #5 and confirm real camera/photography behavior.
+1. Finish CI and in-world verification for Photo Tools, Avatar, Destinations, How To and Conversation Log.
 2. Resolve selection outline/picking and move/rotate/scale gizmo visibility.
 3. Complete locally implementable creator commands (`pose_stand`, `360capture`, `avatar_align`, `face_nearest_avatar`).
 4. Complete viewer UI commands and services (`avatar`, `destinations`, `howto`, `conversation_log`, `regiontracker`, `wearable_favorites`, `omnifilter`).
