@@ -17230,6 +17230,22 @@ impl App {
                 ui::remote_object::show(&ctx, &p, &self.world, &mut self.remote_object);
                 self.photo_ui(&ctx, &p, projector, renderer);
                 self.controls_window(&ctx, &p);
+                if let Some(action) = ui::avatar_align::show(
+                    &ctx,
+                    &p,
+                    &mut self.panels.avatar_align,
+                    self.world.agent.yaw,
+                ) && self.in_world()
+                    && self.world.agent.has_local_control()
+                    && !self.world.agent.is_sitting()
+                {
+                    match action {
+                        ui::avatar_align::Action::FaceNearest => self.face_nearest_avatar(),
+                        ui::avatar_align::Action::RotateTo(yaw) => {
+                            self.world.agent.set_look_at(Vec3::new(yaw.cos(), yaw.sin(), 0.0));
+                        }
+                    }
+                }
                 self.movelock_window(&ctx, &p);
                 self.follow_window(&ctx, &p);
                 self.portals_window(&ctx, &p);
