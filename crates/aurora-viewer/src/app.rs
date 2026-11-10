@@ -13831,6 +13831,11 @@ impl App {
                 let (title, file) = self.world.transcript_of(self.chat_ui.selected);
                 self.history_ui.show_file(title, file);
             }
+            BarAction::InventoryFilters => {
+                ui::widgets::open_floater(&self.egui_ctx, "inventory", &mut self.panels.inventory);
+                // The advanced Find filters already exist in InventoryUi.
+                self.inventory_ui.filters_open = true;
+            }
             BarAction::LandmarkStar(star) => self.landmark_star(star),
             BarAction::PlaceBar { stretch, rights_text } => {
                 self.settings.place_bar_stretch = stretch;
