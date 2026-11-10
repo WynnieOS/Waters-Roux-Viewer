@@ -12,50 +12,46 @@ pub enum Action {
 
 pub fn show(ctx: &egui::Context, p: &Palette, open: &mut bool, yaw: f32) -> Option<Action> {
     let mut action = None;
-    Floater::new("avatar_align", "Avatar Alignment", egui::pos2(540.0, 150.0), egui::vec2(345.0, 245.0))
-        .show(ctx, p, open, |ui| {
-            ui.label("Turn your avatar without moving or changing the camera.");
-            ui.add_space(8.0);
-            for row in [
-                [("NW", 135.0_f32), ("N", 90.0), ("NE", 45.0)],
-                [("W", 180.0), ("E", 0.0), ("SE", -45.0)],
-            ] {
-                ui.horizontal(|ui| {
-                    for (name, angle) in row {
-                        if ui.add_sized([74.0, 30.0], egui::Button::new(name)).clicked() {
-                            action = Some(Action::RotateTo(angle.to_radians()));
-                        }
+    Floater::new(
+        "avatar_align",
+        "Avatar Alignment",
+        egui::pos2(540.0, 150.0),
+        egui::vec2(345.0, 245.0),
+    )
+    .show(ctx, p, open, |ui| {
+        ui.label("Turn your avatar without moving or changing the camera.");
+        ui.add_space(8.0);
+        for row in [
+            [("NW", Some(135.0_f32)), ("N", Some(90.0)), ("NE", Some(45.0))],
+            [("W", Some(180.0)), ("Face", None), ("E", Some(0.0))],
+            [("SW", Some(-135.0)), ("S", Some(-90.0)), ("SE", Some(-45.0))],
+        ] {
+            ui.horizontal(|ui| {
+                for (name, heading) in row {
+                    if ui.add_sized([74.0, 30.0], egui::Button::new(name)).clicked() {
+                        action = Some(match heading {
+                            Some(degrees) => Action::RotateTo(degrees.to_radians()),
+                            None => Action::FaceNearest,
+                        });
                     }
-                });
+                }
+            });
+        }
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            if ui.button("Turn 15° left").clicked() {
+                action = Some(Action::RotateTo(yaw + 15.0_f32.to_radians()));
             }
-            ui.horizontal(|ui| {
-                if ui.add_sized([74.0, 30.0], egui::Button::new("SW")).clicked() {
-                    action = Some(Action::RotateTo((-135.0_f32).to_radians()));
-                }
-                if ui.add_sized([74.0, 30.0], egui::Button::new("S")).clicked() {
-                    action = Some(Action::RotateTo((-90.0_f32).to_radians()));
-                }
-                if ui.add_sized([74.0, 30.0], egui::Button::new("Face nearest")).clicked() {
-                    action = Some(Action::FaceNearest);
-                }
-            });
-            ui.add_space(8.0);
-            ui.horizontal(|ui| {
-                if ui.button("Turn 15° left").clicked() {
-                    action = Some(Action::RotateTo(yaw + 15.0_f32.to_radians()));
-                }
-                if ui.button("Turn 15° right").clicked() {
-                    action = Some(Action::RotateTo(yaw - 15.0_f32.to_radians()));
-                }
-            });
+            if ui.button("Turn 15° right").clicked() {
+                action = Some(Action::RotateTo(yaw - 15.0_f32.to_radians()));
+            }
         });
+    });
     action
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn compass_angles_use_correct_world_axes() {
         let east = 0.0_f32;
