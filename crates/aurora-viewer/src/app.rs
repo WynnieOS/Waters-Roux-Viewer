@@ -17230,12 +17230,8 @@ impl App {
                 ui::remote_object::show(&ctx, &p, &self.world, &mut self.remote_object);
                 self.photo_ui(&ctx, &p, projector, renderer);
                 self.controls_window(&ctx, &p);
-                if let Some(action) = ui::avatar_align::show(
-                    &ctx,
-                    &p,
-                    &mut self.panels.avatar_align,
-                    self.world.agent.yaw,
-                ) && self.in_world()
+                if let Some(action) = ui::avatar_align::show(&ctx, &p, &mut self.panels.avatar_align, self.world.agent.yaw)
+                    && self.in_world()
                     && self.world.agent.has_local_control()
                     && !self.world.agent.is_sitting()
                 {
