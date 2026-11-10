@@ -76,6 +76,8 @@ pub enum BarAction {
     HowTo,
     /// The selected conversation's real persisted transcript.
     ConversationLog,
+    /// Open Inventory with its existing advanced filter controls shown.
+    InventoryFilters,
     /// Our profile on its Picks tab, or closed when Picks is shown
     /// (Avatar.TogglePicks, llviewermenu.cpp).
     MyPicks,
@@ -2134,6 +2136,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         "destinations" => return BarAction::Destinations,
         "howto" => return BarAction::HowTo,
         "conversation_log" => return BarAction::ConversationLog,
+        "omnifilter" => return BarAction::InventoryFilters,
         "beacons" => toggle(super::beacons::WINDOW, &mut panels.beacons),
         // Floater.Toggle quickprefs
         "quickprefs" => toggle(super::quick_prefs::WINDOW, &mut panels.quick_prefs),
@@ -3716,6 +3719,8 @@ mod tests {
         assert!(matches!(run_command(&ctx, "destinations", &mut panels), BarAction::Destinations));
         assert!(matches!(run_command(&ctx, "howto", &mut panels), BarAction::HowTo));
         assert!(matches!(run_command(&ctx, "conversation_log", &mut panels), BarAction::ConversationLog));
+        assert!(super::super::toolbar::ready("omnifilter"));
+        assert!(matches!(run_command(&ctx, "omnifilter", &mut panels), BarAction::InventoryFilters));
     }
 
     #[test]
