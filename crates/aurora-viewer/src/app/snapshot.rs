@@ -1568,6 +1568,13 @@ impl App {
         } else if !self.in_world() {
             self.world
                 .system_message("360 Capture is available only while in-world.".to_owned());
+        } else if self.world.rlva.camera_preset_locked(Uuid::nil())
+            || self.world.rlva.camera_fov_limits(1.0).is_some()
+            || self.world.rlva.has("camunlock")
+        {
+            // A six-face view would otherwise ignore an attachment's
+            // camera ownership, focus offset or lens restriction.
+            self.world.system_message("360 Capture is unavailable while in-world camera restrictions are active.".to_owned());
         } else {
             self.snapshots.panorama_requested = true;
         }
