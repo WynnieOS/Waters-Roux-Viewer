@@ -1574,7 +1574,8 @@ impl App {
         {
             // A six-face view would otherwise ignore an attachment's
             // camera ownership, focus offset or lens restriction.
-            self.world.system_message("360 Capture is unavailable while in-world camera restrictions are active.".to_owned());
+            self.world
+                .system_message("360 Capture is unavailable while in-world camera restrictions are active.".to_owned());
         } else {
             self.snapshots.panorama_requested = true;
         }
