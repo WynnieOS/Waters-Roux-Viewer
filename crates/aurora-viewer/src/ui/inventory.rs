@@ -659,6 +659,18 @@ impl InventoryUi {
         self.fetch_all = true;
     }
 
+    /// Wearable Favorites uses the existing inventory Favorites tab and
+    /// its ordinary wear/attach permissions, filtered to clothing/body and
+    /// objects. Unlike a second favorites database this stays synchronized
+    /// with the actual inventory and supports normal double-click wearing.
+    pub fn open_wearable_favorites(&mut self, prefs: &InventoryPreferences) {
+        set_tab(self, prefs, 4);
+        // Inv types 6 (objects) and 18 (clothing/body), per view::types().
+        self.filters.types = (1_u32 << 6) | (1_u32 << 18);
+        self.filters.smart = None;
+        self.filters_open = true;
+    }
+
     pub fn filter_move_to(&mut self, filter: &str) {
         if let Some(picker) = &mut self.move_to {
             picker.filter = filter.into();
