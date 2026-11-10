@@ -17259,9 +17259,7 @@ impl App {
                         }
                     }
                 }
-                if let Some(action) =
-                    ui::region_tracker::show(&ctx, &p, &mut self.panels.region_tracker, self.world.tp_history.session())
-                {
+                if let Some(action) = ui::region_tracker::show(&ctx, &p, &mut self.panels.region_tracker, self.world.tp_history.session()) {
                     match action {
                         ui::region_tracker::Action::OpenHistory => {
                             self.panels.places = true;
