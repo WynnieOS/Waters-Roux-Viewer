@@ -9,7 +9,7 @@ This is the implementation backlog for toolbar buttons deliberately marked unava
 - [x] `phototools` — opens the existing snapshot/photo panel.
 - [x] `phototools_view` — opens the existing camera controls through the application's normal controls dispatch.
 
-Both need CI approval and a Windows in-world smoke test before release.
+These commands require CI approval and a Windows in-world smoke test before release.
 
 ## Implemented in the current draft (pending CI and live-grid validation)
 
@@ -18,20 +18,20 @@ Both need CI approval and a Windows in-world smoke test before release.
 - [x] `howto` — opens the official Second Life Knowledge Base in the built-in browser.
 - [x] `conversation_log` — opens the real local transcript of the selected conversation (Nearby Chat when no IM is selected).
 - [x] `omnifilter` — opens Inventory's existing advanced filtering controls.
+- [x] `flickr` — opens Flickr in the system browser; **does not publish photos from the viewer**.
+- [x] `primfeed` — opens Primfeed in the system browser; **does not publish photos from the viewer**.
+- [x] `discord` — opens the Discord web app; an official Waters Roux community invite is **not configured**.
+- [x] `face_nearest_avatar` — turns our own avatar toward the closest avatar within 20 metres in the current region, with local-control and sitting checks.
+- [x] `avatar_align` — opens a compass for local heading changes, increments and nearest-avatar facing.
 
 ## Still to implement
 
 | ID | Intended behavior / investigation | Status |
 | --- | --- | --- |
-| `flickr` | Implement supported authenticated photo publishing, if API and permissions permit | External integration |
-| `primfeed` | Verify service/API still exists and is appropriate before building | External integration |
 | `pose_stand` | Implement a pose stand with self-avatar pose controls | Missing |
 | `regiontracker` | Implement region tracking UI and behavior | Missing |
 | `wearable_favorites` | Implement wearable favorites management | Missing |
-| `discord` | Configure an official community target instead of using upstream Aurora's link | Branding dependency |
 | `360capture` | Render and export a genuine panoramic screenshot | Rendering feature |
-| `avatar_align` | Implement safe avatar alignment controls with consent where appropriate | Avatar feature |
-| `face_nearest_avatar` | Implement safe facing controls with appropriate restrictions | Avatar feature |
 
 ## Other greyed-out controls
 
@@ -48,8 +48,8 @@ A grey appearance is not always an unfinished feature. Some existing commands ar
 
 ## Development priorities
 
-1. Finish CI and in-world verification for Photo Tools, Avatar, Destinations, How To and Conversation Log.
+1. Finish CI and in-world verification for the twelve commands enabled in this draft.
 2. Resolve selection outline/picking and move/rotate/scale gizmo visibility.
-3. Complete locally implementable creator commands (`pose_stand`, `360capture`, `avatar_align`, `face_nearest_avatar`).
-4. Complete viewer UI commands and services (`avatar`, `destinations`, `howto`, `conversation_log`, `regiontracker`, `wearable_favorites`, `omnifilter`).
-5. Implement external integrations (`flickr`, `primfeed`, `discord`) only with confirmed API/service availability, branding and credentials.
+3. Implement and verify `pose_stand` and genuine `360capture` rendering/export.
+4. Implement real `regiontracker` and `wearable_favorites` interfaces and data integration.
+5. Upgrade external social links to actual opt-in integrations only if supported, with separate feature acceptance tests.
