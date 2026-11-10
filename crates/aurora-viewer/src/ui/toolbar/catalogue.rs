@@ -103,7 +103,7 @@ pub const COMMANDS: &[Command] = commands![
     "group_titles", "tags-filled", "toolbar-command-group-titles", true;
     "wearable_favorites", "hanger-2-filled", "toolbar-command-wearable-favorites", true;
     "discord", "brand-discord-filled", "toolbar-command-discord", true;
-    "360capture", "panorama-horizontal-filled", "toolbar-command-360-snapshot", false;
+    "360capture", "panorama-horizontal-filled", "toolbar-command-360-snapshot", true;
     "omnifilter", "filter-filled", "toolbar-command-omnifilter", true;
     "avatar_align", "user-scan", "toolbar-command-avatar-align", true;
     "face_nearest_avatar", "user-search", "toolbar-command-face-nearest", true;
