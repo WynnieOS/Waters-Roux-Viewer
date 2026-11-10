@@ -3762,7 +3762,10 @@ mod tests {
         assert!(super::super::toolbar::ready("pose_stand"));
         assert!(matches!(run_command(&ctx, "pose_stand", &mut panels), BarAction::PoseStand));
         assert!(super::super::toolbar::ready("wearable_favorites"));
-        assert!(matches!(run_command(&ctx, "wearable_favorites", &mut panels), BarAction::WearableFavorites));
+        assert!(matches!(
+            run_command(&ctx, "wearable_favorites", &mut panels),
+            BarAction::WearableFavorites
+        ));
         assert!(super::super::toolbar::ready("omnifilter"));
         assert!(matches!(run_command(&ctx, "omnifilter", &mut panels), BarAction::InventoryFilters));
         for (cmd, target) in [
