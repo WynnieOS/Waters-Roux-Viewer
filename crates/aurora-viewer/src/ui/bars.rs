@@ -2166,6 +2166,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
                 toggle: true,
             };
         }
+        "avatar_align" => toggle("avatar_align", &mut panels.avatar_align),
         "view" | "phototools_view" => {
             return BarAction::Controls {
                 movement: false,
@@ -2247,6 +2248,7 @@ fn command_active(cmd: &str, panels: &Panels, flying: bool, seated: bool, mousel
         "preferences" => panels.settings,
         "move" => panels.movement_controls,
         "view" | "phototools_view" => panels.camera_controls,
+        "avatar_align" => panels.avatar_align,
         "fly" => flying,
         "sit" => seated,
         "mouselook" => mouselook,
@@ -3732,6 +3734,12 @@ mod tests {
             run_command(&ctx, "conversation_log", &mut panels),
             BarAction::ConversationLog
         ));
+        assert!(super::super::toolbar::ready("avatar_align"));
+        run_command(&ctx, "avatar_align", &mut panels);
+        assert!(panels.avatar_align);
+        assert!(command_active("avatar_align", &panels, false, false, false));
+        run_command(&ctx, "avatar_align", &mut panels);
+        assert!(!panels.avatar_align);
         assert!(super::super::toolbar::ready("face_nearest_avatar"));
         assert!(matches!(run_command(&ctx, "face_nearest_avatar", &mut panels), BarAction::FaceNearestAvatar));
         assert!(super::super::toolbar::ready("omnifilter"));
