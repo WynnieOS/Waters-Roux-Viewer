@@ -54,7 +54,7 @@ pub fn show(ctx: &egui::Context, p: &Palette, open: &mut bool, session: Session<
                 action = Some(Action::OpenMap);
             }
         });
-        ui.separator();
+        ui.add_space(8.0);
         let list = recent_regions(session);
         ui.label(format!("Visited regions: {}", list.len()));
         egui::ScrollArea::vertical().show(ui, |ui| {
