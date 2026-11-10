@@ -10,9 +10,12 @@ The Beta 26 visual design was explicitly rejected by the owner.
 
 ## Download and launch
 
-Use the **Waters Roux — Windows preview** Actions run for the Beta 27 branch.
+Download the [Beta 27 Windows artifact](https://github.com/WynnieOS/Waters-Roux-Viewer/actions/runs/42762694903/artifacts/13738664714)
+from the [successful Windows preview run](https://github.com/WynnieOS/Waters-Roux-Viewer/actions/runs/42762694903).
+It was built from `d23d841d2d8d4b6b05cacae603c9d43e8ee83d6e` and expires
+November 24, 2026. GitHub sign-in may be needed for artifact downloads.
 The artifact is **Waters-Roux-Viewer-Beta-27-Windows**, independent of the
-Actions run counter. Its inner ZIP is
+Actions run counter. Extract the GitHub download first. Its inner ZIP is
 `Waters-Roux-Viewer-Beta-27-Windows.zip`; extract that ZIP into a **new writable
 folder**, then double-click **Launch Waters Roux.cmd**. The executable is
 `waters-roux-viewer.exe`. `BUILD-INFO.txt` records the exact source commit and
@@ -21,7 +24,9 @@ computed viewer version. This is an artifact, not a GitHub production release.
 Keep the entire extracted folder together. The marker beside the executable
 opts into the adjacent `profile/` folder, separating this preview's settings,
 cache and logs from Aurora and previous Waters Roux previews. A new extraction
-does not migrate old credentials or settings. Password hashes use the OS vault;
+does not migrate old credentials or settings. The existing optional media-support
+consent prompt may appear on first launch; choose according to your preference
+before opening the login gear. Password hashes use the OS vault;
 plaintext passwords are not stored in the artwork configuration.
 
 ## Artwork availability
@@ -92,11 +97,12 @@ human test. No acceptance item is assumed complete from an earlier preview.
 | Requirement | Status | Evidence or remaining verification |
 | --- | --- | --- |
 | Exact official logo displayed | Blocked | Original downloadable PNG unavailable at implementation start |
+| Normal application / launcher / About identity | Implemented | Waters Roux window title, product text and portable launcher/executable names. Official icon is blocked below; the inherited crash-report title remains unfinished polish. |
 | Official Windows/taskbar/launcher icon | Blocked | Requires approved original logo PNG and derived ICO |
 | Approved New Orleans background | Blocked | Standalone background-only file unavailable |
-| Orange login-card perimeter removed | Tested | Actual final 79d5b77e application captures show no amber perimeter/top strip; warning and keyboard-focus states are preserved. |
+| Orange login-card perimeter removed | Tested | Actual d23d841d login/editor/compact captures and earlier desktop captures show no amber perimeter/top strip; warning and keyboard-focus states are preserved. |
 | Refined translucent panel and legible controls | Implemented | Actual login capture shows the glass card and readable controls; approved luxury composition remains blocked by missing artwork and owner review. |
-| Responsive 1920×1080, 1600×900, 1366×768 and tall/narrow layout | Tested | Actual application captures at desktop sizes and 800×1100; existing minimum window width is 800. Image/logo geometry has bounded aspect-ratio tests. Human resizing and translated-label checks remain. |
+| Responsive 1920×1080, 1600×900, 1366×768 and tall/narrow layout | Tested | Actual desktop and 800×1100 captures, plus committed d23d841d compact MFA/account captures at 800×733. Forty login tests pass, including complete-card visibility. Existing minimum width is 800; human resizing and translated labels remain to check. |
 | Login background selection and preview | Implemented | Independent PNG/JPEG import, preview, Fill/Fit/Center and transforms. Core import/persistence tests pass; native picker interaction still requires a human. |
 | Independent login logo selection and preview | Implemented | Separate PNG import, alpha-preserving bytes, bounded aspect-preserving size/placement. Core tests pass; native picker interaction still requires a human. |
 | Independent loading background | Implemented | Separate persisted slot and loading/teleport rendering path. Core tests pass; actual grid transition requires human testing. |
@@ -113,28 +119,29 @@ human test. No acceptance item is assumed complete from an earlier preview.
 | Settings/profile coexistence with previous previews | Implemented | Portable marker and adjacent profile isolate settings/cache/logs; package refuses an existing output folder. Human side-by-side Windows extraction test remains. |
 | Aurora copyright, licenses and derivative notices | Implemented | Existing About attribution and packaged LICENSE, NOTICE, dictionary/emoji notices retained; no endorsement claimed. |
 | Everyday/Studio/Creator workspace branches preserved | Tested | Beta 27 descends from verified Beta 26; no unrelated branch merge. PR #3 Clippy fix remains separate. |
-| Rust formatting / compilation / strict Clippy | Tested | Windows formatting, strict workspace/all-target Clippy and viewer/all-test compilation passed at 7f13526b. The measured-layout/cache follow-up requires its own rerun. Local full test/Clippy compilation exceeded 8 GiB memory. |
-| Focused unit/regression tests | Tested | 18 Windows branding tests, 4 brand/glass tests, 11 local core/atomic-file tests and 13 i18n tests pass. Regression fixes and the new reimport-cache test require final Windows verification. |
+| Rust formatting / compilation / strict Clippy | Tested | Windows formatting, strict workspace/all-target Clippy and viewer/all-test compilation pass at d23d841d. Local native build passes; local full test/Clippy compilation exceeded 8 GiB memory. |
+| Focused unit/regression tests | Tested | 151 passing executions across selected Windows filters, including 19 branding and 40 login tests; 1 OS credential-store test intentionally ignored. Also 11 local core/atomic-file and 13 i18n tests pass. Counts and run below. |
 | Actual interface screenshots | Tested | Native Rust/wgpu application captured on Xvfb/software Vulkan; not a design mockup or native-picker test. Final capture links are recorded below. |
-| Windows portable package / launcher / executable names | Implemented | Fixed Beta 27 artifact/ZIP label, Waters Roux launcher/executable and isolated profile; Windows Actions verification recorded below. |
-| Downloadable Beta 27 artifact | Implemented | Dedicated Windows Actions workflow is running for the final implementation commit; direct successful upload evidence will be recorded below. |
-| Visual design approval | Blocked pending owner | Original artwork and owner's explicit review still required |
+| Windows portable package / launcher / executable names | Tested | Windows release compile, Waters Roux version check, packaging and upload pass for d23d841d. Launcher, executable and portable marker are generated by the checked packaging script. Human Windows launch still required. |
+| Downloadable Beta 27 artifact | Tested | Artifact 13738664714 uploaded successfully from d23d841d; direct link above, retention until November 24, 2026. |
+| Visual design approval | Blocked | Original artwork and owner's explicit review still required |
 
 ## Verification record
 
-Initial screenshot source: `79d5b77e167dcf2ff90aef8124b4a14521c72c61`.
-The compact-layout follow-up uses measured logo/header space so the whole
-saved-account card, not just its button text, fits above the footer. Successful
-reimports invalidate both image caches, allowing repaired managed files to
-refresh without restarting. Additional captures and final verification are
-recorded in the [current online guide](https://github.com/WynnieOS/Waters-Roux-Viewer/blob/feat/waters-roux-beta27/docs/WATERS_ROUX_BETA27.md).
+Tested implementation and primary screenshot source:
+`d23d841d2d8d4b6b05cacae603c9d43e8ee83d6e`.
 [Actual application captures](https://github.com/WynnieOS/Waters-Roux-Viewer/tree/captures/beta27)
-include 1920×1080, 1600×900, 1366×768, 800×1100, the Appearance editor,
-and a High Contrast diagnostic view.
-The diagnostic checkerboard capture is explicitly a test fixture, not official
-artwork or proposed visual design. It verifies actual texture rendering and
-frosted-panel alignment after importing, saving, deleting originals and
-restarting the viewer in an isolated test profile.
+include the 1366×768 login, Appearance editor and 800×733 MFA/account forms from
+that exact committed build. Earlier unchanged default views at 1920×1080,
+1600×900, 800×1100 and the High Contrast diagnostic identify their source
+revision in the capture README. The measured logo/header space keeps complete
+cards above the footer. Reimporting a repaired image invalidates both caches.
+
+The checkerboards and account examples are explicitly isolated offline test
+fixtures, not official artwork, real account details or proposed visual design.
+The rendering smoke test imports four distinct hashes, saves/reloads all four
+selections, deletes the original files and verifies the managed images still
+load. Native-picker and actual grid-transition interactions remain human tests.
 
 Local results: `cargo fmt --all -- --check`, `cargo check --workspace --all-targets`
 and a native `cargo build --locked -p aurora-viewer` pass (dev build uses
@@ -145,15 +152,52 @@ A focused harness of the real branding/atomic-file modules passes **11 tests**.
 `cargo test --locked -p aurora-i18n` passes **4 unit + 9 catalog tests**, including
 English/French/Japanese key and variable parity.
 
-The initial Windows run passed formatting, strict Clippy, compilation and all 18 new branding tests. Its detailed logs exposed six regression failures masked by a PowerShell runner bug. Commit `a2854407` corrects compact header sizing, hover contrast, selected-highlight expectations, inherited Quick Preferences styling and its obsolete footer assertion, and makes each test command fail the job immediately. One selected-reflection assertion still assumed a fixed inset in that follow-up; it now checks that the highlight belongs to the selected card independently of the theme corner radius. The final measured-layout/cache follow-up must be verified with:
-`cargo fmt --all -- --check`, strict
-`cargo clippy --locked --profile ci --workspace --all-targets -- -D warnings`,
-viewer/all-target `cargo check`, and the brand/glass, branding, login,
-interface-colors, credentials, theme-guard, Quick Preferences, CLI, About,
-high-contrast, uninstall and news test filters.
-[Corrected verification run](https://github.com/WynnieOS/Waters-Roux-Viewer/actions/runs/42760243768).
+Windows verification at the tested implementation revision is complete:
+[successful run](https://github.com/WynnieOS/Waters-Roux-Viewer/actions/runs/42762695060).
+Formatting, strict `cargo clippy --locked --profile ci --workspace --all-targets -- -D warnings`
+and `cargo check --locked --profile ci --all-targets -p aurora-viewer` pass.
+The detailed log contains **zero failed tests**. The runner now exits on the
+first failed filter, fixing the earlier false-green PowerShell behavior.
 
-The portable build/artifact result is recorded below when uploaded. Do not substitute the
+| Windows test filter | Passed | Ignored |
+| --- | ---: | ---: |
+| `waters_roux_` | 4 | 0 |
+| `branding` | 19 | 0 |
+| `ui::login` | 40 | 0 |
+| `ui::loading` | 2 | 0 |
+| `login_accounts` | 6 | 0 |
+| `interface_colors` | 13 | 0 |
+| `credentials` | 9 | 1 |
+| `ui::theme_guard` | 5 | 0 |
+| `ui::quick_prefs` | 9 | 0 |
+| `cli::tests` | 8 | 0 |
+| `ui::about` | 4 | 0 |
+| `high_contrast` | 6 | 0 |
+| `uninstall` | 14 | 0 |
+| `ui::news` | 12 | 0 |
+
+These are **151 passing executions across selected filters**, not the full
+viewer test suite or a human in-world result. The intentionally ignored
+`credentials::tests::store_round_trip` needs an OS credential-store human test.
+
+Remaining polish: the crash-report helper still uses the inherited Aurora
+title strings. Normal login/window/About identity is Waters Roux; the exact
+logo, derived icon and approved scene remain blocked by missing source files.
+In-world panels keep existing translucency; world-scene blur is unfinished.
+
+Windows delivery is complete: [successful portable build](https://github.com/WynnieOS/Waters-Roux-Viewer/actions/runs/42762694903),
+[artifact 13738664714](https://github.com/WynnieOS/Waters-Roux-Viewer/actions/runs/42762694903/artifacts/13738664714),
+76,392,789 bytes. The optimized release build uses the existing
+`--release --locked -p aurora-viewer --features xr-static-loader` command.
+Packaging verifies the Waters Roux executable identity and includes available
+assets, licenses, launcher, isolated-profile marker, instructions and the
+missing-art manifest. No original official logo/background/ICO file was
+available to include. The Windows executable was exercised with `--version`
+during packaging; interactive Windows login and native picker remain human tests.
+
+The code in this artifact is the tested implementation commit above. A later
+documentation-only commit records these results without changing application
+source or rebuilding the same code. Do not substitute the
 Beta 26 result for a Beta 27 check. Never call a mockup, a passing linter, or an
 older successful in-world session proof that native pickers and the new
 appearance transactions work.
