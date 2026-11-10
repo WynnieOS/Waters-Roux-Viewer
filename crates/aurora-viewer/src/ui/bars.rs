@@ -3710,7 +3710,10 @@ mod tests {
         // action, which the app dispatches through request_controls().
         assert!(matches!(
             run_command(&ctx, "phototools_view", &mut panels),
-            BarAction::Controls { movement: false, toggle: true }
+            BarAction::Controls {
+                movement: false,
+                toggle: true
+            }
         ));
         panels.camera_controls = true;
         assert!(command_active("phototools_view", &panels, false, false, false));
