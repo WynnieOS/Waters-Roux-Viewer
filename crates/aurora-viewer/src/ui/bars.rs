@@ -78,6 +78,9 @@ pub enum BarAction {
     ConversationLog,
     /// Open Inventory with its existing advanced filter controls shown.
     InventoryFilters,
+    /// Open a trusted third-party service in the user's normal browser;
+    /// this does not claim in-viewer authentication or direct publishing.
+    ExternalService(&'static str),
     /// Our profile on its Picks tab, or closed when Picks is shown
     /// (Avatar.TogglePicks, llviewermenu.cpp).
     MyPicks,
@@ -2137,6 +2140,10 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         "howto" => return BarAction::HowTo,
         "conversation_log" => return BarAction::ConversationLog,
         "omnifilter" => return BarAction::InventoryFilters,
+        "flickr" => return BarAction::ExternalService("https://www.flickr.com/"),
+        "primfeed" => return BarAction::ExternalService("https://www.primfeed.com/"),
+        // No project-specific Discord invite has been configured.
+        "discord" => return BarAction::ExternalService("https://discord.com/app"),
         "beacons" => toggle(super::beacons::WINDOW, &mut panels.beacons),
         // Floater.Toggle quickprefs
         "quickprefs" => toggle(super::quick_prefs::WINDOW, &mut panels.quick_prefs),
@@ -3724,6 +3731,14 @@ mod tests {
         ));
         assert!(super::super::toolbar::ready("omnifilter"));
         assert!(matches!(run_command(&ctx, "omnifilter", &mut panels), BarAction::InventoryFilters));
+        for (cmd, target) in [
+            ("flickr", "https://www.flickr.com/"),
+            ("primfeed", "https://www.primfeed.com/"),
+            ("discord", "https://discord.com/app"),
+        ] {
+            assert!(super::super::toolbar::ready(cmd));
+            assert!(matches!(run_command(&ctx, cmd, &mut panels), BarAction::ExternalService(url) if url == target));
+        }
     }
 
     #[test]
