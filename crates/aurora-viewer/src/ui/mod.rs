@@ -107,6 +107,7 @@ pub mod quick_prefs;
 pub mod region;
 pub mod region_message_prompt;
 pub mod region_restart;
+pub mod region_tracker;
 pub mod remote_object;
 pub mod report_abuse;
 pub(crate) mod resource_drop;
@@ -223,6 +224,8 @@ pub struct Panels {
     pub camera_controls: bool,
     /// Compass for turning the local avatar to cardinal/diagonal bearings.
     pub avatar_align: bool,
+    /// Session region tracker: current and recently visited locations.
+    pub region_tracker: bool,
     pub movement_controls: bool,
     /// Navigation bar location being edited (text) and "just opened" (select all).
     pub nav_edit: Option<String>,
@@ -281,6 +284,7 @@ impl Panels {
             stream_title_history: false,
             camera_controls: settings.show_camera_controls,
             avatar_align: false,
+            region_tracker: false,
             movement_controls: settings.show_movement_controls,
             nav_edit: None,
             nav_edit_new: false,
