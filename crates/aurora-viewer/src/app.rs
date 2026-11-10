@@ -13815,6 +13815,22 @@ impl App {
             BarAction::CreateLandmark => self.open_create_landmark(None),
             BarAction::PhotoToDisk => self.photo_to_disk(),
             BarAction::PhotoRoll => self.photo_reel_show_newest(),
+            // The Destination Guide and Help pages run inside the viewer's
+            // existing browser, rather than creating dead toolbar windows.
+            BarAction::Destinations => {
+                self.web_browser_ui.go_to("https://secondlife.com/destinations");
+                ui::widgets::open_floater(&self.egui_ctx, ui::web_browser::WINDOW, &mut self.panels.web_browser);
+            }
+            BarAction::HowTo => {
+                self.web_browser_ui.go_to("https://community.secondlife.com/knowledgebase/");
+                ui::widgets::open_floater(&self.egui_ctx, ui::web_browser::WINDOW, &mut self.panels.web_browser);
+            }
+            // Existing Chat History UI reads the selected conversation's
+            // local transcript. Without a selected IM it opens Nearby Chat.
+            BarAction::ConversationLog => {
+                let (title, file) = self.world.transcript_of(self.chat_ui.selected);
+                self.history_ui.show_file(title, file);
+            }
             BarAction::LandmarkStar(star) => self.landmark_star(star),
             BarAction::PlaceBar { stretch, rights_text } => {
                 self.settings.place_bar_stretch = stretch;
