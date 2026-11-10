@@ -9243,15 +9243,26 @@ impl App {
         self.viewfinder_frame(&mut gfx.renderer);
         self.photo_isolate_frame(&mut gfx.renderer);
         let photo = self.photo_frame(&mut gfx.renderer);
+        // The panorama uses a fixed eye and six 90° render views without
+        // changing the player's camera or sending a new aim to the grid.
+        let panorama = photo.as_ref().and_then(|frame| frame.panorama);
+        let render_eye = panorama.map_or(self.camera.position, |face| face.eye);
+        let render_forward = panorama.map_or_else(|| self.camera.forward(), |face| face.forward);
+        let render_fov = if panorama.is_some() {
+            std::f32::consts::FRAC_PI_2
+        } else {
+            self.camera.fov_y
+        };
         let window_aspect = w as f32 / h.max(1) as f32;
         let aspect = photo.as_ref().map_or(window_aspect, |f| f.aspect);
         let photo_tile = photo.as_ref().map_or(glam::Mat4::IDENTITY, |f| f.tile);
         let photo_scale = photo.as_ref().map_or(1.0, |f| f.scale);
         let photo_context = photo.as_ref().map_or(aurora_render::PhotoContext::None, |f| f.context);
         let lod_height = photo.as_ref().map_or(h, |f| f.height);
-        let frame_proj = |camera: &crate::camera::Camera| match &photo {
-            Some(f) => photo_tile * camera.photo_proj(f.aspect, window_aspect),
-            None => camera.proj(aspect),
+        let frame_proj = |camera: &crate::camera::Camera| match (panorama, &photo) {
+            (Some(face), _) => face.projection,
+            (None, Some(f)) => photo_tile * camera.photo_proj(f.aspect, window_aspect),
+            (None, None) => camera.proj(aspect),
         };
 
         // ---- agent / camera
@@ -9611,12 +9622,12 @@ impl App {
             self.world.agent.pitch = pitch;
             gfx.renderer.cut_motion_history();
         }
-        let mut view = self.camera.view();
+        let mut view = panorama.map_or_else(|| self.camera.view(), |face| face.view);
         let mut proj = frame_proj(&self.camera);
         let mut vp = proj * view;
-        let camera_fast = self.texture_motion.update(self.camera.position, self.camera.forward(), dt);
-        let mut cull = CullView::new(vp, self.camera.position, lod_height as f32, self.camera.fov_y).with_texture_camera(
-            self.camera.forward(),
+        let camera_fast = self.texture_motion.update(render_eye, render_forward, dt);
+        let mut cull = CullView::new(vp, render_eye, lod_height as f32, render_fov).with_texture_camera(
+            render_forward,
             aspect,
             camera_fast,
         );
@@ -9666,7 +9677,7 @@ impl App {
             }
             // reflection lists: planar reflections and reflection probe captures
             self.scene.reflections = self.settings.water_reflections > 0 || self.settings.mirrors > 0 || in_world;
-            self.scene.fov_y = self.camera.fov_y;
+            self.scene.fov_y = render_fov;
             self.scene.agent_idx = self.world.objects.index_of_uuid(&self.world.agent_id);
             if self.demo
                 && let Some(alpha) = crate::demo::animesh_alpha_step(self.frame_count)
@@ -9934,11 +9945,11 @@ impl App {
                 self.net.send(NetCommand::SetFov(self.sent_fov));
             }
             if camera_changed {
-                view = self.camera.view();
+                view = panorama.map_or_else(|| self.camera.view(), |face| face.view);
                 proj = frame_proj(&self.camera);
                 vp = proj * view;
-                cull = CullView::new(vp, self.camera.position, lod_height as f32, self.camera.fov_y).with_texture_camera(
-                    self.camera.forward(),
+                cull = CullView::new(vp, render_eye, lod_height as f32, render_fov).with_texture_camera(
+                    render_forward,
                     aspect,
                     camera_fast,
                 );
@@ -9948,7 +9959,7 @@ impl App {
                 if gfx.renderer.vr_engaged() || (self.demo && std::env::var_os("AURORA_DEMO_XR_WORLD").is_some()) {
                     cull.planes = [glam::Vec4::W; 6];
                 }
-                self.scene.fov_y = self.camera.fov_y;
+                self.scene.fov_y = render_fov;
                 self.build.cam = crate::build::geom::Cam::new(
                     self.camera.position,
                     self.camera.target,
@@ -10481,10 +10492,10 @@ impl App {
         }
         let (lights, spot_shadows) = if in_world {
             let view = crate::scene::lights::LightView {
-                eye: self.camera.position,
-                forward: self.camera.forward(),
+                eye: render_eye,
+                forward: render_forward,
                 // the frame's own view, even when the culling is frozen
-                frustum: CullView::new(vp, self.camera.position, lod_height as f32, self.camera.fov_y),
+                frustum: CullView::new(vp, render_eye, lod_height as f32, render_fov),
                 range: self.settings.draw_distance,
                 dt,
                 projector_shadows: self.settings.projector_shadows && self.settings.shadow_quality > 0,
@@ -10512,7 +10523,7 @@ impl App {
                 self.probes.refresh();
             }
             self.probes
-                .update(&self.scene, &self.world, self.camera.position, env.probe_ambiance, world_now())
+                .update(&self.scene, &self.world, render_eye, env.probe_ambiance, world_now())
         } else {
             aurora_render::ProbeFrame::default()
         };
@@ -10576,10 +10587,10 @@ impl App {
             photo_tile,
             photo_scale,
             photo_context,
-            camera_pos: self.camera.position,
+            camera_pos: render_eye,
             near: self.camera.near,
             far: self.settings.draw_distance,
-            fov_y: self.camera.fov_y,
+            fov_y: render_fov,
             time: if self.demo {
                 crate::demo::water::inspection_time(world_clock())
             } else {
@@ -10619,9 +10630,10 @@ impl App {
             all_lights: self.frame_profile.all_lights(),
             probe_walk_list: self.frame_profile.probe_walk_list(),
             debug: self.settings.debug.render(),
-            dof: {
-                // the image's own vertical field of view (a photo's may be
-                // wider than the window's)
+            // Per-face depth-of-field would make hard panorama seams.
+            dof: if panorama.is_some() {
+                None
+            } else {
                 let lens_proj = match &photo {
                     Some(f) => self.camera.photo_proj(f.aspect, window_aspect),
                     None => self.camera.proj(aspect),
@@ -13825,6 +13837,7 @@ impl App {
             BarAction::TeleportHistory => self.toggle_teleport_history(),
             BarAction::CreateLandmark => self.open_create_landmark(None),
             BarAction::PhotoToDisk => self.photo_to_disk(),
+            BarAction::CapturePanorama => self.photo_panorama_to_disk(),
             BarAction::PhotoRoll => self.photo_reel_show_newest(),
             // The Destination Guide and Help pages run inside the viewer's
             // existing browser, rather than creating dead toolbar windows.
