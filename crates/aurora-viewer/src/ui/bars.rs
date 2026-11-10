@@ -80,6 +80,8 @@ pub enum BarAction {
     InventoryFilters,
     /// Rotate our own avatar toward the closest visible resident within 20 m.
     FaceNearestAvatar,
+    /// Open the inventory Favorites tab filtered to wearable items.
+    WearableFavorites,
     /// Open a trusted third-party service in the user's normal browser;
     /// this does not claim in-viewer authentication or direct publishing.
     ExternalService(&'static str),
@@ -2143,6 +2145,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         "conversation_log" => return BarAction::ConversationLog,
         "omnifilter" => return BarAction::InventoryFilters,
         "face_nearest_avatar" => return BarAction::FaceNearestAvatar,
+        "wearable_favorites" => return BarAction::WearableFavorites,
         "flickr" => return BarAction::ExternalService("https://www.flickr.com/"),
         "primfeed" => return BarAction::ExternalService("https://www.primfeed.com/"),
         // No project-specific Discord invite has been configured.
@@ -3753,6 +3756,8 @@ mod tests {
             run_command(&ctx, "face_nearest_avatar", &mut panels),
             BarAction::FaceNearestAvatar
         ));
+        assert!(super::super::toolbar::ready("wearable_favorites"));
+        assert!(matches!(run_command(&ctx, "wearable_favorites", &mut panels), BarAction::WearableFavorites));
         assert!(super::super::toolbar::ready("omnifilter"));
         assert!(matches!(run_command(&ctx, "omnifilter", &mut panels), BarAction::InventoryFilters));
         for (cmd, target) in [
