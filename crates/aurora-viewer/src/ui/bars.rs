@@ -2167,6 +2167,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
             };
         }
         "avatar_align" => toggle("avatar_align", &mut panels.avatar_align),
+        "regiontracker" => toggle("region_tracker", &mut panels.region_tracker),
         "view" | "phototools_view" => {
             return BarAction::Controls {
                 movement: false,
@@ -2249,6 +2250,7 @@ fn command_active(cmd: &str, panels: &Panels, flying: bool, seated: bool, mousel
         "move" => panels.movement_controls,
         "view" | "phototools_view" => panels.camera_controls,
         "avatar_align" => panels.avatar_align,
+        "regiontracker" => panels.region_tracker,
         "fly" => flying,
         "sit" => seated,
         "mouselook" => mouselook,
@@ -3734,6 +3736,12 @@ mod tests {
             run_command(&ctx, "conversation_log", &mut panels),
             BarAction::ConversationLog
         ));
+        assert!(super::super::toolbar::ready("regiontracker"));
+        run_command(&ctx, "regiontracker", &mut panels);
+        assert!(panels.region_tracker);
+        assert!(command_active("regiontracker", &panels, false, false, false));
+        run_command(&ctx, "regiontracker", &mut panels);
+        assert!(!panels.region_tracker);
         assert!(super::super::toolbar::ready("avatar_align"));
         run_command(&ctx, "avatar_align", &mut panels);
         assert!(panels.avatar_align);
