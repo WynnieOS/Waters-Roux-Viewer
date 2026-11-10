@@ -13841,6 +13841,7 @@ impl App {
                 // normal browser, never in an unofficial viewer widget.
                 self.egui_ctx.open_url(egui::OpenUrl::new_tab(url));
             }
+            BarAction::FaceNearestAvatar => self.face_nearest_avatar(),
             BarAction::LandmarkStar(star) => self.landmark_star(star),
             BarAction::PlaceBar { stretch, rights_text } => {
                 self.settings.place_bar_stretch = stretch;
