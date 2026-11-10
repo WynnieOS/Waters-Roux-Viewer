@@ -13836,6 +13836,11 @@ impl App {
                 // The advanced Find filters already exist in InventoryUi.
                 self.inventory_ui.filters_open = true;
             }
+            BarAction::ExternalService(url) => {
+                // Authentication remains with the service in the user's
+                // normal browser, never in an unofficial viewer widget.
+                self.egui_ctx.open_url(egui::OpenUrl::new_tab(url));
+            }
             BarAction::LandmarkStar(star) => self.landmark_star(star),
             BarAction::PlaceBar { stretch, rights_text } => {
                 self.settings.place_bar_stretch = stretch;
