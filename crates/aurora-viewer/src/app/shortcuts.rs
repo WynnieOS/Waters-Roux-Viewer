@@ -53,6 +53,27 @@ impl App {
         self.set_double_click(double_click_teleport_toggled(self.settings.double_click));
     }
 
+    /// Firestorm's Face Nearest Avatar (20 metre limit) rotates only the
+    /// local agent. The server receives the new facing via AgentUpdate.
+    pub(super) fn face_nearest_avatar(&mut self) {
+        if !self.in_world() || !self.world.agent.has_local_control() || self.world.agent.is_sitting() {
+            return;
+        }
+        let me = self.world.agent_id;
+        let region = self.world.main_region;
+        let positions = self
+            .world
+            .objects
+            .avatars()
+            .filter(|(_, avatar)| avatar.full_id != me && Some(avatar.key.region) == region)
+            .map(|(_, avatar)| avatar.position);
+        if let Some(direction) = nearest_avatar_direction(self.world.agent.position, positions) {
+            self.world.agent.set_look_at(direction);
+        } else {
+            self.world.system_message("No avatar within 20 metres to face.".to_owned());
+        }
+    }
+
     /// RenderHighlightSelections, as the build tools' option.
     pub(super) fn toggle_selection_outlines(&mut self) {
         self.settings.build.show_highlight = !self.settings.build.show_highlight;
@@ -188,5 +209,39 @@ mod tests {
         assert_eq!(double_click_teleport_toggled(DoubleClick::Nothing), DoubleClick::Teleport);
         assert_eq!(double_click_teleport_toggled(DoubleClick::Walk), DoubleClick::Teleport);
         assert_eq!(double_click_teleport_toggled(DoubleClick::Teleport), DoubleClick::Nothing);
+    }
+}
+
+/// Direction to the nearest resident, using 3D distance to enforce the
+/// 20 metre interaction range and 2D facing so height does not tilt the avatar.
+fn nearest_avatar_direction(origin: glam::Vec3, positions: impl Iterator<Item = glam::Vec3>) -> Option<glam::Vec3> {
+    positions
+        .filter_map(|position| {
+            let delta = position - origin;
+            let distance_sq = delta.length_squared();
+            (delta.is_finite() && distance_sq > 0.0001 && distance_sq <= 400.0 && delta.truncate().length_squared() > 0.0001)
+                .then_some((distance_sq, delta))
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, direction)| direction)
+}
+
+#[cfg(test)]
+mod face_nearest_avatar_tests {
+    use super::*;
+    use glam::Vec3;
+
+    #[test]
+    fn nearest_avatar_facing_ignores_self_out_of_range_and_invalid_targets() {
+        let origin = Vec3::new(100.0, 100.0, 24.0);
+        let targets = [
+            origin,
+            origin + Vec3::new(0.0, 21.0, 0.0),
+            Vec3::splat(f32::NAN),
+            origin + Vec3::new(-3.0, 0.0, 0.0),
+            origin + Vec3::new(0.0, 5.0, 0.0),
+        ];
+        assert_eq!(nearest_avatar_direction(origin, targets.into_iter()), Some(Vec3::new(-3.0, 0.0, 0.0)));
+        assert_eq!(nearest_avatar_direction(origin, [origin, origin + Vec3::X * 25.0].into_iter()), None);
     }
 }
