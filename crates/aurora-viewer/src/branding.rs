@@ -43,7 +43,8 @@ impl Slot {
 pub enum Fit {
     #[default]
     Fill,
-    Fit,
+    #[serde(rename = "fit")]
+    Contain,
     Center,
 }
 
@@ -451,7 +452,7 @@ pub fn placement(value: &ImageSettings, image: [u32; 2], bounds: Rect) -> (Rect,
     let ratios = bounds.size() / size;
     let base = match value.fit {
         Fit::Fill => ratios.x.max(ratios.y),
-        Fit::Fit => ratios.x.min(ratios.y),
+        Fit::Contain => ratios.x.min(ratios.y),
         Fit::Center => 1.0,
     };
     let drawn = size * base * value.scale;

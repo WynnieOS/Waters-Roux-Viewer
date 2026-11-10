@@ -489,7 +489,7 @@ fn image_controls(
                 ui.label(aurora_i18n::tr!("branding-display"));
                 for (fit, label) in [
                     (Fit::Fill, aurora_i18n::tr!("branding-fill")),
-                    (Fit::Fit, aurora_i18n::tr!("branding-fit")),
+                    (Fit::Contain, aurora_i18n::tr!("branding-fit")),
                     (Fit::Center, aurora_i18n::tr!("branding-center")),
                 ] {
                     widgets::radio_value(ui, p, &mut image.fit, fit, label);

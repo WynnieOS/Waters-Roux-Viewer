@@ -387,11 +387,10 @@ fn frosted_shape_for(
 ) -> Option<Shape> {
     let existing = {
         let state = state(ctx);
-        let found = state
+        state
             .lock()
             .ok()
-            .and_then(|state| state.neutral.as_ref().map(|(_, texture)| texture.clone()));
-        found
+            .and_then(|state| state.neutral.as_ref().map(|(_, texture)| texture.clone()))
     };
     let neutral = existing.unwrap_or_else(|| neutral(ctx, &crate::theme::Theme::waters_roux().palette()));
     let mut shapes = vec![cropped_shape(&neutral, screen, full_uv(), pane, radius)?];

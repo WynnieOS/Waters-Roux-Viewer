@@ -186,7 +186,7 @@ fn configuration_cannot_escape_managed_images_or_save_nonfinite_transforms() {
 fn fit_fill_center_and_alignment_preserve_aspect_ratio_at_every_viewport() {
     for viewport in [[1920.0, 1080.0], [1600.0, 900.0], [1366.0, 768.0], [560.0, 1100.0], [320.0, 480.0]] {
         let bounds = Rect::from_min_size(Pos2::new(20.0, 30.0), Vec2::from(viewport));
-        for fit in [Fit::Fill, Fit::Fit, Fit::Center] {
+        for fit in [Fit::Fill, Fit::Contain, Fit::Center] {
             for x in [0.0, 0.5, 1.0] {
                 let settings = ImageSettings {
                     fit,
