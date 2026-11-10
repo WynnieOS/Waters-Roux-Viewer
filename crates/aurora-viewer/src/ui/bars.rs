@@ -3741,7 +3741,10 @@ mod tests {
         run_command(&ctx, "avatar_align", &mut panels);
         assert!(!panels.avatar_align);
         assert!(super::super::toolbar::ready("face_nearest_avatar"));
-        assert!(matches!(run_command(&ctx, "face_nearest_avatar", &mut panels), BarAction::FaceNearestAvatar));
+        assert!(matches!(
+            run_command(&ctx, "face_nearest_avatar", &mut panels),
+            BarAction::FaceNearestAvatar
+        ));
         assert!(super::super::toolbar::ready("omnifilter"));
         assert!(matches!(run_command(&ctx, "omnifilter", &mut panels), BarAction::InventoryFilters));
         for (cmd, target) in [
