@@ -8,6 +8,11 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/waters-roux-integrated-preview.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/WATERS_ROUX_INTEGRATED_BUILD_REQUEST.md'
+      - '.github/workflows/waters-roux-integrated-preview.yml'
   workflow_dispatch:
 
 permissions:
