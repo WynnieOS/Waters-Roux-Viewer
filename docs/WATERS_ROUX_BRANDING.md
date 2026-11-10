@@ -102,3 +102,19 @@ November 9, 2026. Its original downloadable PNG is still needed in the workspace
 The build supports exact-byte embedding and external PNG loading. It never
 substitutes the Aurora emblem. Without the PNG/ICO the beta uses its text name
 and Windows' default application icon, with `MISSING-ARTWORK.txt` in the package.
+
+
+## Beta 27 customization milestone — November 10, 2026
+
+The Beta 26 procedural tree background and decorative amber card perimeter
+have been replaced by a neutral missing-art fallback and subtle blush/blue
+glass highlights. This fallback is not approved artwork. The original logo
+PNG and standalone New Orleans scene are still unavailable as source files.
+
+Login Appearance / Branding has independent Login and Loading background
+and logo selections, managed local imports, aspect-preserving transforms,
+previews, Apply/Cancel/Reset, and persistent glass controls. The login gear
+and Preferences → Waters Roux expose the same editor. See
+[the Beta 27 acceptance guide](WATERS_ROUX_BETA27.md) for the current evidence,
+missing artwork, Windows delivery and human test requirements. Historical
+Beta 26 descriptions above do not describe the Beta 27 fallback.

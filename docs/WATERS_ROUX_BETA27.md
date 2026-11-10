@@ -84,47 +84,76 @@ actual picker interaction: a synthetic UI screenshot alone is insufficient.
 
 ## Acceptance matrix
 
-`Pending` means implementation or verification is in progress. Only a recorded
-result may change a row to `Implemented`, `Tested` or `Blocked`; no row is
-implicitly complete because an earlier preview passed. A tested row must name
-whether the evidence is a unit test, actual application capture, Windows CI or
-human in-world check.
+`Implemented` means source is present, with remaining validation stated explicitly.
+`Tested` names recorded automated or application-capture evidence; it does not
+imply human grid acceptance. `Blocked` identifies missing input or a required
+human test. No acceptance item is assumed complete from an earlier preview.
 
 | Requirement | Status | Evidence or remaining verification |
 | --- | --- | --- |
 | Exact official logo displayed | Blocked | Original downloadable PNG unavailable at implementation start |
 | Official Windows/taskbar/launcher icon | Blocked | Requires approved original logo PNG and derived ICO |
 | Approved New Orleans background | Blocked | Standalone background-only file unavailable |
-| Orange login-card perimeter removed | Pending | Inspect `glass_card()` change and actual Beta 27 capture; preserve warning/focus outlines |
-| Refined translucent panel and legible controls | Pending | Inspect actual first-account and remembered-account views, including high contrast |
-| Responsive 1920×1080, 1600×900, 1366×768 and tall/narrow layout | Pending | Runtime captures and resizing; logo/card/gear must remain reachable |
-| Login background selection and preview | Pending | PNG/JPEG validation, real native picker, fit/fill/center, safe crop/position/scale |
-| Independent login logo selection and preview | Pending | Transparent PNG, complete aspect-preserved logo, size/position; official exe identity unchanged |
-| Independent loading background | Pending | Separate persisted choice, transition rendering and progress/operational text preserved |
-| Independent loading logo | Pending | Separate persisted transparent PNG, size/position; login choice unchanged |
-| Apply / Cancel / Reset / Defaults | Pending | Transaction unit tests plus actual UI interaction and restart verification |
-| Local safe artwork storage | Pending | Bounded decoding, atomic writes, no arbitrary path reuse, no artwork transmission |
-| Missing/corrupt image fallback | Pending | Validation/fallback tests and actual application recovery |
-| Glass 10–100% opacity and persistence | Pending | Unit tests, immediate preview, restart and readability at both endpoints |
-| Glass tint/accent/border/available blur controls | Pending | Label supported effects accurately; avoid per-frame decoding or unnecessary GPU work |
-| High Contrast and keyboard accessibility | Pending | Tab/Shift+Tab, focus indication, warnings and opaque fallback |
-| Working authentication and remembered accounts | Pending human test | No automated grid login or credential handling; owner must test Beta 27 |
-| World/avatar, inventory/search, Quick Preferences and camera | Pending human test | Retain earlier behavior; smoke-test in the Beta 27 binary |
-| Movement/flying/teleport/chat/environment/AO | Pending human test | Human in-world acceptance and performance comparison |
-| Settings/profile coexistence with previous previews | Pending | Portable isolation inspection and restart test in a new extraction folder |
-| Aurora copyright, licenses and derivative notices | Pending | Packaging inventory and About inspection; no endorsement claim |
-| Everyday/Studio/Creator workspace branches preserved | Pending review | No unrelated branch merge; PR #3 remains separate |
-| Rust formatting / compilation / strict Clippy | Pending | Record current revision's commands and results after verification |
-| Focused unit/regression tests | Pending | Four choices, validation, transactions/defaults/persistence/fallback/layout/glass |
-| Actual interface screenshots | Pending | Capture native application, identify source commit, dimensions and missing-art limitations |
-| Windows portable package / launcher / executable names | Pending Windows Actions | Fixed Beta 27 artifact label; package same working dependencies and notices |
-| Downloadable Beta 27 artifact | Pending Windows Actions | Record direct run/artifact link after successful upload |
+| Orange login-card perimeter removed | Tested | Actual final 79d5b77e application captures show no amber perimeter/top strip; warning and keyboard-focus states are preserved. |
+| Refined translucent panel and legible controls | Implemented | Actual login capture shows the glass card and readable controls; approved luxury composition remains blocked by missing artwork and owner review. |
+| Responsive 1920×1080, 1600×900, 1366×768 and tall/narrow layout | Tested | Actual application captures at desktop sizes and 800×1100; existing minimum window width is 800. Image/logo geometry has bounded aspect-ratio tests. Human resizing and translated-label checks remain. |
+| Login background selection and preview | Implemented | Independent PNG/JPEG import, preview, Fill/Fit/Center and transforms. Core import/persistence tests pass; native picker interaction still requires a human. |
+| Independent login logo selection and preview | Implemented | Separate PNG import, alpha-preserving bytes, bounded aspect-preserving size/placement. Core tests pass; native picker interaction still requires a human. |
+| Independent loading background | Implemented | Separate persisted slot and loading/teleport rendering path. Core tests pass; actual grid transition requires human testing. |
+| Independent loading logo | Implemented | Separate persisted PNG slot and bounded placement above progress text. Core tests pass; actual grid transition requires human testing. |
+| Apply / Cancel / Reset / Defaults | Tested | Atomic core and actual editor Cancel-button, reset, independent-section and failed-Apply tests pass in Windows CI. Full human picker-to-Apply/restart interaction remains required. |
+| Local safe artwork storage | Tested | Core tests cover bounded decoding, managed names, atomic publication, exact-byte import and deletion of the original file. Personal artwork stays local. |
+| Missing/corrupt image fallback | Tested | Core missing/corrupt/hidden tests pass; actual default application capture runs without official artwork. |
+| Glass 10–100% opacity and persistence | Tested | Core round-trip and clamping tests pass. Live preview and existing in-world opacity path are implemented; human readability checks at endpoints remain. |
+| Glass tint/accent/border/available blur controls | Implemented | Cached asynchronous login background blur, tint/accent and subtle glow controls. World panels retain existing translucency; world-scene blur is not introduced by this milestone. |
+| High Contrast and keyboard accessibility | Tested | Actual diagnostic-profile capture confirms an opaque card and white labels in High Contrast; existing focus/warning states are retained. Human keyboard and assistive-technology checks remain. |
+| Working authentication and remembered accounts | Blocked | Fresh Beta 27 human grid test required; agents do not connect to a grid or handle credentials. |
+| World/avatar, inventory/search, Quick Preferences and camera | Blocked | Fresh Beta 27 human in-world regression test required; preceding owner test is not substituted. |
+| Movement/flying/teleport/chat/environment/AO | Blocked | Fresh human in-world acceptance and performance comparison required. |
+| Settings/profile coexistence with previous previews | Implemented | Portable marker and adjacent profile isolate settings/cache/logs; package refuses an existing output folder. Human side-by-side Windows extraction test remains. |
+| Aurora copyright, licenses and derivative notices | Implemented | Existing About attribution and packaged LICENSE, NOTICE, dictionary/emoji notices retained; no endorsement claimed. |
+| Everyday/Studio/Creator workspace branches preserved | Tested | Beta 27 descends from verified Beta 26; no unrelated branch merge. PR #3 Clippy fix remains separate. |
+| Rust formatting / compilation / strict Clippy | Tested | Windows formatting, strict workspace/all-target Clippy and viewer/all-test compilation passed at 7f13526b. The measured-layout/cache follow-up requires its own rerun. Local full test/Clippy compilation exceeded 8 GiB memory. |
+| Focused unit/regression tests | Tested | 18 Windows branding tests, 4 brand/glass tests, 11 local core/atomic-file tests and 13 i18n tests pass. Regression fixes and the new reimport-cache test require final Windows verification. |
+| Actual interface screenshots | Tested | Native Rust/wgpu application captured on Xvfb/software Vulkan; not a design mockup or native-picker test. Final capture links are recorded below. |
+| Windows portable package / launcher / executable names | Implemented | Fixed Beta 27 artifact/ZIP label, Waters Roux launcher/executable and isolated profile; Windows Actions verification recorded below. |
+| Downloadable Beta 27 artifact | Implemented | Dedicated Windows Actions workflow is running for the final implementation commit; direct successful upload evidence will be recorded below. |
 | Visual design approval | Blocked pending owner | Original artwork and owner's explicit review still required |
 
 ## Verification record
 
-The implementation owner will record the final commands, counts, failures,
-actual screenshots and Actions links here when available. Do not substitute the
+Initial screenshot source: `79d5b77e167dcf2ff90aef8124b4a14521c72c61`.
+The compact-layout follow-up uses measured logo/header space so the whole
+saved-account card, not just its button text, fits above the footer. Successful
+reimports invalidate both image caches, allowing repaired managed files to
+refresh without restarting. Additional captures and final verification are
+recorded in the [current online guide](https://github.com/WynnieOS/Waters-Roux-Viewer/blob/feat/waters-roux-beta27/docs/WATERS_ROUX_BETA27.md).
+[Actual application captures](https://github.com/WynnieOS/Waters-Roux-Viewer/tree/captures/beta27)
+include 1920×1080, 1600×900, 1366×768, 800×1100, the Appearance editor,
+and a High Contrast diagnostic view.
+The diagnostic checkerboard capture is explicitly a test fixture, not official
+artwork or proposed visual design. It verifies actual texture rendering and
+frosted-panel alignment after importing, saving, deleting originals and
+restarting the viewer in an isolated test profile.
+
+Local results: `cargo fmt --all -- --check`, `cargo check --workspace --all-targets`
+and a native `cargo build --locked -p aurora-viewer` pass (dev build uses
+opt-level 0 for the viewer to fit the available memory). Existing Linux-only
+dead-code warnings remain. Full local viewer test/Clippy compilation hit the
+8 GiB memory limit; Windows strict checks are the target-platform authority.
+A focused harness of the real branding/atomic-file modules passes **11 tests**.
+`cargo test --locked -p aurora-i18n` passes **4 unit + 9 catalog tests**, including
+English/French/Japanese key and variable parity.
+
+The initial Windows run passed formatting, strict Clippy, compilation and all 18 new branding tests. Its detailed logs exposed six regression failures masked by a PowerShell runner bug. Commit `a2854407` corrects compact header sizing, hover contrast, selected-highlight expectations, inherited Quick Preferences styling and its obsolete footer assertion, and makes each test command fail the job immediately. One selected-reflection assertion still assumed a fixed inset in that follow-up; it now checks that the highlight belongs to the selected card independently of the theme corner radius. The final measured-layout/cache follow-up must be verified with:
+`cargo fmt --all -- --check`, strict
+`cargo clippy --locked --profile ci --workspace --all-targets -- -D warnings`,
+viewer/all-target `cargo check`, and the brand/glass, branding, login,
+interface-colors, credentials, theme-guard, Quick Preferences, CLI, About,
+high-contrast, uninstall and news test filters.
+[Corrected verification run](https://github.com/WynnieOS/Waters-Roux-Viewer/actions/runs/42760243768).
+
+The portable build/artifact result is recorded below when uploaded. Do not substitute the
 Beta 26 result for a Beta 27 check. Never call a mockup, a passing linter, or an
 older successful in-world session proof that native pickers and the new
 appearance transactions work.

@@ -357,6 +357,7 @@ impl Editor {
                     self.importing = None;
                     match done.result {
                         Ok(Some(name)) => {
+                            branding_runtime::invalidate_image(ctx, done.slot);
                             if let Some(pending) = &mut self.pending {
                                 pending.image_mut(done.slot).choice = ImageChoice::Custom(name);
                             }

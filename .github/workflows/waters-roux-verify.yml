@@ -67,7 +67,7 @@ jobs:
         run: |
           # PowerShell otherwise reports only the final native command's
           # status, masking a failure in an earlier regression filter.
-          foreach ($filter in @('ui::login', 'interface_colors', 'credentials', 'ui::theme_guard', 'ui::quick_prefs', 'cli::tests', 'ui::about', 'high_contrast', 'uninstall', 'ui::news')) {
+          foreach ($filter in @('ui::login', 'ui::loading', 'login_accounts', 'interface_colors', 'credentials', 'ui::theme_guard', 'ui::quick_prefs', 'cli::tests', 'ui::about', 'high_contrast', 'uninstall', 'ui::news')) {
             cargo test --locked --profile ci --workspace $filter
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }

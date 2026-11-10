@@ -99,6 +99,17 @@ pub fn reload(ctx: &Context) {
     ctx.request_repaint();
 }
 
+/// A successful reimport can repair a missing/corrupt managed file without
+/// changing its content-addressed name. Both caches must retry that slot.
+pub fn invalidate_image(ctx: &Context, slot: Slot) {
+    if let Ok(mut state) = state(ctx).lock() {
+        for offset in [0, SLOTS.len()] {
+            state.entries[slot_index(slot) + offset] = Entry::default();
+        }
+    }
+    ctx.request_repaint();
+}
+
 /// Preview opacity is immediate; outside the editor the existing Appearance
 /// opacity preference remains authoritative, preserving Beta 26 settings.
 /// High Contrast continues to supply its opaque accessible palette intact.
@@ -575,6 +586,43 @@ mod tests {
         assert_eq!(
             state.entries[SLOTS.len()].pending.as_ref().expect("preview request").0.choice,
             ImageChoice::Official
+        );
+    }
+
+    #[test]
+    fn branding_runtime_reimport_retries_a_cached_failure_in_live_and_preview() {
+        let ctx = Context::default();
+        let mut appearance = Appearance::default();
+        appearance.login.logo.choice = ImageChoice::Hidden;
+        let key = AssetKey {
+            choice: ImageChoice::Hidden,
+            blur: 0.0,
+        };
+        {
+            let state = state(&ctx);
+            let mut state = state.lock().expect("runtime cache");
+            for offset in [0, SLOTS.len()] {
+                state.entries[slot_index(Slot::LoginLogo) + offset].key = Some(key.clone());
+            }
+            state.entries[slot_index(Slot::LoadingLogo)].key = Some(key);
+        }
+        // A failed decode remains cached until an explicit import repairs it.
+        prepare(&ctx, &appearance, Slot::LoginLogo, false);
+        assert!(
+            state(&ctx).lock().expect("cache").entries[slot_index(Slot::LoginLogo)]
+                .pending
+                .is_none()
+        );
+        invalidate_image(&ctx, Slot::LoginLogo);
+        prepare(&ctx, &appearance, Slot::LoginLogo, false);
+        prepare(&ctx, &appearance, Slot::LoginLogo, true);
+        let state = state(&ctx);
+        let state = state.lock().expect("runtime cache");
+        assert!(state.entries[slot_index(Slot::LoginLogo)].pending.is_some());
+        assert!(state.entries[slot_index(Slot::LoginLogo) + SLOTS.len()].pending.is_some());
+        assert!(
+            state.entries[slot_index(Slot::LoadingLogo)].key.is_some(),
+            "the independent loading choice stays cached"
         );
     }
 
