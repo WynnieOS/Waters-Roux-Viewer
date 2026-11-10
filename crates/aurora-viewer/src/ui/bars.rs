@@ -3718,7 +3718,10 @@ mod tests {
 
         assert!(matches!(run_command(&ctx, "destinations", &mut panels), BarAction::Destinations));
         assert!(matches!(run_command(&ctx, "howto", &mut panels), BarAction::HowTo));
-        assert!(matches!(run_command(&ctx, "conversation_log", &mut panels), BarAction::ConversationLog));
+        assert!(matches!(
+            run_command(&ctx, "conversation_log", &mut panels),
+            BarAction::ConversationLog
+        ));
         assert!(super::super::toolbar::ready("omnifilter"));
         assert!(matches!(run_command(&ctx, "omnifilter", &mut panels), BarAction::InventoryFilters));
     }
