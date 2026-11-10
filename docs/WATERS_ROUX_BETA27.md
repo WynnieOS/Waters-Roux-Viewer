@@ -52,7 +52,7 @@ publication of personal images chosen later inside the application.
 ## Test the customization controls
 
 1. Before authentication, open the login gear button to open **Login Appearance /
-   Branding**. In-world, open **Preferences → Waters Roux → Appearance & Branding**.
+   Branding**. In-world, open **Preferences → Waters Roux → Login Appearance / Branding**.
 2. In **Login**, choose a background PNG or JPEG. Confirm the native file picker
    opens, choose a file, inspect the preview and current-selection label, then
    try **Fill**, **Fit**, **Center**, alignment and scaling. Check that the image
