@@ -55,7 +55,12 @@ pub fn show(
                 ui.label(egui::RichText::new(format!("REC {:02}:{:02}", elapsed.as_secs() / 60, elapsed.as_secs() % 60)).color(p.danger));
             }
         });
-        widgets::tabs(ui, p, &mut tab, &[("Camera", true), ("Cinematic visuals", true), ("Record video", true)]);
+        widgets::tabs(
+            ui,
+            p,
+            &mut tab,
+            &[("Camera", true), ("Cinematic visuals", true), ("Record video", true)],
+        );
         widgets::divider(ui, p);
         match tab {
             0 => {
@@ -87,12 +92,19 @@ pub fn show(
                     }
                 });
                 let mut fov = settings.camera.fov.to_degrees();
-                if ui.add(egui::Slider::new(&mut fov, 20.0..=100.0).text("Camera vertical field of view (degrees)")).changed() {
+                if ui
+                    .add(egui::Slider::new(&mut fov, 20.0..=100.0).text("Camera vertical field of view (degrees)"))
+                    .changed()
+                {
                     settings.camera.fov = fov.to_radians();
                     changed = true;
                 }
-                changed |= ui.add(egui::Slider::new(&mut settings.camera.zoom_time, 0.0..=5.0).text("Camera transition time (s)")).changed();
-                changed |= ui.add(egui::Slider::new(&mut settings.camera.smoothing, 0.0..=50.0).text("Camera movement smoothing")).changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut settings.camera.zoom_time, 0.0..=5.0).text("Camera transition time (s)"))
+                    .changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut settings.camera.smoothing, 0.0..=50.0).text("Camera movement smoothing"))
+                    .changed();
                 changed |= widgets::switch_labeled(ui, p, &mut settings.camera.track_focus_object, "Keep focused object tracked").changed();
                 ui.label("For saved camera presets and precise orbit/pan, open Camera controls.");
             }
@@ -100,22 +112,38 @@ pub fn show(
                 ui.label("Cinematic visual effects — settings change the actual renderer");
                 egui::ScrollArea::vertical().max_height(245.0).show(ui, |ui| {
                     changed |= widgets::switch_labeled(ui, p, &mut settings.hdr_emissive, "HDR / emissive lighting").changed();
-                    changed |= ui.add(egui::Slider::new(&mut settings.exposure, 0.25..=4.0).text("Exposure")).changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut settings.exposure, 0.25..=4.0).text("Exposure"))
+                        .changed();
                     changed |= widgets::switch_labeled(ui, p, &mut settings.dof.enabled, "Depth of field").changed();
                     ui.add_enabled_ui(settings.dof.enabled, |ui| {
-                        changed |= ui.add(egui::Slider::new(&mut settings.dof.f_number, 1.0..=22.0).text("Aperture f-number")).changed();
-                        changed |= ui.add(egui::Slider::new(&mut settings.dof.focal_length, 10.0..=200.0).text("Lens focal length (mm)")).changed();
+                        changed |= ui
+                            .add(egui::Slider::new(&mut settings.dof.f_number, 1.0..=22.0).text("Aperture f-number"))
+                            .changed();
+                        changed |= ui
+                            .add(egui::Slider::new(&mut settings.dof.focal_length, 10.0..=200.0).text("Lens focal length (mm)"))
+                            .changed();
                     });
                     changed |= widgets::switch_labeled(ui, p, &mut settings.glow, "Object glow").changed();
                     changed |= widgets::switch_labeled(ui, p, &mut settings.bloom, "Cinematic bloom").changed();
                     if settings.bloom {
-                        changed |= ui.add(egui::Slider::new(&mut settings.bloom_strength, 0.05..=1.0).text("Bloom strength")).changed();
+                        changed |= ui
+                            .add(egui::Slider::new(&mut settings.bloom_strength, 0.05..=1.0).text("Bloom strength"))
+                            .changed();
                     }
                     changed |= widgets::switch_labeled(ui, p, &mut settings.ssr, "Screen-space reflections").changed();
-                    changed |= ui.add(egui::Slider::new(&mut settings.shadow_quality, 0..=4).text("Shadow quality")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut settings.draw_distance, 32.0..=512.0).text("Draw distance (m)")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut settings.render_scale_percent, 50..=100).text("Render resolution (%)")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut settings.tonemap_mix, 0.0..=1.0).text("Tonemapping strength")).changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut settings.shadow_quality, 0..=4).text("Shadow quality"))
+                        .changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut settings.draw_distance, 32.0..=512.0).text("Draw distance (m)"))
+                        .changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut settings.render_scale_percent, 50..=100).text("Render resolution (%)"))
+                        .changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut settings.tonemap_mix, 0.0..=1.0).text("Tonemapping strength"))
+                        .changed();
                 });
             }
             _ => {
@@ -130,10 +158,14 @@ pub fn show(
                 ui.horizontal(|ui| {
                     ui.label("Target frame rate:");
                     for fps in [24, 30, 60] {
-                        changed |= ui.selectable_value(&mut settings.recording.fps, fps, format!("{fps} FPS")).changed();
+                        changed |= ui
+                            .selectable_value(&mut settings.recording.fps, fps, format!("{fps} FPS"))
+                            .changed();
                     }
                 });
-                changed |= ui.add(egui::Slider::new(&mut settings.recording.jpeg_quality, 80..=100).text("Frame image quality")).changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut settings.recording.jpeg_quality, 80..=100).text("Frame image quality"))
+                    .changed();
                 changed |= widgets::switch_labeled(
                     ui,
                     p,
@@ -146,10 +178,20 @@ pub fn show(
                 ui.label("AVI/MJPEG + PCM is experimental and can produce very large files. H.264/MP4 recording is not implemented yet.");
                 ui.horizontal(|ui| {
                     if recording {
-                        if widgets::action_button(ui, p, "player-stop-filled", "Stop and save video", ActionKind::Primary, Vec2::new(0.0, 32.0)).clicked() {
+                        if widgets::action_button(
+                            ui,
+                            p,
+                            "player-stop-filled",
+                            "Stop and save video",
+                            ActionKind::Primary,
+                            Vec2::new(0.0, 32.0),
+                        )
+                        .clicked()
+                        {
                             action = Action::StopRecording;
                         }
-                    } else if widgets::action_button(ui, p, "video", "Start recording", ActionKind::Primary, Vec2::new(0.0, 32.0)).clicked() {
+                    } else if widgets::action_button(ui, p, "video", "Start recording", ActionKind::Primary, Vec2::new(0.0, 32.0)).clicked()
+                    {
                         action = Action::StartRecording;
                     }
                 });
