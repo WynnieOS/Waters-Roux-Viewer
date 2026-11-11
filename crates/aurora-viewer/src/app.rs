@@ -13668,11 +13668,10 @@ impl App {
                 if !self.in_world() || self.world.agent.is_sitting() {
                     self.world.system_message("Stand up before starting Pose Stand.".to_owned());
                 } else {
-                    // A self-only pose entry point, deliberately distinct
-                    // from the general Poser which may target consenting peers.
-                    self.ik_editor.open_poser();
-                    self.ik_editor.select_pose_subject(&self.world, self.world.agent_id);
-                    ui::widgets::open_floater(&self.egui_ctx, "poser", &mut self.ik_editor.open);
+                    // A genuinely separate self-only station; the full
+                    // multi-avatar Poser and its consent controls stay intact.
+                    self.ik_editor.open_pose_stand(&self.world);
+                    ui::widgets::open_floater(&self.egui_ctx, "pose_stand", &mut self.ik_editor.open);
                 }
             }
             // a minimized poser expands, a shown one closes as its cross
