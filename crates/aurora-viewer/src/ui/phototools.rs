@@ -61,6 +61,24 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
                 }
             });
             ui.label("EEP and personal lighting open their full native editors.");
+            widgets::divider(ui, p);
+            ui.label("In-world editing feedback");
+            changed |= widgets::switch_labeled(
+                ui,
+                p,
+                &mut settings.build.show_selection_beam,
+                "Hand-to-object selection beam",
+            )
+            .changed();
+            if settings.build.show_selection_beam {
+                changed |= widgets::switch_labeled(
+                    ui,
+                    p,
+                    &mut settings.build.selection_beam_animated,
+                    "Animate selection particles",
+                )
+                .changed();
+            }
         } else {
             ui.label("Photography-specific lens and depth-of-field controls");
             changed |= widgets::switch_labeled(ui, p, &mut settings.dof.enabled, "Enable depth of field").changed();
