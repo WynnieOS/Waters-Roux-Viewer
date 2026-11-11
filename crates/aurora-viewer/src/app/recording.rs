@@ -1,8 +1,11 @@
-//! User-initiated silent MJPEG/AVI capture of the in-world renderer.
+//! User-initiated high-quality MJPEG/AVI video with optional in-world audio.
 //!
-//! This is a *real video file*, encoded asynchronously from the GPU's existing
-//! scene capture readback. Voice and desktop audio are NOT recorded. Never
-//! start recording without the resident explicitly pressing Record.
+//! The resident can explicitly opt into recording the viewer's OWN 48 kHz
+//! stereo mix, including incoming WebRTC voice, sounds, parcel music and media.
+//! It does not monitor other desktop applications or record the local microphone.
+//! Both video and audio are captured to one indexed AVI. Get consent before
+//! recording conversations. Encoding remains an experimental release blocker
+//! until real in-world playback tests pass.
 
 use std::{
     fs::{self, File, OpenOptions},
@@ -13,10 +16,50 @@ use std::{
     time::{Duration, Instant},
 };
 
-const FPS: u32 = 12;
-const MAX_WIDTH: u32 = 1280;
-const MAX_HEIGHT: u32 = 720;
-const LIMIT_SECONDS: u64 = 600;
+const LIMIT_SECONDS: u64 = 300;
+const SAMPLE_RATE: u32 = 48_000;
+const AUDIO_CHANNELS: u16 = 2;
+const AUDIO_BITS: u16 = 16;
+const AUDIO_FRAME_BYTES: u32 = u32::from(AUDIO_CHANNELS) * u32::from(AUDIO_BITS) / 8;
+
+/// Configured from the Machinima Bar, persisted independently of PhotoTools.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Options {
+    pub height: u32,
+    pub fps: u32,
+    pub jpeg_quality: u8,
+    pub capture_world_audio: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self { height: 1080, fps: 30, jpeg_quality: 95, capture_world_audio: false }
+    }
+}
+
+impl Options {
+    pub fn sanitize(&mut self) {
+        self.height = match self.height {
+            720 | 1080 | 1440 | 2160 => self.height,
+            _ => 1080,
+        };
+        self.fps = match self.fps {
+            24 | 30 | 60 => self.fps,
+            _ => 30,
+        };
+        self.jpeg_quality = self.jpeg_quality.clamp(80, 100);
+    }
+}
+
+pub const fn recording_label(options: Options) -> &'static str {
+    match options.height {
+        720 => "HD 720p",
+        1440 => "QHD 1440p",
+        2160 => "UHD 2160p",
+        _ => "Full HD 1080p",
+    }
+}
 
 enum Packet {
     Frame(u32, u32, Vec<u8>),
@@ -27,6 +70,7 @@ struct Session {
     sender: SyncSender<Packet>,
     worker: thread::JoinHandle<Result<(PathBuf, u64), String>>,
     output: PathBuf,
+    options: Options,
     started: Instant,
     next_frame: Instant,
     requested: Option<Instant>,
@@ -54,7 +98,8 @@ impl Recorder {
         self.session.as_ref().map_or(Duration::ZERO, |s| s.started.elapsed())
     }
 
-    pub fn start(&mut self) -> Result<PathBuf, String> {
+    pub fn start(&mut self, mut options: Options, audio_engine: Option<&aurora_audio::AudioEngine>) -> Result<PathBuf, String> {
+        options.sanitize();
         if self.active() {
             return Err("A recording is already running".into());
         }
@@ -70,22 +115,37 @@ impl Recorder {
             .ok_or_else(|| "Could not choose an unused recording filename".to_owned())?;
         let (sender, rx) = mpsc::sync_channel(3);
         let path = output.clone();
+        // A second, separate audio receiver: the microphone's echo-reference
+        // samples are NEVER consumed by the recorder.
+        let audio = if options.capture_world_audio {
+            audio_engine.map(|engine| engine.recording_tap())
+        } else {
+            None
+        };
+        let has_audio = audio.is_some();
         let worker = thread::Builder::new()
             .name("waters-roux-video-encoder".into())
-            .spawn(move || encode_stream(rx, path))
+            .spawn(move || encode_stream(rx, path, options, audio))
             .map_err(|e| format!("Unable to start video encoder: {e}"))?;
         let now = Instant::now();
         self.session = Some(Session {
             sender,
             worker,
             output: output.clone(),
+            options,
             started: now,
             next_frame: now,
             requested: None,
             sent: 0,
             dropped: 0,
         });
-        self.message = Some(format!("Silent video recording started: {}", output.display()));
+        self.message = Some(format!(
+            "Recording started: {} ({} • {} fps • world audio {})",
+            output.display(),
+            recording_label(options),
+            options.fps,
+            if has_audio { "ON" } else { "OFF" },
+        ));
         Ok(output)
     }
 
@@ -114,7 +174,7 @@ impl Recorder {
     pub fn accept(&mut self, width: u32, height: u32, rgba: Vec<u8>) {
         let Some(s) = self.session.as_mut() else { return };
         s.requested = None;
-        s.next_frame = Instant::now() + Duration::from_secs_f32(1.0 / FPS as f32);
+        s.next_frame = Instant::now() + Duration::from_secs_f32(1.0 / s.options.fps as f32);
         if width == 0 || height == 0 || rgba.len() != (width as usize).saturating_mul(height as usize).saturating_mul(4) {
             s.dropped += 1;
             return;
@@ -136,7 +196,7 @@ impl Recorder {
         match result {
             Ok((path, frames)) if frames > 0 => {
                 self.message = Some(format!(
-                    "Saved silent video: {} ({frames} frames; {} dropped)",
+                    "Saved video: {} ({frames} frames; {} dropped)",
                     path.display(),
                     s.dropped
                 ));
