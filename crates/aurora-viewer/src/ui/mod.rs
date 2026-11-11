@@ -94,6 +94,7 @@ pub mod owned_land;
 pub mod parcel_icons;
 pub mod pay;
 pub mod people;
+pub mod phototools;
 pub mod perf;
 pub mod photo_reel;
 pub mod physics;
@@ -160,6 +161,10 @@ pub struct Panels {
     pub group_titles: bool,
     /// The photo window (Firestorm's snapshot floater).
     pub snapshot: bool,
+    /// Independent photo production controls (not the Snapshot window).
+    pub photo_tools: bool,
+    /// True when the separate Photo Camera toolbar command selected its tab.
+    pub photo_tools_camera_tab: bool,
     pub people: bool,
     pub minimap: bool,
     /// World map (Ctrl+M).
@@ -246,6 +251,8 @@ impl Panels {
             sim_console: false,
             group_titles: false,
             snapshot: false,
+            photo_tools: false,
+            photo_tools_camera_tab: false,
             people: settings.show_people,
             minimap: settings.show_minimap,
             world_map: false,
