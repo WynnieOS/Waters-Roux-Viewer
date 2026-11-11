@@ -116,6 +116,7 @@ mod plate_click;
 mod pointing;
 mod quick_prefs;
 mod region_restart;
+mod recording;
 mod region_window;
 mod relogin;
 mod report_abuse;
@@ -712,6 +713,8 @@ pub struct App {
     /// Capture the 3D view on the next frame; a capture is on its way.
     want_scene_capture: bool,
     scene_capture_pending: bool,
+    /// Native, explicitly started local-only silent video recording.
+    recorder: recording::Recorder,
     scene_capture_place: Option<(crate::login_accounts::Account, String)>,
     /// Teleport screen: start, end (fade out), destination.
     tp_overlay: Option<TpOverlay>,
@@ -1672,6 +1675,7 @@ impl App {
             backdrop,
             want_scene_capture: false,
             scene_capture_pending: false,
+            recorder: recording::Recorder::default(),
             scene_capture_place: None,
             tp_overlay: None,
             was_teleporting: false,
@@ -11385,6 +11389,25 @@ impl App {
             gfx.renderer.capture_scene = true;
             self.scene_capture_pending = true;
         }
+        // Native machinima video reads the actual rendered world frames.
+        // Never compete with snapshot, login-background, abuse-report or
+        // inventory captures: they take priority over video frames.
+        if self.recorder.active()
+            && self.in_world()
+            && !self.scene_paused()
+            && self.inventory_images.capturing.is_none()
+            && !self.inventory_images.auto_capture_pending
+            && !self.scene_capture_pending
+            && !self.report_abuse.capture_pending
+            && self.capture.is_none()
+            && self.snapshots.capturing.is_none()
+            && !gfx.renderer.capture_request
+            && !gfx.renderer.capture_scene
+            && self.recorder.needs_frame(Instant::now())
+        {
+            gfx.renderer.capture_request = true;
+            self.recorder.mark_requested(Instant::now());
+        }
         self.frame_profile.lap(Lap::Actions);
         // ---- render: the frame is closed and leaves as a packet for the
         // render thread (aurora-render, main_thread.rs), which draws it
@@ -12003,6 +12026,13 @@ impl App {
             if self.settings.loading_backdrop {
                 self.backdrop.set_capture(w, h, pixels, wait);
             }
+        }
+        // Read only the capture requested by the recorder after the
+        // higher-priority consumers have had their turn.
+        if self.recorder.pending()
+            && let Some((w, h, pixels)) = gfx.renderer.captured.take()
+        {
+            self.recorder.accept(w, h, pixels);
         }
         if let Some((files, exit)) = &mut self.capture {
             if !self.inventory_images.auto_capture_pending
@@ -13831,6 +13861,23 @@ impl App {
             BarAction::CreateLandmark => self.open_create_landmark(None),
             BarAction::PhotoToDisk => self.photo_to_disk(),
             BarAction::CapturePanorama => self.photo_panorama_to_disk(),
+            BarAction::StartRecording => {
+                if self.in_world() {
+                    match self.recorder.start() {
+                        Ok(path) => self.world.system_message(format!("Recording silent video to {}", path.display())),
+                        Err(error) => self.world.system_message(format!("Recorder error: {error}")),
+                    }
+                } else {
+                    self.world.system_message("Enter Second Life before starting the video recorder.".to_owned());
+                }
+            }
+            BarAction::StopRecording => {
+                match self.recorder.stop() {
+                    Ok(Some(path)) => self.world.system_message(format!("Saved silent video: {}", path.display())),
+                    Ok(None) => self.world.system_message("No recorded frames were saved.".to_owned()),
+                    Err(error) => self.world.system_message(format!("Video finalize failed: {error}")),
+                }
+            },
             BarAction::PhotoRoll => self.photo_reel_show_newest(),
             // The Destination Guide and Help pages run inside the viewer's
             // existing browser, rather than creating dead toolbar windows.
@@ -16077,7 +16124,14 @@ impl App {
                 if ui::phototools::show(&ctx, &p, &mut self.panels, &mut self.settings) {
                     self.settings.save();
                 }
-                let machinima = ui::machinima::show(&ctx, &p, &mut self.panels.machinima, self.camera.mouselook());
+                let machinima = ui::machinima::show(
+                    &ctx,
+                    &p,
+                    &mut self.panels.machinima,
+                    self.camera.mouselook(),
+                    self.recorder.active(),
+                    self.recorder.elapsed(),
+                );
                 match machinima {
                     ui::machinima::Action::None => {}
                     ui::machinima::Action::TogglePov => a.bar = BarAction::ToggleMouselook,
@@ -16090,6 +16144,8 @@ impl App {
                     ui::machinima::Action::Snapshot => self.panels.snapshot = true,
                     ui::machinima::Action::Panorama => a.bar = BarAction::CapturePanorama,
                     ui::machinima::Action::ToggleInterface => a.bar = BarAction::ToggleInterface,
+                    ui::machinima::Action::StartRecording => a.bar = BarAction::StartRecording,
+                    ui::machinima::Action::StopRecording => a.bar = BarAction::StopRecording,
                 }
                 ui::debug_overlay::draw(
                     &ctx,
