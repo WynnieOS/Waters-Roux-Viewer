@@ -38,7 +38,7 @@ pub fn show(
     let screen = ctx.content_rect();
     let mut action = Action::None;
     let mut changed = false;
-    let tab_id = egui::Id::new("waters-roux-machinima-tab");
+    let tab_id = egui::Id::unique("waters-roux-machinima-tab");
     let mut tab = ctx.data(|d| d.get_temp::<usize>(tab_id)).unwrap_or(0);
     let mut floater = Floater::new(
         WINDOW,
