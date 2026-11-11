@@ -505,4 +505,3 @@ mod tests {
         assert_eq!(style.corner_radius, 0.0);
     }
 }
-
