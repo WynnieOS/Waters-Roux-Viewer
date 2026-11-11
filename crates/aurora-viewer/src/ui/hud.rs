@@ -667,7 +667,7 @@ pub fn draw(
                         painter.ctx(),
                         t.clone(),
                         FontId::proportional(size_of(*s)),
-                        Color32::BLACK.gamma_multiply(fade),
+                        p.bar.gamma_multiply(fade),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -705,7 +705,7 @@ pub fn draw(
                     tex.id(),
                     r,
                     egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-                    Color32::WHITE.gamma_multiply(custom.image_opacity * fade),
+                    super::widgets::PICTURE_TINT.gamma_multiply(custom.image_opacity * fade),
                 );
             }
             // still loading: thin progress bar along the bottom of the tag
