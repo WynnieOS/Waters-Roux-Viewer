@@ -2801,7 +2801,7 @@ impl App {
             Some(NameTagsEnv::Classic) => true,
             Some(NameTagsEnv::Plate) => false,
             Some(NameTagsEnv::Alternate) => self.name_tags_alt_classic,
-            None => self.settings.classic_name_tags,
+            None => self.settings.classic_name_tags || self.settings.name_tag_style.enabled,
         }
     }
 
@@ -16120,6 +16120,9 @@ impl App {
                 }
                 // The photography suite is a real, distinct renderer-settings
                 // floater, not a shortcut back to Snapshot or generic Controls.
+                if ui::name_tag_studio::show(&ctx, &p, &mut self.panels.name_tag_studio, &mut self.settings) {
+                    self.settings.save();
+                }
                 if ui::phototools::show(&ctx, &p, &mut self.panels, &mut self.settings) {
                     self.settings.save();
                 }
