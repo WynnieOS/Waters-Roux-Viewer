@@ -5,7 +5,7 @@
 use super::widgets::{self, ActionKind, Floater};
 use crate::{settings::Settings, theme::Palette};
 use egui::{Color32, Context, Pos2, Rect, TextureHandle, TextureOptions, Vec2};
-use image::{AnimationDecoder, GenericImageView, ImageDecoder};
+use image::{AnimationDecoder, ImageDecoder};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, io::Cursor, path::Path};
 
