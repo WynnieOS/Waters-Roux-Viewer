@@ -31,7 +31,7 @@ pub const COMMANDS: &[Command] = commands![
     "conversations", "Command_Chat_Icon", "common-conversations", true;
     "speak", "Command_Speak_Icon", "ui-skin-speak", true;
     "move", "Command_Move_Icon", "controls-movement-title", true;
-    "view", "video-filled", "controls-camera-title", true;
+    "view", "camera", "controls-camera-title", true;
     "vr_view", "device-vision-pro-filled", "vr-view", cfg!(any(target_os = "linux", target_os = "windows", target_os = "macos"));
     "mouselook", "Command_View_Icon", "common-mouselook-m", true;
     "people", "Command_People_Icon", "common-people", true;
@@ -93,9 +93,8 @@ pub const COMMANDS: &[Command] = commands![
     "soundexplorer", "music", "toolbar-command-sound-explorer", true;
     "assetblacklist", "shield-off", "toolbar-command-asset-blacklist", true;
     "phototools", "camera-cog", "toolbar-command-phototools", true;
-    "machinima", "video-filled", "toolbar-command-machinima", true;
+    "machinima", "movie", "toolbar-command-machinima", true;
     "nametagstudio", "tags-filled", "toolbar-command-nametag-studio", true;
-    "phototools_view", "video-filled", "toolbar-command-phototools-camera", true;
     "pose_stand", "man-filled", "toolbar-command-pose-stand", true;
     "conversation_log", "file-text-filled", "toolbar-command-conversation-log", true;
     "movelock", "lock-filled", "movelock-title", true;
