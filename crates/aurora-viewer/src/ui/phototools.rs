@@ -2,7 +2,10 @@
 //! PhotoTools are separate tools; the latter edits the *real* renderer
 //! settings rather than forwarding its toolbar button to Snapshot.
 
-use super::{Panels, widgets::{self, ActionKind, Floater}};
+use super::{
+    Panels,
+    widgets::{self, ActionKind, Floater},
+};
 use crate::{dof::FocusMode, settings::Settings, theme::Palette};
 use egui::{Context, Vec2};
 
@@ -36,10 +39,12 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
         if tab == 0 {
             ui.label("Live world lighting and render adjustments");
             changed |= widgets::switch_labeled(ui, p, &mut settings.hdr_emissive, "HDR / Emissive").changed();
-            changed |= ui.add_enabled(
-                settings.hdr_emissive,
-                egui::Slider::new(&mut settings.exposure, 0.25..=4.0).text("Exposure"),
-            ).changed();
+            changed |= ui
+                .add_enabled(
+                    settings.hdr_emissive,
+                    egui::Slider::new(&mut settings.exposure, 0.25..=4.0).text("Exposure"),
+                )
+                .changed();
             changed |= ui
                 .add(egui::Slider::new(&mut settings.draw_distance, 32.0..=512.0).text("Draw distance (m)"))
                 .changed();
@@ -56,11 +61,15 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
             ui.label("Photography-specific lens and depth-of-field controls");
             changed |= widgets::switch_labeled(ui, p, &mut settings.dof.enabled, "Enable depth of field").changed();
             ui.add_enabled_ui(settings.dof.enabled, |ui| {
-                changed |= ui.add(egui::Slider::new(&mut settings.dof.f_number, 1.0..=22.0).text("Aperture (f-number)")).changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut settings.dof.f_number, 1.0..=22.0).text("Aperture (f-number)"))
+                    .changed();
                 changed |= ui
                     .add(egui::Slider::new(&mut settings.dof.focal_length, 10.0..=200.0).text("Focal length (mm)"))
                     .changed();
-                changed |= ui.add(egui::Slider::new(&mut settings.dof.transition, 0.1..=5.0).text("Focus transition (s)")).changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut settings.dof.transition, 0.1..=5.0).text("Focus transition (s)"))
+                    .changed();
                 ui.horizontal_wrapped(|ui| {
                     ui.label("Focus target");
                     for (mode, label) in [
