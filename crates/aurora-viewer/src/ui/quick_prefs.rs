@@ -256,21 +256,12 @@ impl QuickPrefsUi {
                 .changed();
                 // Hand-origin selection particles are visual feedback for
                 // Build/Edit, not scriptable object particle emitters.
-                out.changed |= widgets::switch_labeled(
-                    ui,
-                    p,
-                    &mut settings.build.show_selection_beam,
-                    "Hand-to-object selection beam",
-                )
-                .changed();
+                out.changed |=
+                    widgets::switch_labeled(ui, p, &mut settings.build.show_selection_beam, "Hand-to-object selection beam").changed();
                 if settings.build.show_selection_beam {
-                    out.changed |= widgets::switch_labeled(
-                        ui,
-                        p,
-                        &mut settings.build.selection_beam_animated,
-                        "Animate selection particles",
-                    )
-                    .changed();
+                    out.changed |=
+                        widgets::switch_labeled(ui, p, &mut settings.build.selection_beam_animated, "Animate selection particles")
+                            .changed();
                 }
                 widgets::divider(ui, p);
                 // the fixed part: Hover Height, Max Bandwidth, Max Complexity
