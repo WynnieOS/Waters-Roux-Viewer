@@ -223,72 +223,98 @@ impl Drop for Recorder {
     }
 }
 
-fn encode_stream(rx: Receiver<Packet>, path: PathBuf) -> Result<(PathBuf, u64), String> {
+fn encode_stream(
+    rx: Receiver<Packet>,
+    path: PathBuf,
+    options: Options,
+    audio: Option<aurora_audio::RecordingTap>,
+) -> Result<(PathBuf, u64), String> {
     let mut avi: Option<Avi> = None;
-    while let Ok(packet) = rx.recv() {
-        let Packet::Frame(w, h, pixels) = packet else { break };
-        if avi.is_none() {
-            let dimensions = dimensions(w, h);
-            avi = Some(Avi::new(&path, dimensions.0, dimensions.1, FPS).map_err(|e| e.to_string())?);
+    loop {
+        let mut stop = false;
+        match rx.recv_timeout(Duration::from_millis(20)) {
+            Ok(Packet::Frame(w, h, pixels)) => {
+                if avi.is_none() {
+                    let size = dimensions(w, h, options.height);
+                    avi = Some(Avi::new(&path, size.0, size.1, options.fps, audio.is_some()).map_err(|e| e.to_string())?);
+                }
+                let writer = avi.as_mut().expect("created on first frame");
+                let rgba = image::RgbaImage::from_raw(w, h, pixels).ok_or_else(|| "Invalid frame dimensions".to_owned())?;
+                let scaled = image::imageops::resize(&rgba, writer.width, writer.height, image::imageops::FilterType::Lanczos3);
+                let rgb = image::RgbImage::from_fn(writer.width, writer.height, |x, y| {
+                    let p = scaled.get_pixel(x, y).0;
+                    image::Rgb([p[0], p[1], p[2]])
+                });
+                let mut encoded = Vec::new();
+                image::codecs::jpeg::JpegEncoder::new_with_quality(&mut encoded, options.jpeg_quality)
+                    .encode(rgb.as_raw(), writer.width, writer.height, image::ExtendedColorType::Rgb8)
+                    .map_err(|e| format!("JPEG encode: {e}"))?;
+                writer.push_frame(&encoded).map_err(|e| format!("AVI frame write: {e}"))?;
+            }
+            Ok(Packet::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => stop = true,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
         }
-        let writer = avi.as_mut().expect("created by first frame");
-        let rgba = image::RgbaImage::from_raw(w, h, pixels).ok_or_else(|| "Invalid frame dimensions".to_owned())?;
-        let scaled = image::imageops::resize(&rgba, writer.width, writer.height, image::imageops::FilterType::Triangle);
-        let rgb = image::RgbImage::from_fn(writer.width, writer.height, |x, y| {
-            let p = scaled.get_pixel(x, y).0;
-            image::Rgb([p[0], p[1], p[2]])
-        });
-        let mut encoded = Vec::new();
-        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut encoded, 80)
-            .encode(rgb.as_raw(), writer.width, writer.height, image::ExtendedColorType::Rgb8)
-            .map_err(|e| format!("JPEG encode: {e}"))?;
-        writer.push_frame(&encoded).map_err(|e| format!("AVI frame write: {e}"))?;
+        // Audio is received on its OWN queue. A slow JPEG encoder cannot
+        // consume the voice chat echo-cancellation samples or fill the video
+        // frame queue with hundreds of tiny audio packets per second.
+        if let (Some(writer), Some(tap)) = (avi.as_mut(), audio.as_ref()) {
+            for _ in 0..256 {
+                let Some(pcm) = tap.try_pop() else { break };
+                writer.push_audio(&pcm).map_err(|e| format!("AVI audio write: {e}"))?;
+            }
+        }
+        if stop {
+            break;
+        }
     }
     let Some(avi) = avi else { return Ok((path, 0)) };
-    let frames = avi.frames.len() as u64;
+    let frames = avi.video_frames;
     avi.finish().map_err(|e| format!("AVI finalize: {e}"))?;
     Ok((path, frames))
 }
 
-fn dimensions(w: u32, h: u32) -> (u32, u32) {
-    let scale = (MAX_WIDTH as f64 / w.max(1) as f64)
-        .min(MAX_HEIGHT as f64 / h.max(1) as f64)
+fn dimensions(w: u32, h: u32, max_height: u32) -> (u32, u32) {
+    let max_width = max_height * 16 / 9;
+    let scale = (max_width as f64 / w.max(1) as f64)
+        .min(max_height as f64 / h.max(1) as f64)
         .min(1.0);
     let even = |value: u32| (value / 2 * 2).max(2);
     (even((w as f64 * scale).round() as u32), even((h as f64 * scale).round() as u32))
 }
 
-/// Minimal AVI 1.0 video-only RIFF writer with MJPEG-compressed frames.
-/// No executable codec or process is downloaded or launched.
+/// RIFF AVI with indexed MJPEG video plus optional 48-kHz stereo PCM.
+/// Sound is the consented in-viewer mix, not an operating-system screen tap.
 struct Avi {
     file: File,
     width: u32,
     height: u32,
     movi_size_at: u64,
     movi_tag_at: u64,
-    frames_at: u64,
-    strh_length_at: u64,
-    frames: Vec<(u32, u32)>,
+    video_length_at: u64,
+    audio_length_at: Option<u64>,
+    video_frames: u64,
+    audio_bytes: u64,
+    index: Vec<([u8; 4], u32, u32, u32)>,
 }
 
 impl Avi {
-    fn new(path: &PathBuf, width: u32, height: u32, fps: u32) -> std::io::Result<Self> {
+    fn new(path: &PathBuf, width: u32, height: u32, fps: u32, with_audio: bool) -> std::io::Result<Self> {
         let mut f = OpenOptions::new().create_new(true).write(true).read(true).open(path)?;
         f.write_all(b"RIFF")?;
         u32le(&mut f, 0)?;
         f.write_all(b"AVI ")?;
         f.write_all(b"LIST")?;
-        u32le(&mut f, 192)?;
+        u32le(&mut f, if with_audio { 292 } else { 192 })?;
         f.write_all(b"hdrl")?;
         f.write_all(b"avih")?;
         u32le(&mut f, 56)?;
-        u32le(&mut f, 1_000_000 / fps)?;
-        u32le(&mut f, 5_000_000)?;
+        u32le(&mut f, 1_000_000 / fps.max(1))?;
+        u32le(&mut f, 40_000_000)?;
         u32le(&mut f, 0)?;
         u32le(&mut f, 0x10)?;
         let frames_at = f.stream_position()?;
         u32le(&mut f, 0)?;
-        for val in [0, 1, width * height * 3, width, height, 0, 0, 0, 0] {
+        for val in [0, if with_audio { 2 } else { 1 }, width * height * 3, width, height, 0, 0, 0, 0] {
             u32le(&mut f, val)?;
         }
         f.write_all(b"LIST")?;
@@ -304,7 +330,7 @@ impl Avi {
         u32le(&mut f, 1)?;
         u32le(&mut f, fps)?;
         u32le(&mut f, 0)?;
-        let strh_length_at = f.stream_position()?;
+        let video_length_at = f.stream_position()?;
         u32le(&mut f, 0)?;
         u32le(&mut f, width * height * 3)?;
         u32le(&mut f, u32::MAX)?;
@@ -323,6 +349,41 @@ impl Avi {
         for v in [width * height * 3, 0, 0, 0, 0] {
             u32le(&mut f, v)?;
         }
+        let audio_length_at = if with_audio {
+            f.write_all(b"LIST")?;
+            u32le(&mut f, 92)?;
+            f.write_all(b"strl")?;
+            f.write_all(b"strh")?;
+            u32le(&mut f, 56)?;
+            f.write_all(b"auds")?;
+            u32le(&mut f, 0)?;
+            u32le(&mut f, 0)?;
+            f.write_all(&0u16.to_le_bytes())?;
+            f.write_all(&0u16.to_le_bytes())?;
+            u32le(&mut f, 0)?;
+            u32le(&mut f, AUDIO_FRAME_BYTES)?;
+            u32le(&mut f, SAMPLE_RATE * AUDIO_FRAME_BYTES)?;
+            u32le(&mut f, 0)?;
+            let at = f.stream_position()?;
+            u32le(&mut f, 0)?;
+            u32le(&mut f, SAMPLE_RATE / 10 * AUDIO_FRAME_BYTES)?;
+            u32le(&mut f, u32::MAX)?;
+            u32le(&mut f, AUDIO_FRAME_BYTES)?;
+            for _ in 0..4 {
+                f.write_all(&0u16.to_le_bytes())?;
+            }
+            f.write_all(b"strf")?;
+            u32le(&mut f, 16)?;
+            f.write_all(&1u16.to_le_bytes())?;
+            f.write_all(&AUDIO_CHANNELS.to_le_bytes())?;
+            u32le(&mut f, SAMPLE_RATE)?;
+            u32le(&mut f, SAMPLE_RATE * AUDIO_FRAME_BYTES)?;
+            f.write_all(&(AUDIO_FRAME_BYTES as u16).to_le_bytes())?;
+            f.write_all(&AUDIO_BITS.to_le_bytes())?;
+            Some(at)
+        } else {
+            None
+        };
         f.write_all(b"LIST")?;
         let movi_size_at = f.stream_position()?;
         u32le(&mut f, 0)?;
@@ -334,50 +395,86 @@ impl Avi {
             height,
             movi_size_at,
             movi_tag_at,
-            frames_at,
-            strh_length_at,
-            frames: Vec::new(),
+            video_length_at,
+            audio_length_at,
+            video_frames: 0,
+            audio_bytes: 0,
+            index: Vec::new(),
         })
     }
 
-    fn push_frame(&mut self, encoded: &[u8]) -> std::io::Result<()> {
-        let offset = self.file.stream_position()? - self.movi_tag_at;
-        let len = encoded.len() as u32;
-        if offset > u32::MAX as u64 || encoded.len() >= u32::MAX as usize {
-            return Err(std::io::Error::other("AVI 4 GB format limit exceeded"));
+    fn chunk(&mut self, kind: [u8; 4], flags: u32, bytes: &[u8]) -> std::io::Result<()> {
+        let pos = self.file.stream_position()?;
+        let offset = pos - self.movi_tag_at;
+        // Keep room for the final index, and below AVI 1.0's 4 GiB cap.
+        if offset > 3_700_000_000 || self.index.len() >= 1_000_000 {
+            return Err(std::io::Error::other("AVI file limit reached; stop and start a new recording"));
         }
-        self.file.write_all(b"00dc")?;
+        let len = bytes.len() as u32;
+        self.file.write_all(&kind)?;
         u32le(&mut self.file, len)?;
-        self.file.write_all(encoded)?;
+        self.file.write_all(bytes)?;
         if len & 1 != 0 {
             self.file.write_all(&[0])?;
         }
-        self.frames.push((offset as u32, len));
+        self.index.push((kind, flags, offset as u32, len));
+        Ok(())
+    }
+
+    fn push_frame(&mut self, encoded: &[u8]) -> std::io::Result<()> {
+        self.chunk(*b"00dc", 0x10, encoded)?;
+        self.video_frames += 1;
+        Ok(())
+    }
+
+    fn push_audio(&mut self, stereo: &[f32; 960]) -> std::io::Result<()> {
+        if self.audio_length_at.is_none() {
+            return Ok(());
+        }
+        let mut pcm = Vec::with_capacity(stereo.len() * 2);
+        for sample in stereo {
+            let quantized = (sample.clamp(-1.0, 1.0) * 32767.0) as i16;
+            pcm.extend_from_slice(&quantized.to_le_bytes());
+        }
+        self.chunk(*b"01wb", 0, &pcm)?;
+        self.audio_bytes += pcm.len() as u64;
         Ok(())
     }
 
     fn finish(mut self) -> std::io::Result<()> {
         let end_movi = self.file.stream_position()?;
         self.file.write_all(b"idx1")?;
-        u32le(&mut self.file, (self.frames.len() as u32) * 16)?;
-        for &(offset, size) in &self.frames {
-            self.file.write_all(b"00dc")?;
-            u32le(&mut self.file, 0x10)?;
+        u32le(&mut self.file, (self.index.len() as u32) * 16)?;
+        for &(kind, flags, offset, size) in &self.index {
+            self.file.write_all(&kind)?;
+            u32le(&mut self.file, flags)?;
             u32le(&mut self.file, offset)?;
             u32le(&mut self.file, size)?;
         }
         let end = self.file.stream_position()?;
+        if end > u32::MAX as u64 {
+            return Err(std::io::Error::other("AVI file is too large"));
+        }
         self.file.seek(SeekFrom::Start(4))?;
         u32le(&mut self.file, (end - 8) as u32)?;
         self.file.seek(SeekFrom::Start(self.movi_size_at))?;
         u32le(&mut self.file, (end_movi - self.movi_tag_at) as u32)?;
-        self.file.seek(SeekFrom::Start(self.frames_at))?;
-        u32le(&mut self.file, self.frames.len() as u32)?;
-        self.file.seek(SeekFrom::Start(self.strh_length_at))?;
-        u32le(&mut self.file, self.frames.len() as u32)?;
+        self.file.seek(SeekFrom::Start(self.video_length_at))?;
+        u32le(&mut self.file, self.video_frames as u32)?;
+        self.file.seek(SeekFrom::Start(frames_at_from_header(&mut self.file)?))?;
+        u32le(&mut self.file, self.video_frames as u32)?;
+        if let Some(at) = self.audio_length_at {
+            self.file.seek(SeekFrom::Start(at))?;
+            u32le(&mut self.file, (self.audio_bytes / u64::from(AUDIO_FRAME_BYTES)) as u32)?;
+        }
         self.file.flush()?;
         self.file.sync_all()
     }
+}
+
+/// Total-frame field of the AVI main header is always at file offset 48.
+fn frames_at_from_header(_file: &mut File) -> std::io::Result<u64> {
+    Ok(48)
 }
 
 fn u32le(f: &mut File, value: u32) -> std::io::Result<()> {
