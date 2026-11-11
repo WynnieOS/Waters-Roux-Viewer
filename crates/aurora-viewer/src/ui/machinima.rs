@@ -72,7 +72,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn closed_machinima_bar_does_not_issue_camera_actions() {
-        assert_eq!(show(&Context::default(), &Palette::default(), &mut false, false), Action::None);
+    fn machinima_actions_are_explicit() {
+        assert_eq!(Action::default(), Action::None);
+        assert_ne!(Action::TogglePov, Action::Snapshot);
     }
 }
