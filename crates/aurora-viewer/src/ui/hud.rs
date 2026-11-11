@@ -641,7 +641,11 @@ pub fn draw(
     // reader's own viewer without ever changing simulator identity.
     let image = super::name_tag_studio::texture(ctx, custom, now_s);
     for (d, sp, lines, in_voice, progress, avatar, at, alpha, bubble) in tags {
-        let sp = if custom.enabled { sp - egui::vec2(0.0, custom.text_height) } else { sp };
+        let sp = if custom.enabled {
+            sp - egui::vec2(0.0, custom.text_height)
+        } else {
+            sp
+        };
         // the scene hides what it has in front of this point
         aurora_render::world_label_at(ctx, Some(at));
         let is_avatar = d < 1000.0;
@@ -678,7 +682,11 @@ pub fn draw(
             .iter()
             .map(|(t, c, s)| {
                 let foreground = if custom.enabled && custom.custom_text_colors {
-                    if *s == 13.0 { color(custom.name_color) } else { color(custom.detail_color) }
+                    if *s == 13.0 {
+                        color(custom.name_color)
+                    } else {
+                        color(custom.detail_color)
+                    }
                 } else {
                     *c
                 };
@@ -689,7 +697,12 @@ pub fn draw(
             lines
                 .iter()
                 .map(|(t, _, s)| {
-                    super::bidi::no_wrap(painter.ctx(), t.clone(), font_of(*s), color(custom.outline_color).gamma_multiply(fade))
+                    super::bidi::no_wrap(
+                        painter.ctx(),
+                        t.clone(),
+                        font_of(*s),
+                        color(custom.outline_color).gamma_multiply(fade),
+                    )
                 })
                 .collect::<Vec<_>>()
         });
