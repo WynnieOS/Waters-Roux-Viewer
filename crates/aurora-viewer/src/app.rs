@@ -16080,16 +16080,16 @@ impl App {
                 let machinima = ui::machinima::show(&ctx, &p, &mut self.panels.machinima, self.camera.mouselook());
                 match machinima {
                     ui::machinima::Action::None => {}
-                    ui::machinima::Action::TogglePov => self.toggle_mouselook(),
-                    ui::machinima::Action::ResetCamera => self.reset_camera_view(),
+                    ui::machinima::Action::TogglePov => a.bar = BarAction::ToggleMouselook,
+                    ui::machinima::Action::ResetCamera => a.bar = BarAction::ResetCamera,
                     ui::machinima::Action::CameraControls => self.panels.camera_controls = true,
                     ui::machinima::Action::PhotoToolsCamera => {
                         self.panels.photo_tools = true;
                         self.panels.photo_tools_camera_tab = true;
                     }
                     ui::machinima::Action::Snapshot => self.panels.snapshot = true,
-                    ui::machinima::Action::Panorama => self.photo_panorama_to_disk(),
-                    ui::machinima::Action::ToggleInterface => self.toggle_interface(),
+                    ui::machinima::Action::Panorama => a.bar = BarAction::CapturePanorama,
+                    ui::machinima::Action::ToggleInterface => a.bar = BarAction::ToggleInterface,
                 }
                 ui::debug_overlay::draw(
                     &ctx,
