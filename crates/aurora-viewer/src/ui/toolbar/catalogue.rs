@@ -112,11 +112,19 @@ pub const COMMANDS: &[Command] = commands![
 
 impl Command {
     pub fn label(&self) -> &'static str {
-        if self.id == "machinima" { "Machinima Bar" } else { aurora_i18n::text(self.key) }
+        if self.id == "machinima" {
+            "Machinima Bar"
+        } else {
+            aurora_i18n::text(self.key)
+        }
     }
 
     pub fn label_in(&self, language: &str) -> &'static str {
-        if self.id == "machinima" { "Machinima Bar" } else { aurora_i18n::text_in(language, self.key) }
+        if self.id == "machinima" {
+            "Machinima Bar"
+        } else {
+            aurora_i18n::text_in(language, self.key)
+        }
     }
 }
 
