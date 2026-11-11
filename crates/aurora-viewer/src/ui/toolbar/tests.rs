@@ -877,8 +877,8 @@ fn toolbar_sanitize_keeps_each_command_once_over_the_three_toolbars() {
 fn toolbar_catalogue_holds_firestorm_commands_and_runs_the_ready_ones() {
     let skin = Layout::default();
     let all = catalogue(&skin);
-    assert_eq!(all.len(), 75);
-    assert_eq!(COMMANDS.len(), 75);
+    assert_eq!(all.len(), 76);
+    assert_eq!(COMMANDS.len(), 76);
     let mut ids: Vec<_> = COMMANDS.iter().map(|c| c.id).collect();
     ids.sort_unstable();
     ids.dedup();
