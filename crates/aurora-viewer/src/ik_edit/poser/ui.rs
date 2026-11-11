@@ -40,7 +40,12 @@ impl Editor {
         let mut stop = false;
         let mut toggle_library = false;
         let has_session = self.poser.sessions.contains_key(&world.agent_id);
-        let mut floater = Floater::new("pose_stand", "Waters Roux Pose Stand", egui::pos2(710.0, 95.0), egui::vec2(480.0, 490.0));
+        let mut floater = Floater::new(
+            "pose_stand",
+            "Waters Roux Pose Stand",
+            egui::pos2(710.0, 95.0),
+            egui::vec2(480.0, 490.0),
+        );
         floater.min_size = egui::vec2(390.0, 360.0);
         floater.steady_size = true;
         floater.show(ctx, p, &mut open, |ui| {
