@@ -660,14 +660,17 @@ pub fn draw(
             .map(|(t, c, s)| super::bidi::no_wrap(painter.ctx(), t.clone(), FontId::proportional(size_of(*s)), c.gamma_multiply(fade)))
             .collect();
         let outlines = (custom.enabled && custom.outline).then(|| {
-            lines.iter().map(|(t, _, s)| {
-                super::bidi::no_wrap(
-                    painter.ctx(),
-                    t.clone(),
-                    FontId::proportional(size_of(*s)),
-                    Color32::BLACK.gamma_multiply(fade),
-                )
-            }).collect::<Vec<_>>()
+            lines
+                .iter()
+                .map(|(t, _, s)| {
+                    super::bidi::no_wrap(
+                        painter.ctx(),
+                        t.clone(),
+                        FontId::proportional(size_of(*s)),
+                        Color32::BLACK.gamma_multiply(fade),
+                    )
+                })
+                .collect::<Vec<_>>()
         });
         let total_h: f32 = galleys.iter().map(|g| g.size().y).sum();
         let max_w = galleys.iter().map(|g| g.size().x).fold(0.0, f32::max);
@@ -684,14 +687,20 @@ pub fn draw(
             }
             painter.rect_filled(
                 r,
-                if custom.enabled { custom.corner_radius } else { tag_radius.to_f32() },
+                if custom.enabled {
+                    custom.corner_radius
+                } else {
+                    tag_radius.to_f32()
+                },
                 if custom.enabled {
                     custom.color(fade)
                 } else {
                     Color32::from_rgba_unmultiplied(p.bar.r(), p.bar.g(), p.bar.b(), (190.0 * fade) as u8)
                 },
             );
-            if custom.enabled && let Some(tex) = &image {
+            if custom.enabled
+                && let Some(tex) = &image
+            {
                 painter.image(
                     tex.id(),
                     r,
@@ -747,7 +756,12 @@ pub fn draw(
             let pos = Pos2::new(text_x, y);
             let rect = Align2::CENTER_TOP.anchor_size(pos, g.size());
             if let Some(outline) = outlines.as_ref().and_then(|outlines| outlines.get(i)) {
-                for delta in [egui::vec2(-0.9, 0.0), egui::vec2(0.9, 0.0), egui::vec2(0.0, -0.9), egui::vec2(0.0, 0.9)] {
+                for delta in [
+                    egui::vec2(-0.9, 0.0),
+                    egui::vec2(0.9, 0.0),
+                    egui::vec2(0.0, -0.9),
+                    egui::vec2(0.0, 0.9),
+                ] {
                     painter.galley(rect.min + delta, outline.clone(), Color32::PLACEHOLDER);
                 }
             }
