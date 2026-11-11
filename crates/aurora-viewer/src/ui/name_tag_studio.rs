@@ -93,10 +93,26 @@ impl Style {
         } else {
             1.0
         };
-        self.border_width = if self.border_width.is_finite() { self.border_width.clamp(0.0, 6.0) } else { 1.0 };
-        self.padding = if self.padding.is_finite() { self.padding.clamp(2.0, 32.0) } else { 8.0 };
-        self.text_height = if self.text_height.is_finite() { self.text_height.clamp(-40.0, 40.0) } else { 0.0 };
-        self.detail_size = if self.detail_size.is_finite() { self.detail_size.clamp(9.0, 24.0) } else { 12.0 };
+        self.border_width = if self.border_width.is_finite() {
+            self.border_width.clamp(0.0, 6.0)
+        } else {
+            1.0
+        };
+        self.padding = if self.padding.is_finite() {
+            self.padding.clamp(2.0, 32.0)
+        } else {
+            8.0
+        };
+        self.text_height = if self.text_height.is_finite() {
+            self.text_height.clamp(-40.0, 40.0)
+        } else {
+            0.0
+        };
+        self.detail_size = if self.detail_size.is_finite() {
+            self.detail_size.clamp(9.0, 24.0)
+        } else {
+            12.0
+        };
         if !matches!(self.image_fit.as_str(), "cover" | "contain" | "stretch") {
             self.image_fit = "cover".into();
         }
@@ -193,7 +209,9 @@ fn decode_art(ctx: &Context, path: &str) -> Result<Art, String> {
         if !fits_size(w, h, MAX_IMAGE_SIDE) {
             return Err("Image dimensions must be at most 8192 × 8192 pixels.".into());
         }
-        let rgba = image::load_from_memory(&bytes).map_err(|e| format!("Cannot decode image: {e}"))?.to_rgba8();
+        let rgba = image::load_from_memory(&bytes)
+            .map_err(|e| format!("Cannot decode image: {e}"))?
+            .to_rgba8();
         frames.push(to_texture(ctx, "waters-roux-name-tag-background".into(), &shrink(rgba)));
         delays.push(1.0);
     }
@@ -201,7 +219,12 @@ fn decode_art(ctx: &Context, path: &str) -> Result<Art, String> {
         return Err("The file has no readable image frames.".into());
     }
     let total = delays.iter().sum();
-    Ok(Art { path: path.into(), frames, delays, total })
+    Ok(Art {
+        path: path.into(),
+        frames,
+        delays,
+        total,
+    })
 }
 
 /// A visible import error instead of silently discarding ordinary PNG/JPG/GIFs.
@@ -222,7 +245,10 @@ pub fn texture(ctx: &Context, style: &Style, now: f64) -> Option<TextureHandle> 
         if cache.as_ref().is_none_or(|asset| asset.path() != style.image_path) {
             *cache = Some(match decode_art(ctx, &style.image_path) {
                 Ok(art) => Cache::Ready(art),
-                Err(reason) => Cache::Failed { path: style.image_path.clone(), reason },
+                Err(reason) => Cache::Failed {
+                    path: style.image_path.clone(),
+                    reason,
+                },
             });
         }
         let Some(Cache::Ready(art)) = cache.as_ref() else {
@@ -262,10 +288,16 @@ pub fn image_rect(texture: &TextureHandle, destination: Rect, fit: &str) -> (Rec
     if fit == "cover" {
         if image_aspect > frame_aspect {
             let half = frame_aspect / image_aspect * 0.5;
-            return (destination, Rect::from_min_max(Pos2::new(0.5 - half, 0.0), Pos2::new(0.5 + half, 1.0)));
+            return (
+                destination,
+                Rect::from_min_max(Pos2::new(0.5 - half, 0.0), Pos2::new(0.5 + half, 1.0)),
+            );
         }
         let half = image_aspect / frame_aspect * 0.5;
-        return (destination, Rect::from_min_max(Pos2::new(0.0, 0.5 - half), Pos2::new(1.0, 0.5 + half)));
+        return (
+            destination,
+            Rect::from_min_max(Pos2::new(0.0, 0.5 - half), Pos2::new(1.0, 0.5 + half)),
+        );
     }
     (destination, full)
 }
@@ -296,8 +328,12 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
         egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| match tab {
             0 => {
                 ui.strong("Name typography");
-                changed |= ui.add(egui::Slider::new(&mut style.name_size, 10.0..=28.0).text("Display-name size")).changed();
-                changed |= ui.add(egui::Slider::new(&mut style.detail_size, 9.0..=24.0).text("Titles and detail size")).changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut style.name_size, 10.0..=28.0).text("Display-name size"))
+                    .changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut style.detail_size, 9.0..=24.0).text("Titles and detail size"))
+                    .changed();
                 changed |= widgets::switch_labeled(ui, p, &mut style.monospace, "Monospace lettering").changed();
                 changed |= widgets::switch_labeled(ui, p, &mut style.bold, "Bold name").changed();
                 changed |= widgets::switch_labeled(ui, p, &mut style.outline, "Text outline / readability").changed();
@@ -336,11 +372,15 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
                 changed |= ui.text_edit_singleline(&mut style.image_path).changed();
                 ui.horizontal(|ui| {
                     ui.label("Image fit");
-                    changed |= ui.selectable_value(&mut style.image_fit, "cover".to_owned(), "Fill / crop").changed();
+                    changed |= ui
+                        .selectable_value(&mut style.image_fit, "cover".to_owned(), "Fill / crop")
+                        .changed();
                     changed |= ui.selectable_value(&mut style.image_fit, "contain".to_owned(), "Fit").changed();
                     changed |= ui.selectable_value(&mut style.image_fit, "stretch".to_owned(), "Stretch").changed();
                 });
-                changed |= ui.add(egui::Slider::new(&mut style.image_opacity, 0.0..=1.0).text("Image opacity")).changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut style.image_opacity, 0.0..=1.0).text("Image opacity"))
+                    .changed();
                 if !style.image_path.is_empty() {
                     if let Some(error) = image_error() {
                         ui.label(egui::RichText::new(format!("Image import failed: {error}")).color(p.danger));
@@ -352,10 +392,18 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
             }
             _ => {
                 ui.strong("Tag shape and position");
-                changed |= ui.add(egui::Slider::new(&mut style.padding, 2.0..=32.0).text("Space around name")).changed();
-                changed |= ui.add(egui::Slider::new(&mut style.corner_radius, 0.0..=20.0).text("Rounded corners")).changed();
-                changed |= ui.add(egui::Slider::new(&mut style.border_width, 0.0..=6.0).text("Border thickness")).changed();
-                changed |= ui.add(egui::Slider::new(&mut style.text_height, -40.0..=40.0).text("Height above avatar")).changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut style.padding, 2.0..=32.0).text("Space around name"))
+                    .changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut style.corner_radius, 0.0..=20.0).text("Rounded corners"))
+                    .changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut style.border_width, 0.0..=6.0).text("Border thickness"))
+                    .changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut style.text_height, -40.0..=40.0).text("Height above avatar"))
+                    .changed();
                 ui.horizontal(|ui| {
                     ui.label("Border color");
                     changed |= widgets::color_button(ui, p, "tag-border-color", &mut style.border_color, true).changed();
@@ -373,7 +421,8 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
         ui.painter().rect_filled(rect, style.corner_radius, style.color(1.0));
         if let Some(texture) = texture(ctx, style, ui.input(|i| i.time)) {
             let (dest, uv) = image_rect(&texture, rect, &style.image_fit);
-            ui.painter().image(texture.id(), dest, uv, widgets::PICTURE_TINT.gamma_multiply(style.image_opacity));
+            ui.painter()
+                .image(texture.id(), dest, uv, widgets::PICTURE_TINT.gamma_multiply(style.image_opacity));
         }
         if style.border_width > 0.0 {
             let [r, g, b, a] = style.border_color;
@@ -386,11 +435,20 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
         }
         let font = egui::FontId::new(
             style.name_size,
-            if style.monospace { egui::FontFamily::Monospace } else { egui::FontFamily::Proportional },
+            if style.monospace {
+                egui::FontFamily::Monospace
+            } else {
+                egui::FontFamily::Proportional
+            },
         );
         let [r, g, b, a] = style.name_color;
-        let text = if style.custom_text_colors { Color32::from_rgba_unmultiplied(r, g, b, a) } else { p.ink };
-        ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "Example Resident", font, text);
+        let text = if style.custom_text_colors {
+            Color32::from_rgba_unmultiplied(r, g, b, a)
+        } else {
+            p.ink
+        };
+        ui.painter()
+            .text(rect.center(), egui::Align2::CENTER_CENTER, "Example Resident", font, text);
         if widgets::action_button(ui, p, "refresh", "Restore defaults", ActionKind::Flat, Vec2::new(0.0, 29.0)).clicked() {
             reset = true;
         }
@@ -407,7 +465,10 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
         changed = true;
     }
     if let Some(path) = ctx.input(|i| i.raw.dropped_files.iter().find_map(|f| f.path.clone())) {
-        if path.extension().is_some_and(|e| matches!(e.to_string_lossy().to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg" | "gif")) {
+        if path
+            .extension()
+            .is_some_and(|e| matches!(e.to_string_lossy().to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg" | "gif"))
+        {
             style.image_path = path.to_string_lossy().into_owned();
             style.enabled = true;
             changed = true;
