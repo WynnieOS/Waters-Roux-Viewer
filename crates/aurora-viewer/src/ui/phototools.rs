@@ -24,6 +24,7 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
     let mut open_environment = false;
     let mut open_lighting = false;
     let mut open_camera = false;
+    let mut open_machinima = false;
     let screen = ctx.content_rect();
 
     Floater::new(
@@ -54,6 +55,9 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
                 }
                 if widgets::action_button(ui, p, "bulb", "Personal lighting", ActionKind::Flat, Vec2::new(0.0, 29.0)).clicked() {
                     open_lighting = true;
+                }
+                if widgets::action_button(ui, p, "video", "Machinima bar", ActionKind::Flat, Vec2::new(0.0, 29.0)).clicked() {
+                    open_machinima = true;
                 }
             });
             ui.label("EEP and personal lighting open their full native editors.");
@@ -105,6 +109,9 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
     }
     if open_camera {
         panels.camera_controls = true;
+    }
+    if open_machinima {
+        panels.machinima = true;
     }
     if changed {
         settings.dof.sanitize();
