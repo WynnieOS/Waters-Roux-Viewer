@@ -41,7 +41,16 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, pov: bool, recording: b
         ui.horizontal_wrapped(|ui| {
             if recording {
                 ui.strong(format!("REC • {:02}:{:02}", elapsed.as_secs() / 60, elapsed.as_secs() % 60));
-                if widgets::action_button(ui, p, "player-stop-filled", "Stop and save AVI", ActionKind::Primary, Vec2::new(0.0, 29.0)).clicked() {
+                if widgets::action_button(
+                    ui,
+                    p,
+                    "player-stop-filled",
+                    "Stop and save AVI",
+                    ActionKind::Primary,
+                    Vec2::new(0.0, 29.0),
+                )
+                .clicked()
+                {
                     action = Action::StopRecording;
                 }
             } else if widgets::action_button(ui, p, "video", "Record silent video", ActionKind::Primary, Vec2::new(0.0, 29.0)).clicked() {
