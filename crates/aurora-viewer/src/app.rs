@@ -115,8 +115,8 @@ mod physics_editor;
 mod plate_click;
 mod pointing;
 mod quick_prefs;
-mod region_restart;
 mod recording;
+mod region_restart;
 mod region_window;
 mod relogin;
 mod report_abuse;
@@ -13868,15 +13868,14 @@ impl App {
                         Err(error) => self.world.system_message(format!("Recorder error: {error}")),
                     }
                 } else {
-                    self.world.system_message("Enter Second Life before starting the video recorder.".to_owned());
+                    self.world
+                        .system_message("Enter Second Life before starting the video recorder.".to_owned());
                 }
             }
-            BarAction::StopRecording => {
-                match self.recorder.stop() {
-                    Ok(Some(path)) => self.world.system_message(format!("Saved silent video: {}", path.display())),
-                    Ok(None) => self.world.system_message("No recorded frames were saved.".to_owned()),
-                    Err(error) => self.world.system_message(format!("Video finalize failed: {error}")),
-                }
+            BarAction::StopRecording => match self.recorder.stop() {
+                Ok(Some(path)) => self.world.system_message(format!("Saved silent video: {}", path.display())),
+                Ok(None) => self.world.system_message("No recorded frames were saved.".to_owned()),
+                Err(error) => self.world.system_message(format!("Video finalize failed: {error}")),
             },
             BarAction::PhotoRoll => self.photo_reel_show_newest(),
             // The Destination Guide and Help pages run inside the viewer's
