@@ -69,6 +69,7 @@ pub mod layout;
 pub mod link_health;
 pub mod loading;
 pub mod login;
+pub mod login_grid;
 pub mod lookat_targets;
 pub mod looks_editor;
 pub mod machinima;
