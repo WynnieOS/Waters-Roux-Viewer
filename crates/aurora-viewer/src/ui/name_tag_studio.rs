@@ -185,12 +185,7 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
             changed |= ui
                 .add(egui::Slider::new(&mut style.corner_radius, 0.0..=20.0).text("Corner radius"))
                 .changed();
-            let mut color =
-                Color32::from_rgba_unmultiplied(style.background[0], style.background[1], style.background[2], style.background[3]);
-            if ui.color_edit_button_srgba(&mut color).changed() {
-                style.background = [color.r(), color.g(), color.b(), color.a()];
-                changed = true;
-            }
+            changed |= widgets::color_button(ui, p, "nametag-background-color", &mut style.background, true).changed();
             ui.label("Background image: local PNG or animated GIF (up to 8 MB, 512×512)");
             ui.horizontal(|ui| {
                 changed |= ui.text_edit_singleline(&mut style.image_path).changed();
@@ -202,7 +197,7 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
                 .add(egui::Slider::new(&mut style.image_opacity, 0.0..=1.0).text("Image opacity"))
                 .changed();
         });
-        ui.separator();
+        widgets::divider(ui, p);
         ui.strong("Live preview");
         let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 90.0), egui::Sense::hover());
         ui.painter().rect_filled(r, style.corner_radius, style.color(1.0));
@@ -211,12 +206,12 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
                 tex.id(),
                 r,
                 Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-                Color32::WHITE.gamma_multiply(style.image_opacity),
+                widgets::PICTURE_TINT.gamma_multiply(style.image_opacity),
             );
         }
         let font = egui::FontId::proportional(style.name_size);
         ui.painter()
-            .text(r.center(), egui::Align2::CENTER_CENTER, "Example Resident", font, Color32::WHITE);
+            .text(r.center(), egui::Align2::CENTER_CENTER, "Example Resident", font, p.ink);
         if widgets::action_button(ui, p, "refresh", "Restore defaults", ActionKind::Flat, Vec2::new(0.0, 29.0)).clicked() {
             reset = true;
         }
