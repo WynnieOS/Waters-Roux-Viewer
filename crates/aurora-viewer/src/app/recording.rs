@@ -45,6 +45,11 @@ impl Recorder {
         self.session.is_some()
     }
 
+    /// A recorder-exclusive GPU readback is outstanding.
+    pub fn pending(&self) -> bool {
+        self.session.as_ref().is_some_and(|session| session.requested.is_some())
+    }
+
     pub fn elapsed(&self) -> Duration {
         self.session.as_ref().map_or(Duration::ZERO, |s| s.started.elapsed())
     }
