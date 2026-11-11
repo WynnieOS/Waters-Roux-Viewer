@@ -3810,7 +3810,11 @@ mod tests {
         let ctx = egui::Context::default();
         let mut panels = Panels::from_settings(&crate::settings::Settings::default());
         assert!(super::super::toolbar::ready("phototools"));
-        assert!(!super::super::toolbar::COMMANDS.iter().any(|command| command.id == "phototools_view"));
+        assert!(
+            !super::super::toolbar::COMMANDS
+                .iter()
+                .any(|command| command.id == "phototools_view")
+        );
         assert!(!panels.snapshot && !panels.camera_controls && !panels.photo_tools);
 
         assert!(matches!(run_command(&ctx, "phototools", &mut panels), BarAction::None));
