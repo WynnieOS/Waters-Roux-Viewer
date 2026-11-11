@@ -26,6 +26,93 @@ fn pane(ui: &mut egui::Ui, id: &str, rect: egui::Rect) -> egui::Ui {
 }
 
 impl Editor {
+    /// A compact, genuinely separate self-only pose station. The advanced
+    /// Poser retains all bone tools and nearby-avatar invitation controls;
+    /// the stand intentionally never exposes remote residents as subjects.
+    pub(in crate::ik_edit) fn pose_stand_ui(&mut self, ctx: &egui::Context, p: &Palette, world: &World, frame: &Frame) {
+        if self.poser.subject != world.agent_id {
+            self.pick_subject(world, world.agent_id);
+        }
+        let mut open = self.open;
+        let mut full_poser = false;
+        let mut reset = false;
+        let mut save = false;
+        let mut stop = false;
+        let mut toggle_library = false;
+        let has_session = self.poser.sessions.contains_key(&world.agent_id);
+        let mut floater = Floater::new("pose_stand", "Waters Roux Pose Stand", egui::pos2(710.0, 95.0), egui::vec2(480.0, 490.0));
+        floater.min_size = egui::vec2(390.0, 360.0);
+        floater.steady_size = true;
+        floater.show(ctx, p, &mut open, |ui| {
+            ui.strong("Self-only pose studio");
+            ui.label("Hold your current pose, load a saved pose or reset it. Use Full Poser for individual joints and consensual nearby-avatar posing.");
+            widgets::divider(ui, p);
+            ui.horizontal_wrapped(|ui| {
+                if widgets::action_button(ui, p, "book", "My pose library", widgets::ActionKind::Flat, egui::vec2(0.0, 28.0)).clicked() {
+                    toggle_library = true;
+                }
+                if widgets::action_button(ui, p, "wand", "Full Poser", widgets::ActionKind::Flat, egui::vec2(0.0, 28.0)).clicked() {
+                    full_poser = true;
+                }
+            });
+            if self.poser.library_open {
+                ui.add_space(6.0);
+                ui.allocate_ui_with_layout(
+                    egui::vec2(ui.available_width(), 270.0),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| self.pose_library_ui(ui, p, world),
+                );
+            } else {
+                ui.add_space(12.0);
+                ui.strong("Current pose");
+                ui.label(if has_session { "Pose session active on your avatar" } else { "Your pose session is starting" });
+                widgets::divider(ui, p);
+                widgets::restricted_text_field(ui, true, &mut self.poser.name, widgets::TextPolicy::PrintableNoPipe, |value, _| {
+                    egui::TextEdit::singleline(value).char_limit(100).desired_width(360.0).hint_text("Name this pose")
+                });
+                ui.horizontal_wrapped(|ui| {
+                    if widgets::action_button_if(
+                        ui, p, "device-floppy-filled", "Save pose", widgets::ActionKind::Primary, egui::vec2(0.0, 28.0),
+                        has_session && !self.poser.storage.busy && !self.poser.name.trim().is_empty(),
+                    ).clicked() {
+                        save = true;
+                    }
+                    if widgets::action_button_if(
+                        ui, p, "refresh", "Reset pose", widgets::ActionKind::Flat, egui::vec2(0.0, 28.0), has_session,
+                    ).clicked() {
+                        reset = true;
+                    }
+                });
+                ui.label("Reset restores the pose you entered the stand with. Stop releases the local pose.");
+            }
+            ui.add_space(8.0);
+            if widgets::action_button(ui, p, "player-stop-filled", "Stop my pose", widgets::ActionKind::FlatDanger, egui::vec2(0.0, 28.0)).clicked() {
+                stop = true;
+            }
+        });
+        if toggle_library {
+            self.poser.library_open = !self.poser.library_open;
+        }
+        if save {
+            self.save_pose(&world.avatar_lib.rig, frame);
+        }
+        if reset && let Some(session) = self.poser.sessions.get_mut(&world.agent_id) {
+            session.checkpoint();
+            session.pose = session.base.clone();
+            self.refresh = true;
+        }
+        if full_poser {
+            self.poser.stand_mode = false;
+            self.open = true;
+        } else if stop || !open {
+            // This is an explicit local-only stop; it never revokes or
+            // synthesizes a nearby avatar's consent.
+            self.stop_editing();
+        } else {
+            self.open = true;
+        }
+    }
+
     pub(in crate::ik_edit) fn poser_ui(&mut self, ctx: &egui::Context, p: &Palette, world: &World, frame: &Frame) {
         if !ctx.input(|i| i.pointer.primary_down() || i.pointer.primary_released()) {
             self.poser.drag_checkpoint = false;
