@@ -688,9 +688,9 @@ pub fn draw(
             painter.rect_filled(
                 r,
                 if custom.enabled {
-                    custom.corner_radius
+                    egui::CornerRadius::same(custom.corner_radius.round() as u8)
                 } else {
-                    tag_radius.to_f32()
+                    tag_radius
                 },
                 if custom.enabled {
                     custom.color(fade)
