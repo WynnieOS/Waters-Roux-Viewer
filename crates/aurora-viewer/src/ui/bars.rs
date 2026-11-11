@@ -2154,14 +2154,11 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
                 super::widgets::open_floater(ctx, super::phototools::WINDOW, &mut panels.photo_tools);
             }
         }
-        // Opens PhotoTools on its actual lens / DoF camera tab.
+        // An old saved PhotoTools Camera toolbar button opens PhotoTools.
+        // The duplicate command is no longer in the toolbar catalogue.
         "phototools_view" => {
-            if panels.photo_tools && panels.photo_tools_camera_tab {
-                toggle(super::phototools::WINDOW, &mut panels.photo_tools);
-            } else {
-                panels.photo_tools_camera_tab = true;
-                super::widgets::open_floater(ctx, super::phototools::WINDOW, &mut panels.photo_tools);
-            }
+            panels.photo_tools_camera_tab = false;
+            super::widgets::open_floater(ctx, super::phototools::WINDOW, &mut panels.photo_tools);
         }
         // File.TakeSnapshotToDisk: a photo saved with the last settings,
         // without the window (the keyboard's Save to disk)
@@ -2278,7 +2275,7 @@ fn command_active(cmd: &str, panels: &Panels, flying: bool, seated: bool, mousel
         "machinima" => panels.machinima,
         "nametagstudio" => panels.name_tag_studio,
         "phototools" => panels.photo_tools && !panels.photo_tools_camera_tab,
-        "phototools_view" => panels.photo_tools && panels.photo_tools_camera_tab,
+        "phototools_view" => panels.photo_tools,
         "beacons" => panels.beacons,
         "quickprefs" => panels.quick_prefs,
         "settings_debug" => panels.debug_settings,
@@ -3809,28 +3806,27 @@ mod tests {
     }
 
     #[test]
-    fn photo_tools_and_camera_have_distinct_panels_and_do_not_alias_snapshot() {
+    fn photo_tools_is_one_floater_with_legacy_alias_and_not_snapshot() {
         let ctx = egui::Context::default();
         let mut panels = Panels::from_settings(&crate::settings::Settings::default());
         assert!(super::super::toolbar::ready("phototools"));
-        assert!(super::super::toolbar::ready("phototools_view"));
+        assert!(super::super::toolbar::find("phototools_view").is_none());
         assert!(!panels.snapshot && !panels.camera_controls && !panels.photo_tools);
 
         assert!(matches!(run_command(&ctx, "phototools", &mut panels), BarAction::None));
         assert!(panels.photo_tools && !panels.photo_tools_camera_tab);
         assert!(!panels.snapshot && !panels.camera_controls);
         assert!(command_active("phototools", &panels, false, false, false));
-        assert!(!command_active("phototools_view", &panels, false, false, false));
 
         assert!(matches!(run_command(&ctx, "phototools_view", &mut panels), BarAction::None));
-        assert!(panels.photo_tools && panels.photo_tools_camera_tab);
+        assert!(panels.photo_tools && !panels.photo_tools_camera_tab);
         assert!(!panels.snapshot && !panels.camera_controls);
         assert!(command_active("phototools_view", &panels, false, false, false));
-        assert!(!command_active("phototools", &panels, false, false, false));
+        assert!(command_active("phototools", &panels, false, false, false));
 
         assert!(matches!(run_command(&ctx, "snapshot", &mut panels), BarAction::None));
         assert!(panels.snapshot);
-        assert!(panels.photo_tools && panels.photo_tools_camera_tab);
+        assert!(panels.photo_tools && !panels.photo_tools_camera_tab);
     }
 
     #[test]
