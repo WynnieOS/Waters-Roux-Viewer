@@ -27,8 +27,7 @@ fn ends(build: &BuildTool, world: &World, scene: &Scene, now: Instant) -> Option
         .joint_world(world, &world.agent_id, "mWristRight", now)
         .or_else(|| scene.joint_world(world, &world.agent_id, "mHandRight", now))?;
     let len = from.distance(to);
-    (from.is_finite() && to.is_finite() && (MIN_BEAM_METRES..=MAX_BEAM_METRES).contains(&len))
-        .then_some((from, to))
+    (from.is_finite() && to.is_finite() && (MIN_BEAM_METRES..=MAX_BEAM_METRES).contains(&len)).then_some((from, to))
 }
 
 fn particle_positions(count: usize, time: f32, animated: bool) -> impl Iterator<Item = f32> {
