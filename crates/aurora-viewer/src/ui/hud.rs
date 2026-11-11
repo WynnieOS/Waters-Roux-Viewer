@@ -632,6 +632,10 @@ pub fn draw(
     // far first so near tags draw on top
     tags.sort_by(|a, b| b.0.total_cmp(&a.0));
     let opacity = bubbles.as_ref().map_or(0.0, |b| b.opacity);
+    let custom = &settings.name_tag_style;
+    // Single cached asset for the frame; animated GIFs advance in the
+    // reader's own viewer without ever changing simulator identity.
+    let image = super::name_tag_studio::texture(ctx, custom, now_s);
     for (d, sp, lines, in_voice, progress, avatar, at, alpha, bubble) in tags {
         // the scene hides what it has in front of this point
         aurora_render::world_label_at(ctx, Some(at));
@@ -649,10 +653,22 @@ pub fn draw(
         };
         let mut y = sp.y;
         // measure
+        let name_multiplier = if custom.enabled { custom.name_size / 13.0 } else { 1.0 };
+        let size_of = |size: f32| size * name_multiplier;
         let galleys: Vec<_> = lines
             .iter()
-            .map(|(t, c, s)| super::bidi::no_wrap(painter.ctx(), t.clone(), FontId::proportional(*s), c.gamma_multiply(fade)))
+            .map(|(t, c, s)| super::bidi::no_wrap(painter.ctx(), t.clone(), FontId::proportional(size_of(*s)), c.gamma_multiply(fade)))
             .collect();
+        let outlines = (custom.enabled && custom.outline).then(|| {
+            lines.iter().map(|(t, _, s)| {
+                super::bidi::no_wrap(
+                    painter.ctx(),
+                    t.clone(),
+                    FontId::proportional(size_of(*s)),
+                    Color32::BLACK.gamma_multiply(fade),
+                )
+            }).collect::<Vec<_>>()
+        });
         let total_h: f32 = galleys.iter().map(|g| g.size().y).sum();
         let max_w = galleys.iter().map(|g| g.size().x).fold(0.0, f32::max);
         y -= total_h;
@@ -668,9 +684,21 @@ pub fn draw(
             }
             painter.rect_filled(
                 r,
-                tag_radius,
-                Color32::from_rgba_unmultiplied(p.bar.r(), p.bar.g(), p.bar.b(), (190.0 * fade) as u8),
+                if custom.enabled { custom.corner_radius } else { tag_radius.to_f32() },
+                if custom.enabled {
+                    custom.color(fade)
+                } else {
+                    Color32::from_rgba_unmultiplied(p.bar.r(), p.bar.g(), p.bar.b(), (190.0 * fade) as u8)
+                },
             );
+            if custom.enabled && let Some(tex) = &image {
+                painter.image(
+                    tex.id(),
+                    r,
+                    egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                    Color32::WHITE.gamma_multiply(custom.image_opacity * fade),
+                );
+            }
             // still loading: thin progress bar along the bottom of the tag
             // (violet -> turquoise, like the loading screens)
             if let Some(f) = progress {
@@ -714,11 +742,20 @@ pub fn draw(
                 super::chat_bubbles::paint(&painter, p, b, top, fade, opacity, false, now_s);
             }
         }
-        for g in galleys {
+        for (i, g) in galleys.into_iter().enumerate() {
             let h = g.size().y;
             let pos = Pos2::new(text_x, y);
             let rect = Align2::CENTER_TOP.anchor_size(pos, g.size());
-            // every line was laid out with its own color: nothing to fall back on
+            if let Some(outline) = outlines.as_ref().and_then(|outlines| outlines.get(i)) {
+                for delta in [egui::vec2(-0.9, 0.0), egui::vec2(0.9, 0.0), egui::vec2(0.0, -0.9), egui::vec2(0.0, 0.9)] {
+                    painter.galley(rect.min + delta, outline.clone(), Color32::PLACEHOLDER);
+                }
+            }
+            // A subtle second pass thickens the glyphs; the authoritative
+            // displayed text remains the one supplied by Second Life.
+            if custom.enabled && custom.bold {
+                painter.galley(rect.min + egui::vec2(0.55, 0.0), g.clone(), Color32::PLACEHOLDER);
+            }
             painter.galley(rect.min, g, Color32::PLACEHOLDER);
             y += h;
         }
