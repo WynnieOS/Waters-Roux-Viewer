@@ -85,6 +85,7 @@ pub mod monitor;
 pub mod movelock;
 pub mod movement;
 pub mod nameplate;
+pub mod name_tag_studio;
 pub mod news;
 pub mod notification_center;
 pub mod notifications;
@@ -164,6 +165,7 @@ pub struct Panels {
     pub snapshot: bool,
     /// Independent photo production controls (not the Snapshot window).
     pub photo_tools: bool,
+    pub name_tag_studio: bool,
     /// Independent dockable camera controls for machinima production.
     pub machinima: bool,
     /// True when the separate Photo Camera toolbar command selected its tab.
@@ -255,6 +257,7 @@ impl Panels {
             group_titles: false,
             snapshot: false,
             photo_tools: false,
+            name_tag_studio: false,
             machinima: false,
             photo_tools_camera_tab: false,
             people: settings.show_people,
