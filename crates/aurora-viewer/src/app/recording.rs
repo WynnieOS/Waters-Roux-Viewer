@@ -135,7 +135,11 @@ impl Recorder {
         let result = s.worker.join().map_err(|_| "Video encoder thread panicked".to_owned())?;
         match result {
             Ok((path, frames)) if frames > 0 => {
-                self.message = Some(format!("Saved silent video: {} ({frames} frames; {} dropped)", path.display(), s.dropped));
+                self.message = Some(format!(
+                    "Saved silent video: {} ({frames} frames; {} dropped)",
+                    path.display(),
+                    s.dropped
+                ));
                 Ok(Some(path))
             }
             Ok((_path, _)) => {
@@ -224,7 +228,9 @@ impl Avi {
         u32le(&mut f, 0x10)?;
         let frames_at = f.stream_position()?;
         u32le(&mut f, 0)?;
-        for val in [0, 1, width * height * 3, width, height, 0, 0, 0, 0] { u32le(&mut f, val)?; }
+        for val in [0, 1, width * height * 3, width, height, 0, 0, 0, 0] {
+            u32le(&mut f, val)?;
+        }
         f.write_all(b"LIST")?;
         u32le(&mut f, 116)?;
         f.write_all(b"strl")?;
@@ -243,7 +249,9 @@ impl Avi {
         u32le(&mut f, width * height * 3)?;
         u32le(&mut f, u32::MAX)?;
         u32le(&mut f, 0)?;
-        for v in [0u16, 0, width as u16, height as u16] { f.write_all(&v.to_le_bytes())?; }
+        for v in [0u16, 0, width as u16, height as u16] {
+            f.write_all(&v.to_le_bytes())?;
+        }
         f.write_all(b"strf")?;
         u32le(&mut f, 40)?;
         u32le(&mut f, 40)?;
@@ -252,13 +260,24 @@ impl Avi {
         f.write_all(&1u16.to_le_bytes())?;
         f.write_all(&24u16.to_le_bytes())?;
         f.write_all(b"MJPG")?;
-        for v in [width * height * 3, 0, 0, 0, 0] { u32le(&mut f, v)?; }
+        for v in [width * height * 3, 0, 0, 0, 0] {
+            u32le(&mut f, v)?;
+        }
         f.write_all(b"LIST")?;
         let movi_size_at = f.stream_position()?;
         u32le(&mut f, 0)?;
         let movi_tag_at = f.stream_position()?;
         f.write_all(b"movi")?;
-        Ok(Self { file: f, width, height, movi_size_at, movi_tag_at, frames_at, strh_length_at, frames: Vec::new() })
+        Ok(Self {
+            file: f,
+            width,
+            height,
+            movi_size_at,
+            movi_tag_at,
+            frames_at,
+            strh_length_at,
+            frames: Vec::new(),
+        })
     }
 
     fn push_frame(&mut self, encoded: &[u8]) -> std::io::Result<()> {
@@ -270,7 +289,9 @@ impl Avi {
         self.file.write_all(b"00dc")?;
         u32le(&mut self.file, len)?;
         self.file.write_all(encoded)?;
-        if len & 1 != 0 { self.file.write_all(&[0])?; }
+        if len & 1 != 0 {
+            self.file.write_all(&[0])?;
+        }
         self.frames.push((offset as u32, len));
         Ok(())
     }
