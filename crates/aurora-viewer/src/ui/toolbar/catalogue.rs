@@ -94,6 +94,7 @@ pub const COMMANDS: &[Command] = commands![
     "assetblacklist", "shield-off", "toolbar-command-asset-blacklist", true;
     "phototools", "camera-cog", "toolbar-command-phototools", true;
     "machinima", "video-filled", "toolbar-command-machinima", true;
+    "nametagstudio", "tags-filled", "toolbar-command-nametag-studio", true;
     "phototools_view", "video-filled", "toolbar-command-phototools-camera", true;
     "pose_stand", "man-filled", "toolbar-command-pose-stand", true;
     "conversation_log", "file-text-filled", "toolbar-command-conversation-log", true;
@@ -114,6 +115,8 @@ impl Command {
     pub fn label(&self) -> &'static str {
         if self.id == "machinima" {
             "Machinima Bar"
+        } else if self.id == "nametagstudio" {
+            "Name Tag Studio"
         } else {
             aurora_i18n::text(self.key)
         }
@@ -122,6 +125,8 @@ impl Command {
     pub fn label_in(&self, language: &str) -> &'static str {
         if self.id == "machinima" {
             "Machinima Bar"
+        } else if self.id == "nametagstudio" {
+            "Name Tag Studio"
         } else {
             aurora_i18n::text_in(language, self.key)
         }
