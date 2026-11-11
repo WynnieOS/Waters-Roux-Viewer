@@ -2157,7 +2157,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
                 panels.photo_tools_camera_tab = true;
                 super::widgets::open_floater(ctx, super::phototools::WINDOW, &mut panels.photo_tools);
             }
-        },
+        }
         // File.TakeSnapshotToDisk: a photo saved with the last settings,
         // without the window (the keyboard's Save to disk)
         "snapshot_to_disk" => return BarAction::PhotoToDisk,
