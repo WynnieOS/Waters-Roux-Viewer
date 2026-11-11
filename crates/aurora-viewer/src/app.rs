@@ -16073,6 +16073,11 @@ impl App {
                     }
                     self.settings.world_overlays.land_owners = self.settings.build.show_parcel_owners;
                 }
+                // The photography suite is a real, distinct renderer-settings
+                // floater, not a shortcut back to Snapshot or generic Controls.
+                if ui::phototools::show(&ctx, &p, &mut self.panels, &mut self.settings) {
+                    self.settings.save();
+                }
                 ui::debug_overlay::draw(
                     &ctx,
                     &self.world,
