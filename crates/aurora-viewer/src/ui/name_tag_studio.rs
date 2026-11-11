@@ -311,7 +311,7 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
     let mut reset = false;
     let mut browse = false;
     let mut clear_image = false;
-    let tab_id = egui::Id::new("waters-roux-nametag-studio-tab");
+    let tab_id = egui::Id::unique("waters-roux-nametag-studio-tab");
     let mut tab = ctx.data(|d| d.get_temp::<usize>(tab_id)).unwrap_or(0);
     let mut floater = Floater::new(
         WINDOW,
