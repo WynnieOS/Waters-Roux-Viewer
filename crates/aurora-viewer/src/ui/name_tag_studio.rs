@@ -278,63 +278,143 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
     let style = &mut settings.name_tag_style;
     let mut reset = false;
     let mut browse = false;
+    let mut clear_image = false;
+    let tab_id = egui::Id::new("waters-roux-nametag-studio-tab");
+    let mut tab = ctx.data(|d| d.get_temp::<usize>(tab_id)).unwrap_or(0);
     let mut floater = Floater::new(
         WINDOW,
-        "Waters Roux Name Tag Studio",
-        egui::pos2(550.0, 120.0),
-        Vec2::new(445.0, 515.0),
+        "Waters Roux • Name Tag Studio",
+        egui::pos2(520.0, 110.0),
+        Vec2::new(520.0, 565.0),
     );
-    floater.min_size = Vec2::new(360.0, 380.0);
+    floater.min_size = Vec2::new(425.0, 420.0);
     floater.show(ctx, p, open, |ui| {
-        ui.label("Customize how nearby avatar name tags appear on YOUR viewer.");
-        changed |= widgets::switch_labeled(ui, p, &mut style.enabled, "Use my custom name-tag design").changed();
-        ui.add_enabled_ui(style.enabled, |ui| {
-            changed |= ui
-                .add(egui::Slider::new(&mut style.name_size, 10.0..=28.0).text("Name font size"))
-                .changed();
-            changed |= widgets::switch_labeled(ui, p, &mut style.bold, "Bold names").changed();
-            changed |= widgets::switch_labeled(ui, p, &mut style.outline, "Text readability outline").changed();
-            changed |= ui
-                .add(egui::Slider::new(&mut style.corner_radius, 0.0..=20.0).text("Corner radius"))
-                .changed();
-            changed |= widgets::color_button(ui, p, "nametag-background-color", &mut style.background, true).changed();
-            ui.label("Background image: local PNG or animated GIF (up to 8 MB, 512×512)");
-            ui.horizontal(|ui| {
+        ui.label("Design every visible part of avatar name tags on your viewer.");
+        changed |= widgets::switch_labeled(ui, p, &mut style.enabled, "Enable my custom name tags").changed();
+        widgets::tabs(ui, p, &mut tab, &[("Typography", true), ("Background", true), ("Layout", true)]);
+        widgets::divider(ui, p);
+        egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| match tab {
+            0 => {
+                ui.strong("Name typography");
+                changed |= ui.add(egui::Slider::new(&mut style.name_size, 10.0..=28.0).text("Display-name size")).changed();
+                changed |= ui.add(egui::Slider::new(&mut style.detail_size, 9.0..=24.0).text("Titles and detail size")).changed();
+                changed |= widgets::switch_labeled(ui, p, &mut style.monospace, "Monospace lettering").changed();
+                changed |= widgets::switch_labeled(ui, p, &mut style.bold, "Bold name").changed();
+                changed |= widgets::switch_labeled(ui, p, &mut style.outline, "Text outline / readability").changed();
+                changed |= widgets::switch_labeled(ui, p, &mut style.custom_text_colors, "Custom text colors").changed();
+                ui.horizontal(|ui| {
+                    ui.label("Display name");
+                    changed |= widgets::color_button(ui, p, "tag-name-color", &mut style.name_color, true).changed();
+                    ui.label("Other text");
+                    changed |= widgets::color_button(ui, p, "tag-detail-color", &mut style.detail_color, true).changed();
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Text outline color");
+                    changed |= widgets::color_button(ui, p, "tag-outline-color", &mut style.outline_color, true).changed();
+                });
+                widgets::divider(ui, p);
+                ui.strong("Which information appears");
+                changed |= widgets::switch_labeled(ui, p, &mut style.show_group_title, "Group titles").changed();
+                changed |= widgets::switch_labeled(ui, p, &mut style.show_username, "Usernames under display names").changed();
+                changed |= widgets::switch_labeled(ui, p, &mut style.show_status, "Away / busy / typing indicators").changed();
+            }
+            1 => {
+                ui.strong("Background color and image");
+                ui.horizontal(|ui| {
+                    ui.label("Background color and transparency");
+                    changed |= widgets::color_button(ui, p, "nametag-background-color", &mut style.background, true).changed();
+                });
+                ui.label("PNG, JPG, JPEG or animated GIF. Up to 32 MB. Large still images are safely resized.");
+                ui.horizontal_wrapped(|ui| {
+                    if widgets::action_button(ui, p, "folder", "Import image", ActionKind::Primary, Vec2::new(0.0, 30.0)).clicked() {
+                        browse = true;
+                    }
+                    if widgets::action_button(ui, p, "trash", "Remove image", ActionKind::Flat, Vec2::new(0.0, 30.0)).clicked() {
+                        clear_image = true;
+                    }
+                });
                 changed |= ui.text_edit_singleline(&mut style.image_path).changed();
-                if widgets::action_button(ui, p, "folder", "Browse", ActionKind::Flat, Vec2::new(0.0, 28.0)).clicked() {
-                    browse = true;
+                ui.horizontal(|ui| {
+                    ui.label("Image fit");
+                    changed |= ui.selectable_value(&mut style.image_fit, "cover".to_owned(), "Fill / crop").changed();
+                    changed |= ui.selectable_value(&mut style.image_fit, "contain".to_owned(), "Fit").changed();
+                    changed |= ui.selectable_value(&mut style.image_fit, "stretch".to_owned(), "Stretch").changed();
+                });
+                changed |= ui.add(egui::Slider::new(&mut style.image_opacity, 0.0..=1.0).text("Image opacity")).changed();
+                if !style.image_path.is_empty() {
+                    if let Some(error) = image_error() {
+                        ui.label(egui::RichText::new(format!("Image import failed: {error}")).color(p.danger));
+                    } else {
+                        ui.label(egui::RichText::new("Image loaded or awaiting preview").color(p.success));
+                    }
                 }
-            });
-            changed |= ui
-                .add(egui::Slider::new(&mut style.image_opacity, 0.0..=1.0).text("Image opacity"))
-                .changed();
+                ui.label("Tip: you can also drag a local PNG, JPG or GIF onto this window.");
+            }
+            _ => {
+                ui.strong("Tag shape and position");
+                changed |= ui.add(egui::Slider::new(&mut style.padding, 2.0..=32.0).text("Space around name")).changed();
+                changed |= ui.add(egui::Slider::new(&mut style.corner_radius, 0.0..=20.0).text("Rounded corners")).changed();
+                changed |= ui.add(egui::Slider::new(&mut style.border_width, 0.0..=6.0).text("Border thickness")).changed();
+                changed |= ui.add(egui::Slider::new(&mut style.text_height, -40.0..=40.0).text("Height above avatar")).changed();
+                ui.horizontal(|ui| {
+                    ui.label("Border color");
+                    changed |= widgets::color_button(ui, p, "tag-border-color", &mut style.border_color, true).changed();
+                });
+                widgets::divider(ui, p);
+                ui.strong("Viewer-wide visibility");
+                changed |= widgets::switch_labeled(ui, p, &mut settings.show_own_name_tag, "My own name tag").changed();
+                changed |= widgets::switch_labeled(ui, p, &mut settings.show_friend_name_tags, "Friends' name tags").changed();
+                changed |= widgets::switch_labeled(ui, p, &mut settings.show_other_name_tags, "Other residents' name tags").changed();
+            }
         });
         widgets::divider(ui, p);
         ui.strong("Live preview");
-        let (r, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 90.0), egui::Sense::hover());
-        ui.painter().rect_filled(r, style.corner_radius, style.color(1.0));
-        if let Some(tex) = texture(ctx, style, ui.input(|i| i.time)) {
-            ui.painter().image(
-                tex.id(),
-                r,
-                Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-                widgets::PICTURE_TINT.gamma_multiply(style.image_opacity),
+        let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 92.0), egui::Sense::hover());
+        ui.painter().rect_filled(rect, style.corner_radius, style.color(1.0));
+        if let Some(texture) = texture(ctx, style, ui.input(|i| i.time)) {
+            let (dest, uv) = image_rect(&texture, rect, &style.image_fit);
+            ui.painter().image(texture.id(), dest, uv, widgets::PICTURE_TINT.gamma_multiply(style.image_opacity));
+        }
+        if style.border_width > 0.0 {
+            let [r, g, b, a] = style.border_color;
+            ui.painter().rect_stroke(
+                rect,
+                style.corner_radius,
+                egui::Stroke::new(style.border_width, Color32::from_rgba_unmultiplied(r, g, b, a)),
+                egui::StrokeKind::Inside,
             );
         }
-        let font = egui::FontId::proportional(style.name_size);
-        ui.painter()
-            .text(r.center(), egui::Align2::CENTER_CENTER, "Example Resident", font, p.ink);
+        let font = egui::FontId::new(
+            style.name_size,
+            if style.monospace { egui::FontFamily::Monospace } else { egui::FontFamily::Proportional },
+        );
+        let [r, g, b, a] = style.name_color;
+        let text = if style.custom_text_colors { Color32::from_rgba_unmultiplied(r, g, b, a) } else { p.ink };
+        ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "Example Resident", font, text);
         if widgets::action_button(ui, p, "refresh", "Restore defaults", ActionKind::Flat, Vec2::new(0.0, 29.0)).clicked() {
             reset = true;
         }
-        ui.label("Names and usernames remain authoritative Second Life identities. Image designs only affect your local display.");
+        ui.label("These settings only affect your local display; they never change actual Second Life identities.");
     });
+    ctx.data_mut(|d| d.insert_temp(tab_id, tab));
     if browse
         && let Some(path) = rfd::FileDialog::new()
-            .add_filter("Name tag background", &["png", "gif"])
+            .add_filter("Name tag images", &["png", "jpg", "jpeg", "gif"])
             .pick_file()
     {
         style.image_path = path.to_string_lossy().into_owned();
+        style.enabled = true;
+        changed = true;
+    }
+    if let Some(path) = ctx.input(|i| i.raw.dropped_files.iter().find_map(|f| f.path.clone())) {
+        if path.extension().is_some_and(|e| matches!(e.to_string_lossy().to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg" | "gif")) {
+            style.image_path = path.to_string_lossy().into_owned();
+            style.enabled = true;
+            changed = true;
+        }
+    }
+    if clear_image {
+        style.image_path.clear();
         changed = true;
     }
     if reset {
