@@ -25,7 +25,10 @@ pub struct Overview {
 
 impl Default for Overview {
     fn default() -> Self {
-        Self { health: Health::Checking, residents: None }
+        Self {
+            health: Health::Checking,
+            residents: None,
+        }
     }
 }
 
@@ -79,7 +82,12 @@ pub fn parse_status_page(body: &str) -> Option<Health> {
 async fn fetch() -> Overview {
     let http = match reqwest::Client::builder().timeout(Duration::from_secs(8)).https_only(true).build() {
         Ok(http) => http,
-        Err(_) => return Overview { health: Health::Unavailable, residents: None },
+        Err(_) => {
+            return Overview {
+                health: Health::Unavailable,
+                residents: None,
+            };
+        }
     };
     if let Ok(response) = http.get(STATISTICS).send().await
         && let Ok(response) = response.error_for_status()
@@ -112,13 +120,22 @@ pub struct LiveGrid {
 impl Default for LiveGrid {
     fn default() -> Self {
         let (tx, rx) = crossbeam_channel::bounded(2);
-        Self { overview: Overview::default(), rt: None, tx, rx, last_requested: None }
+        Self {
+            overview: Overview::default(),
+            rt: None,
+            tx,
+            rx,
+            last_requested: None,
+        }
     }
 }
 
 impl LiveGrid {
     pub fn start(rt: &tokio::runtime::Handle) -> Self {
-        let mut feed = Self { rt: Some(rt.clone()), ..Self::default() };
+        let mut feed = Self {
+            rt: Some(rt.clone()),
+            ..Self::default()
+        };
         feed.refresh();
         feed
     }
