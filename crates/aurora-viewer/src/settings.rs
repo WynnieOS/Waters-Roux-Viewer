@@ -971,6 +971,8 @@ pub struct Settings {
     pub name_tag_distance: f32,
     /// Waters Roux custom locally rendered animated name-tag backgrounds.
     pub name_tag_style: crate::ui::name_tag_studio::Style,
+    /// The resident's opt-in native machinima video/audio recording choices.
+    pub recording: crate::app::recording::Options,
     pub show_own_name_tag: bool,
     pub show_friend_name_tags: bool,
     pub show_other_name_tags: bool,
@@ -2054,6 +2056,7 @@ impl Default for Settings {
             auto_replace: false,
             name_tag_distance: 64.0,
             name_tag_style: Default::default(),
+            recording: Default::default(),
             show_own_name_tag: true,
             show_friend_name_tags: true,
             show_other_name_tags: true,
@@ -2937,6 +2940,7 @@ impl Settings {
         self.im_toast_seconds = self.im_toast_seconds.clamp(3.0, 60.0);
         self.name_tag_distance = self.name_tag_distance.clamp(0.0, 128.0);
         self.name_tag_style.sanitize();
+        self.recording.sanitize();
         self.name_tag_show_seconds = if self.name_tag_show_seconds.is_finite() {
             self.name_tag_show_seconds.clamp(1.0, 60.0)
         } else {
