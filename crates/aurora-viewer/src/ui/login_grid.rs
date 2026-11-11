@@ -177,3 +177,4 @@ mod tests {
         assert_eq!(parse_status_page("bad-json"), None);
     }
 }
+
