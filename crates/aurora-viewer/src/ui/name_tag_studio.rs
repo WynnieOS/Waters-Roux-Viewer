@@ -464,7 +464,7 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
         style.enabled = true;
         changed = true;
     }
-    if let Some(path) = ctx.input(|i| i.raw.dropped_files.iter().find_map(|f| f.path.clone())) {
+    if let Some(path) = ctx.input(|i| i.raw.dropped_files.iter().find_map(|f| f.path().map(|path| path.to_path_buf()))) {
         if path
             .extension()
             .is_some_and(|e| matches!(e.to_string_lossy().to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg" | "gif"))
