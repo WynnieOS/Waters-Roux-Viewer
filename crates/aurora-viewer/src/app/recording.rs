@@ -171,7 +171,7 @@ fn encode_stream(rx: Receiver<Packet>, path: PathBuf) -> Result<(PathBuf, u64), 
         });
         let mut encoded = Vec::new();
         image::codecs::jpeg::JpegEncoder::new_with_quality(&mut encoded, 80)
-            .encode(&rgb, writer.width, writer.height, image::ExtendedColorType::Rgb8)
+            .encode(rgb.as_raw(), writer.width, writer.height, image::ExtendedColorType::Rgb8)
             .map_err(|e| format!("JPEG encode: {e}"))?;
         writer.push_frame(&encoded).map_err(|e| format!("AVI frame write: {e}"))?;
     }
