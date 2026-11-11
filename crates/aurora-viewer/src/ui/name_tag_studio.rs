@@ -10,9 +10,13 @@ use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, io::Cursor, path::Path};
 
 pub const WINDOW: &str = "waters_roux_nametag_designer";
-const MAX_FILE: u64 = 8 * 1024 * 1024;
-const MAX_SIDE: u32 = 512;
-const MAX_FRAMES: usize = 32;
+// Original assets may be high-resolution; scale to a bounded GPU texture
+// instead of rejecting every ordinary creator-sized PNG/JPG/GIF.
+const MAX_FILE: u64 = 32 * 1024 * 1024;
+const MAX_IMAGE_SIDE: u32 = 8192;
+const MAX_GIF_SIDE: u32 = 2048;
+const MAX_TEXTURE_SIDE: u32 = 1024;
+const MAX_FRAMES: usize = 48;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -25,6 +29,22 @@ pub struct Style {
     pub image_path: String,
     pub image_opacity: f32,
     pub corner_radius: f32,
+    pub name_color: [u8; 4],
+    pub detail_color: [u8; 4],
+    pub border_color: [u8; 4],
+    pub outline_color: [u8; 4],
+    pub border_width: f32,
+    pub padding: f32,
+    pub text_height: f32,
+    pub detail_size: f32,
+    pub monospace: bool,
+    pub custom_text_colors: bool,
+    pub show_group_title: bool,
+    pub show_username: bool,
+    pub show_status: bool,
+    /// "cover" crops to fill, "contain" preserves the entire image,
+    /// "stretch" fills the name tag without preserving aspect ratio.
+    pub image_fit: String,
 }
 
 impl Default for Style {
@@ -38,6 +58,20 @@ impl Default for Style {
             image_path: String::new(),
             image_opacity: 0.95,
             corner_radius: 8.0,
+            name_color: [255, 255, 255, 255],
+            detail_color: [224, 219, 231, 255],
+            border_color: [209, 160, 237, 255],
+            outline_color: [20, 13, 30, 255],
+            border_width: 1.0,
+            padding: 8.0,
+            text_height: 0.0,
+            detail_size: 12.0,
+            monospace: false,
+            custom_text_colors: false,
+            show_group_title: true,
+            show_username: true,
+            show_status: true,
+            image_fit: "cover".into(),
         }
     }
 }
@@ -59,6 +93,13 @@ impl Style {
         } else {
             1.0
         };
+        self.border_width = if self.border_width.is_finite() { self.border_width.clamp(0.0, 6.0) } else { 1.0 };
+        self.padding = if self.padding.is_finite() { self.padding.clamp(2.0, 32.0) } else { 8.0 };
+        self.text_height = if self.text_height.is_finite() { self.text_height.clamp(-40.0, 40.0) } else { 0.0 };
+        self.detail_size = if self.detail_size.is_finite() { self.detail_size.clamp(9.0, 24.0) } else { 12.0 };
+        if !matches!(self.image_fit.as_str(), "cover" | "contain" | "stretch") {
+            self.image_fit = "cover".into();
+        }
         if self.image_path.len() > 2048 {
             self.image_path.clear();
         }
