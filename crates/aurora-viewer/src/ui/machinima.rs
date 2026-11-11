@@ -216,4 +216,3 @@ mod tests {
         assert_ne!(Action::PhotoTools, Action::CameraControls);
     }
 }
-
