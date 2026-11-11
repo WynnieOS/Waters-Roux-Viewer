@@ -1,5 +1,5 @@
 //! Dedicated, movable cinematography control bar. Every enabled button
-//! invokes an existing real camera or photo action; no fake Record button.
+//! invokes a real camera, photo or user-initiated video recorder action.
 
 use super::widgets::{self, ActionKind, Floater};
 use crate::theme::Palette;
@@ -19,9 +19,11 @@ pub enum Action {
     Snapshot,
     Panorama,
     ToggleInterface,
+    StartRecording,
+    StopRecording,
 }
 
-pub fn show(ctx: &Context, p: &Palette, open: &mut bool, pov: bool) -> Action {
+pub fn show(ctx: &Context, p: &Palette, open: &mut bool, pov: bool, recording: bool, elapsed: std::time::Duration) -> Action {
     if !*open {
         return Action::None;
     }
@@ -37,6 +39,14 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, pov: bool) -> Action {
     floater.steady_size = true;
     floater.show(ctx, p, open, |ui| {
         ui.horizontal_wrapped(|ui| {
+            if recording {
+                ui.strong(format!("REC • {:02}:{:02}", elapsed.as_secs() / 60, elapsed.as_secs() % 60));
+                if widgets::action_button(ui, p, "player-stop-filled", "Stop and save AVI", ActionKind::Primary, Vec2::new(0.0, 29.0)).clicked() {
+                    action = Action::StopRecording;
+                }
+            } else if widgets::action_button(ui, p, "video", "Record silent video", ActionKind::Primary, Vec2::new(0.0, 29.0)).clicked() {
+                action = Action::StartRecording;
+            }
             let btn = |ui: &mut egui::Ui, icon: &str, label: &str| {
                 widgets::action_button(ui, p, icon, label, ActionKind::Flat, Vec2::new(0.0, 29.0)).clicked()
             };
@@ -62,7 +72,7 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, pov: bool) -> Action {
                 action = Action::ToggleInterface;
             }
         });
-        ui.label("Camera and photo controls are live. Native video recording is not implemented yet.");
+        ui.label("Video saves locally as silent MJPEG AVI (up to 720p/12 fps). Voice and desktop audio are not recorded.");
     });
     action
 }
