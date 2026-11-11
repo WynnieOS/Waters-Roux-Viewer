@@ -34,7 +34,12 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Self {
-        Self { height: 1080, fps: 30, jpeg_quality: 95, capture_world_audio: false }
+        Self {
+            height: 1080,
+            fps: 30,
+            jpeg_quality: 95,
+            capture_world_audio: false,
+        }
     }
 }
 
@@ -195,11 +200,7 @@ impl Recorder {
         let result = s.worker.join().map_err(|_| "Video encoder thread panicked".to_owned())?;
         match result {
             Ok((path, frames)) if frames > 0 => {
-                self.message = Some(format!(
-                    "Saved video: {} ({frames} frames; {} dropped)",
-                    path.display(),
-                    s.dropped
-                ));
+                self.message = Some(format!("Saved video: {} ({frames} frames; {} dropped)", path.display(), s.dropped));
                 Ok(Some(path))
             }
             Ok((_path, _)) => {
