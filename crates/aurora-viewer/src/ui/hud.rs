@@ -1287,3 +1287,4 @@ mod tests {
         assert!((pulled - eye).normalize().distance((up - eye).normalize()) < 1e-5);
     }
 }
+
