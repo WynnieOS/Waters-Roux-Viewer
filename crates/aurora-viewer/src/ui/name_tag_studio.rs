@@ -117,86 +117,157 @@ struct Art {
     delays: Vec<f64>,
     total: f64,
 }
+
+enum Cache {
+    Ready(Art),
+    Failed { path: String, reason: String },
+}
+
+impl Cache {
+    fn path(&self) -> &str {
+        match self {
+            Self::Ready(art) => &art.path,
+            Self::Failed { path, .. } => path,
+        }
+    }
+}
+
 thread_local! {
-    static ART: RefCell<Option<Art>> = const { RefCell::new(None) };
+    static ART: RefCell<Option<Cache>> = const { RefCell::new(None) };
+}
+
+fn fits_size(width: u32, height: u32, max: u32) -> bool {
+    width > 0 && height > 0 && width <= max && height <= max
+}
+
+fn to_texture(ctx: &Context, key: String, rgba: &image::RgbaImage) -> TextureHandle {
+    let (w, h) = rgba.dimensions();
+    let size = [w as usize, h as usize];
+    let pixels = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
+    ctx.load_texture(key, pixels, TextureOptions::LINEAR)
+}
+
+fn shrink(image: image::RgbaImage) -> image::RgbaImage {
+    let (w, h) = image.dimensions();
+    if w <= MAX_TEXTURE_SIDE && h <= MAX_TEXTURE_SIDE {
+        return image;
+    }
+    let scale = (MAX_TEXTURE_SIDE as f32 / w as f32).min(MAX_TEXTURE_SIDE as f32 / h as f32);
+    let width = (w as f32 * scale).round().max(1.0) as u32;
+    let height = (h as f32 * scale).round().max(1.0) as u32;
+    image::imageops::resize(&image, width, height, image::imageops::FilterType::Lanczos3)
 }
 
 fn decode_art(ctx: &Context, path: &str) -> Result<Art, String> {
     let file = Path::new(path);
-    let meta = std::fs::metadata(file).map_err(|e| format!("Could not read image: {e}"))?;
+    let meta = std::fs::metadata(file).map_err(|e| format!("Cannot open file: {e}"))?;
     if meta.len() > MAX_FILE {
-        return Err("Name-tag images must be at most 8 MB".into());
+        return Err("The image exceeds 32 MB. Compress it before importing.".into());
     }
-    let bytes = std::fs::read(file).map_err(|e| e.to_string())?;
+    let ext = file.extension().and_then(|v| v.to_str()).unwrap_or_default().to_ascii_lowercase();
+    if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "gif") {
+        return Err("Choose a PNG, JPG, JPEG, or GIF file.".into());
+    }
+    let bytes = std::fs::read(file).map_err(|e| format!("Cannot read image: {e}"))?;
     let mut frames = Vec::new();
     let mut delays = Vec::new();
-    let is_gif = file.extension().is_some_and(|e| e.eq_ignore_ascii_case("gif"));
-    if is_gif {
-        let decoder = image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).map_err(|e| e.to_string())?;
+    if ext == "gif" {
+        let decoder = image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).map_err(|e| format!("Invalid GIF: {e}"))?;
         let (w, h) = decoder.dimensions();
-        if w == 0 || h == 0 || w > MAX_SIDE || h > MAX_SIDE {
-            return Err("GIF dimensions must not exceed 512×512".into());
+        if !fits_size(w, h, MAX_GIF_SIDE) {
+            return Err("GIF dimensions must be at most 2048 × 2048 pixels.".into());
         }
         for (i, frame) in decoder.into_frames().take(MAX_FRAMES).enumerate() {
-            let frame = frame.map_err(|e| e.to_string())?;
+            let frame = frame.map_err(|e| format!("GIF frame could not be decoded: {e}"))?;
             let (num, den) = frame.delay().numer_denom_ms();
             let seconds = (num as f64 / den.max(1) as f64 / 1000.0).clamp(0.08, 2.0);
-            let image = frame.into_buffer();
-            let (width, height) = image.dimensions();
-            let color = egui::ColorImage::from_rgba_unmultiplied([width as usize, height as usize], image.as_raw());
-            frames.push(ctx.load_texture(format!("name-tag-gif-{i}"), color, TextureOptions::LINEAR));
+            let rgba = shrink(frame.into_buffer());
+            frames.push(to_texture(ctx, format!("waters-roux-name-tag-gif-{i}"), &rgba));
             delays.push(seconds);
         }
     } else {
         let source = image::ImageReader::new(Cursor::new(&bytes))
             .with_guessed_format()
             .map_err(|e| e.to_string())?;
-        let (w, h) = source.into_dimensions().map_err(|e| e.to_string())?;
-        if w == 0 || h == 0 || w > MAX_SIDE || h > MAX_SIDE {
-            return Err("Image dimensions must not exceed 512×512".into());
+        let (w, h) = source.into_dimensions().map_err(|e| format!("Cannot read image dimensions: {e}"))?;
+        if !fits_size(w, h, MAX_IMAGE_SIDE) {
+            return Err("Image dimensions must be at most 8192 × 8192 pixels.".into());
         }
-        let image = image::load_from_memory(&bytes).map_err(|e| e.to_string())?.to_rgba8();
-        let color = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], image.as_raw());
-        frames.push(ctx.load_texture("name-tag-image", color, TextureOptions::LINEAR));
+        let rgba = image::load_from_memory(&bytes).map_err(|e| format!("Cannot decode image: {e}"))?.to_rgba8();
+        frames.push(to_texture(ctx, "waters-roux-name-tag-background".into(), &shrink(rgba)));
         delays.push(1.0);
     }
     if frames.is_empty() {
-        return Err("The image contains no decodable frames".into());
+        return Err("The file has no readable image frames.".into());
     }
     let total = delays.iter().sum();
-    Ok(Art {
-        path: path.into(),
-        frames,
-        delays,
-        total,
+    Ok(Art { path: path.into(), frames, delays, total })
+}
+
+/// A visible import error instead of silently discarding ordinary PNG/JPG/GIFs.
+/// Invalid paths are cached so the painter never repeatedly opens files.
+pub fn image_error() -> Option<String> {
+    ART.with_borrow(|cached| match cached.as_ref() {
+        Some(Cache::Failed { reason, .. }) => Some(reason.clone()),
+        _ => None,
     })
 }
 
-/// Load once per path and reuse GPU textures; an animated GIF changes its
-/// displayed texture over time without repeatedly decoding the file.
+/// Return the GPU texture for the requested image or current GIF frame.
 pub fn texture(ctx: &Context, style: &Style, now: f64) -> Option<TextureHandle> {
     if !style.enabled || style.image_path.trim().is_empty() {
         return None;
     }
-    ART.with_borrow_mut(|cached| {
-        if cached.as_ref().is_none_or(|a| a.path != style.image_path) {
-            *cached = decode_art(ctx, &style.image_path).ok();
+    ART.with_borrow_mut(|cache| {
+        if cache.as_ref().is_none_or(|asset| asset.path() != style.image_path) {
+            *cache = Some(match decode_art(ctx, &style.image_path) {
+                Ok(art) => Cache::Ready(art),
+                Err(reason) => Cache::Failed { path: style.image_path.clone(), reason },
+            });
         }
-        let art = cached.as_ref()?;
+        let Some(Cache::Ready(art)) = cache.as_ref() else {
+            return None;
+        };
         if art.frames.len() > 1 {
             ctx.request_repaint_after(std::time::Duration::from_millis(80));
         }
-        let mut t = now.rem_euclid(art.total.max(0.001));
-        let mut index = 0;
-        for (i, &duration) in art.delays.iter().enumerate() {
-            if t < duration {
+        let mut time = now.rem_euclid(art.total.max(0.001));
+        let mut index = art.frames.len().saturating_sub(1);
+        for (i, &delay) in art.delays.iter().enumerate() {
+            if time < delay {
                 index = i;
                 break;
             }
-            t -= duration;
+            time -= delay;
         }
         art.frames.get(index).cloned()
     })
+}
+
+/// Returns destination and UV rectangles for crop/contain/stretch, so imported
+/// backgrounds do not distort unless the resident explicitly chooses Stretch.
+pub fn image_rect(texture: &TextureHandle, destination: Rect, fit: &str) -> (Rect, Rect) {
+    let [w, h] = texture.size();
+    let image_aspect = w as f32 / h.max(1) as f32;
+    let frame_aspect = destination.width() / destination.height().max(1.0);
+    let full = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
+    if fit == "contain" {
+        let size = if image_aspect > frame_aspect {
+            Vec2::new(destination.width(), destination.width() / image_aspect)
+        } else {
+            Vec2::new(destination.height() * image_aspect, destination.height())
+        };
+        return (Rect::from_center_size(destination.center(), size), full);
+    }
+    if fit == "cover" {
+        if image_aspect > frame_aspect {
+            let half = frame_aspect / image_aspect * 0.5;
+            return (destination, Rect::from_min_max(Pos2::new(0.5 - half, 0.0), Pos2::new(0.5 + half, 1.0)));
+        }
+        let half = image_aspect / frame_aspect * 0.5;
+        return (destination, Rect::from_min_max(Pos2::new(0.0, 0.5 - half), Pos2::new(1.0, 0.5 + half)));
+    }
+    (destination, full)
 }
 
 pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings) -> bool {
