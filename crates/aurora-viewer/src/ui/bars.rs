@@ -2140,6 +2140,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         // Aurora's Performance window
         "performance" | "statistics" => toggle("perf", &mut panels.perf),
         "snapshot" => toggle(super::snapshot::WINDOW, &mut panels.snapshot),
+        "machinima" => toggle(super::machinima::WINDOW, &mut panels.machinima),
         // A dedicated producer's floater, not a second Snapshot button.
         "phototools" => {
             if panels.photo_tools && !panels.photo_tools_camera_tab {
@@ -2270,6 +2271,7 @@ fn command_active(cmd: &str, panels: &Panels, flying: bool, seated: bool, mousel
         "voice" => panels.voice_controls,
         "performance" | "statistics" => panels.perf,
         "snapshot" => panels.snapshot,
+        "machinima" => panels.machinima,
         "phototools" => panels.photo_tools && !panels.photo_tools_camera_tab,
         "phototools_view" => panels.photo_tools && panels.photo_tools_camera_tab,
         "beacons" => panels.beacons,
