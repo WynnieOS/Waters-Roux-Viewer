@@ -72,6 +72,9 @@ pub enum BarAction {
     PhotoToDisk,
     /// Real 360° six-face capture to a 2:1 equirectangular PNG.
     CapturePanorama,
+    /// User explicitly requested recording: start/stop a local silent AVI.
+    StartRecording,
+    StopRecording,
     /// The toolbar's Photo roll: the reel's quick view on its newest photo.
     PhotoRoll,
     /// Explore Second Life destinations in the built-in browser.
