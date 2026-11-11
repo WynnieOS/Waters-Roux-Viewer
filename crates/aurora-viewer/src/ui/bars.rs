@@ -2144,6 +2144,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         "performance" | "statistics" => toggle("perf", &mut panels.perf),
         "snapshot" => toggle(super::snapshot::WINDOW, &mut panels.snapshot),
         "machinima" => toggle(super::machinima::WINDOW, &mut panels.machinima),
+        "nametagstudio" => toggle(super::name_tag_studio::WINDOW, &mut panels.name_tag_studio),
         // A dedicated producer's floater, not a second Snapshot button.
         "phototools" => {
             if panels.photo_tools && !panels.photo_tools_camera_tab {
@@ -2275,6 +2276,7 @@ fn command_active(cmd: &str, panels: &Panels, flying: bool, seated: bool, mousel
         "performance" | "statistics" => panels.perf,
         "snapshot" => panels.snapshot,
         "machinima" => panels.machinima,
+        "nametagstudio" => panels.name_tag_studio,
         "phototools" => panels.photo_tools && !panels.photo_tools_camera_tab,
         "phototools_view" => panels.photo_tools && panels.photo_tools_camera_tab,
         "beacons" => panels.beacons,
