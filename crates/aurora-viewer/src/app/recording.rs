@@ -20,7 +20,7 @@ const LIMIT_SECONDS: u64 = 300;
 const SAMPLE_RATE: u32 = 48_000;
 const AUDIO_CHANNELS: u16 = 2;
 const AUDIO_BITS: u16 = 16;
-const AUDIO_FRAME_BYTES: u32 = u32::from(AUDIO_CHANNELS) * u32::from(AUDIO_BITS) / 8;
+const AUDIO_FRAME_BYTES: u32 = AUDIO_CHANNELS as u32 * AUDIO_BITS as u32 / 8;
 
 /// Configured from the Machinima Bar, persisted independently of PhotoTools.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -290,6 +290,7 @@ struct Avi {
     height: u32,
     movi_size_at: u64,
     movi_tag_at: u64,
+    frames_at: u64,
     video_length_at: u64,
     audio_length_at: Option<u64>,
     video_frames: u64,
@@ -395,6 +396,7 @@ impl Avi {
             height,
             movi_size_at,
             movi_tag_at,
+            frames_at,
             video_length_at,
             audio_length_at,
             video_frames: 0,
@@ -461,7 +463,7 @@ impl Avi {
         u32le(&mut self.file, (end_movi - self.movi_tag_at) as u32)?;
         self.file.seek(SeekFrom::Start(self.video_length_at))?;
         u32le(&mut self.file, self.video_frames as u32)?;
-        self.file.seek(SeekFrom::Start(frames_at_from_header(&mut self.file)?))?;
+        self.file.seek(SeekFrom::Start(self.frames_at))?;
         u32le(&mut self.file, self.video_frames as u32)?;
         if let Some(at) = self.audio_length_at {
             self.file.seek(SeekFrom::Start(at))?;
@@ -470,11 +472,6 @@ impl Avi {
         self.file.flush()?;
         self.file.sync_all()
     }
-}
-
-/// Total-frame field of the AVI main header is always at file offset 48.
-fn frames_at_from_header(_file: &mut File) -> std::io::Result<u64> {
-    Ok(48)
 }
 
 fn u32le(f: &mut File, value: u32) -> std::io::Result<()> {
@@ -486,19 +483,23 @@ mod tests {
     use super::*;
     #[test]
     fn recording_dimensions_remain_even_and_within_budget() {
-        assert_eq!(dimensions(1920, 1080), (1280, 720));
-        assert_eq!(dimensions(800, 600), (800, 600));
-        assert_eq!(dimensions(3840, 2160), (1280, 720));
+        assert_eq!(dimensions(1920, 1080, 1080), (1920, 1080));
+        assert_eq!(dimensions(800, 600, 1080), (800, 600));
+        assert_eq!(dimensions(3840, 2160, 1440), (2560, 1440));
+        assert_eq!(dimensions(3840, 2160, 2160), (3840, 2160));
     }
     #[test]
     fn avi_container_writes_index_and_frame_counts() {
         let path = std::env::temp_dir().join(format!("waters-roux-test-{}.avi", uuid::Uuid::new_v4()));
-        let mut w = Avi::new(&path, 4, 4, FPS).expect("AVI create");
+        let mut w = Avi::new(&path, 4, 4, 30, true).expect("AVI create");
+        w.push_audio(&[0.25; 960]).expect("audio chunk");
         w.push_frame(&[0xff, 0xd8, 0xff, 0xd9]).expect("frame");
         w.finish().expect("finalize");
         let data = fs::read(&path).expect("read AVI");
         assert!(data.starts_with(b"RIFF"));
         assert!(data.windows(4).any(|b| b == b"movi"));
+        assert!(data.windows(4).any(|b| b == b"auds"));
+        assert!(data.windows(4).any(|b| b == b"01wb"));
         assert!(data.windows(4).any(|b| b == b"idx1"));
         assert_eq!(u32::from_le_bytes(data[4..8].try_into().unwrap()) as usize, data.len() - 8);
         fs::remove_file(path).expect("cleanup");
