@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/waters-roux-beta28-preview.yml'
       - 'docs/WATERS_ROUX_BETA28_PACKAGE_REQUEST.md'
+      - 'crates/aurora-viewer/src/**'
   workflow_dispatch:
 
 permissions:
