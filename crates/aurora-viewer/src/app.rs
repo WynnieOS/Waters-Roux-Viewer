@@ -115,7 +115,7 @@ mod physics_editor;
 mod plate_click;
 mod pointing;
 mod quick_prefs;
-mod recording;
+pub(crate) mod recording;
 mod region_restart;
 mod region_window;
 mod relogin;
@@ -13863,8 +13863,8 @@ impl App {
             BarAction::CapturePanorama => self.photo_panorama_to_disk(),
             BarAction::StartRecording => {
                 if self.in_world() {
-                    match self.recorder.start() {
-                        Ok(path) => self.world.system_message(format!("Recording silent video to {}", path.display())),
+                    match self.recorder.start(self.settings.recording, self.audio_engine.as_ref()) {
+                        Ok(path) => self.world.system_message(format!("Recording video to {}", path.display())),
                         Err(error) => self.world.system_message(format!("Recorder error: {error}")),
                     }
                 } else {
@@ -13873,7 +13873,7 @@ impl App {
                 }
             }
             BarAction::StopRecording => match self.recorder.stop() {
-                Ok(Some(path)) => self.world.system_message(format!("Saved silent video: {}", path.display())),
+                Ok(Some(path)) => self.world.system_message(format!("Saved video: {}", path.display())),
                 Ok(None) => self.world.system_message("No recorded frames were saved.".to_owned()),
                 Err(error) => self.world.system_message(format!("Video finalize failed: {error}")),
             },
@@ -16126,22 +16126,26 @@ impl App {
                 if ui::phototools::show(&ctx, &p, &mut self.panels, &mut self.settings) {
                     self.settings.save();
                 }
-                let machinima = ui::machinima::show(
+                let (machinima, machinima_settings_changed) = ui::machinima::show(
                     &ctx,
                     &p,
                     &mut self.panels.machinima,
                     self.camera.mouselook(),
                     self.recorder.active(),
                     self.recorder.elapsed(),
+                    &mut self.settings,
                 );
+                if machinima_settings_changed {
+                    self.settings.save();
+                }
                 match machinima {
                     ui::machinima::Action::None => {}
                     ui::machinima::Action::TogglePov => a.bar = BarAction::ToggleMouselook,
                     ui::machinima::Action::ResetCamera => a.bar = BarAction::ResetCamera,
                     ui::machinima::Action::CameraControls => self.panels.camera_controls = true,
-                    ui::machinima::Action::PhotoToolsCamera => {
+                    ui::machinima::Action::PhotoTools => {
                         self.panels.photo_tools = true;
-                        self.panels.photo_tools_camera_tab = true;
+                        self.panels.photo_tools_camera_tab = false;
                     }
                     ui::machinima::Action::Snapshot => self.panels.snapshot = true,
                     ui::machinima::Action::Panorama => a.bar = BarAction::CapturePanorama,
