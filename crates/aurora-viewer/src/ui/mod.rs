@@ -71,6 +71,7 @@ pub mod loading;
 pub mod login;
 pub mod lookat_targets;
 pub mod looks_editor;
+pub mod machinima;
 pub mod map_tiles;
 pub mod marketplace;
 pub mod marketplace_listings;
@@ -163,6 +164,8 @@ pub struct Panels {
     pub snapshot: bool,
     /// Independent photo production controls (not the Snapshot window).
     pub photo_tools: bool,
+    /// Independent dockable camera controls for machinima production.
+    pub machinima: bool,
     /// True when the separate Photo Camera toolbar command selected its tab.
     pub photo_tools_camera_tab: bool,
     pub people: bool,
@@ -252,6 +255,7 @@ impl Panels {
             group_titles: false,
             snapshot: false,
             photo_tools: false,
+            machinima: false,
             photo_tools_camera_tab: false,
             people: settings.show_people,
             minimap: settings.show_minimap,
