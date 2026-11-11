@@ -2139,7 +2139,25 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         // the Legacy Viewer's Statistics (Floater.Toggle stats) opens
         // Aurora's Performance window
         "performance" | "statistics" => toggle("perf", &mut panels.perf),
-        "snapshot" | "phototools" => toggle(super::snapshot::WINDOW, &mut panels.snapshot),
+        "snapshot" => toggle(super::snapshot::WINDOW, &mut panels.snapshot),
+        // A dedicated producer's floater, not a second Snapshot button.
+        "phototools" => {
+            if panels.photo_tools && !panels.photo_tools_camera_tab {
+                toggle(super::phototools::WINDOW, &mut panels.photo_tools);
+            } else {
+                panels.photo_tools_camera_tab = false;
+                super::widgets::open_floater(ctx, super::phototools::WINDOW, &mut panels.photo_tools);
+            }
+        }
+        // Opens PhotoTools on its actual lens / DoF camera tab.
+        "phototools_view" => {
+            if panels.photo_tools && panels.photo_tools_camera_tab {
+                toggle(super::phototools::WINDOW, &mut panels.photo_tools);
+            } else {
+                panels.photo_tools_camera_tab = true;
+                super::widgets::open_floater(ctx, super::phototools::WINDOW, &mut panels.photo_tools);
+            }
+        },
         // File.TakeSnapshotToDisk: a photo saved with the last settings,
         // without the window (the keyboard's Save to disk)
         "snapshot_to_disk" => return BarAction::PhotoToDisk,
@@ -2176,7 +2194,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         }
         "avatar_align" => toggle("avatar_align", &mut panels.avatar_align),
         "regiontracker" => toggle("region_tracker", &mut panels.region_tracker),
-        "view" | "phototools_view" => {
+        "view" => {
             return BarAction::Controls {
                 movement: false,
                 toggle: true,
@@ -2251,13 +2269,15 @@ fn command_active(cmd: &str, panels: &Panels, flying: bool, seated: bool, mousel
         "webbrowser" => panels.web_browser,
         "voice" => panels.voice_controls,
         "performance" | "statistics" => panels.perf,
-        "snapshot" | "phototools" => panels.snapshot,
+        "snapshot" => panels.snapshot,
+        "phototools" => panels.photo_tools && !panels.photo_tools_camera_tab,
+        "phototools_view" => panels.photo_tools && panels.photo_tools_camera_tab,
         "beacons" => panels.beacons,
         "quickprefs" => panels.quick_prefs,
         "settings_debug" => panels.debug_settings,
         "preferences" => panels.settings,
         "move" => panels.movement_controls,
-        "view" | "phototools_view" => panels.camera_controls,
+        "view" => panels.camera_controls,
         "avatar_align" => panels.avatar_align,
         "regiontracker" => panels.region_tracker,
         "fly" => flying,
@@ -3782,32 +3802,28 @@ mod tests {
     }
 
     #[test]
-    fn photo_tools_toolbar_commands_open_existing_working_controls() {
+    fn photo_tools_and_camera_have_distinct_panels_and_do_not_alias_snapshot() {
         let ctx = egui::Context::default();
         let mut panels = Panels::from_settings(&crate::settings::Settings::default());
         assert!(super::super::toolbar::ready("phototools"));
         assert!(super::super::toolbar::ready("phototools_view"));
+        assert!(!panels.snapshot && !panels.camera_controls && !panels.photo_tools);
 
-        // Both snapshot and Photo Tools use the existing photography window.
-        panels.snapshot = false;
         assert!(matches!(run_command(&ctx, "phototools", &mut panels), BarAction::None));
-        assert!(panels.snapshot);
+        assert!(panels.photo_tools && !panels.photo_tools_camera_tab);
+        assert!(!panels.snapshot && !panels.camera_controls);
         assert!(command_active("phototools", &panels, false, false, false));
-        assert!(command_active("snapshot", &panels, false, false, false));
-        run_command(&ctx, "phototools", &mut panels);
-        assert!(!panels.snapshot);
+        assert!(!command_active("phototools_view", &panels, false, false, false));
 
-        // The separate camera command must use the established Controls
-        // action, which the app dispatches through request_controls().
-        assert!(matches!(
-            run_command(&ctx, "phototools_view", &mut panels),
-            BarAction::Controls {
-                movement: false,
-                toggle: true
-            }
-        ));
-        panels.camera_controls = true;
+        assert!(matches!(run_command(&ctx, "phototools_view", &mut panels), BarAction::None));
+        assert!(panels.photo_tools && panels.photo_tools_camera_tab);
+        assert!(!panels.snapshot && !panels.camera_controls);
         assert!(command_active("phototools_view", &panels, false, false, false));
+        assert!(!command_active("phototools", &panels, false, false, false));
+
+        assert!(matches!(run_command(&ctx, "snapshot", &mut panels), BarAction::None));
+        assert!(panels.snapshot);
+        assert!(panels.photo_tools && panels.photo_tools_camera_tab);
     }
 
     #[test]
