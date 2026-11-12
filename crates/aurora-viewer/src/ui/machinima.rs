@@ -154,7 +154,7 @@ pub fn show(
                 });
             }
             _ => {
-                ui.strong("High-quality recording configuration");
+                ui.strong("H.264 / MP4 video recording");
                 ui.label("Captures the actual in-world renderer, not the desktop.");
                 ui.horizontal_wrapped(|ui| {
                     ui.label("Recording size:");
@@ -179,7 +179,7 @@ pub fn show(
                     }
                 });
                 changed |= ui
-                    .add(egui::Slider::new(&mut settings.recording.jpeg_quality, 80..=100).text("Frame image quality"))
+                    .add(egui::Slider::new(&mut settings.recording.jpeg_quality, 80..=100).text("H.264 recording quality"))
                     .changed();
                 changed |= widgets::switch_labeled(
                     ui,
@@ -199,7 +199,9 @@ pub fn show(
                 ui.label("Turn either option off for a clean cinematic capture. Changes apply when starting a new recording.");
                 ui.label("Recording other residents' conversations may require their consent.");
                 ui.label("Your microphone narration and unrelated desktop audio are not captured yet.");
-                ui.label("AVI/MJPEG + PCM is experimental and can produce very large files. H.264/MP4 recording is not implemented yet.");
+                ui.label("Records H.264 video to a real MP4 file; optional in-world audio is encoded as AAC. Recording requires the bundled FFmpeg encoder.");
+                ui.label("The MP4 file is finalized when you stop recording. Do not close the viewer or remove the recording folder until saving finishes.");
+                ui.label("Voice chat and in-world audio may require consent. Microphone narration is not captured.");
                 ui.horizontal(|ui| {
                     if recording {
                         if widgets::action_button(
