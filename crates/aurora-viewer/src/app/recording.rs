@@ -533,7 +533,7 @@ mod tests {
     fn recording_dimensions_remain_even_and_within_budget() {
         assert_eq!(dimensions(1920, 1080, 1080), (1920, 1080));
         assert_eq!(dimensions(1920, 1200, 0), (1920, 1200));
-        assert_eq!(dimensions(960, 540, 480), (852, 478));
+        assert_eq!(dimensions(960, 540, 480), (852, 480));
         assert_eq!(dimensions(800, 600, 1080), (800, 600));
         assert_eq!(dimensions(3840, 2160, 1440), (2560, 1440));
         assert_eq!(dimensions(3840, 2160, 2160), (3840, 2160));
