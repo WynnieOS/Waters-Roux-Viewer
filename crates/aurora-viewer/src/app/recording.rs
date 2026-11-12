@@ -318,7 +318,7 @@ fn encode_stream(
 /// Number of constant-frame-rate AVI slots covering the elapsed real time.
 fn expected_frames(elapsed: Duration, fps: u32) -> u64 {
     let nanos = elapsed.as_nanos().min(u128::from(LIMIT_SECONDS) * 1_000_000_000);
-    ((nanos * u128::from(fps) + 999_999_999) / 1_000_000_000) as u64
+    (nanos * u128::from(fps)).div_ceil(1_000_000_000) as u64
 }
 
 fn dimensions(w: u32, h: u32, max_height: u32) -> (u32, u32) {
