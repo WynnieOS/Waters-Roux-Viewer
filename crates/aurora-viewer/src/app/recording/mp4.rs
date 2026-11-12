@@ -17,7 +17,7 @@ use std::{
     time::Duration,
 };
 
-use super::{dimensions, expected_frames, Options, Packet, AUDIO_CHANNELS, SAMPLE_RATE};
+use super::{AUDIO_CHANNELS, Options, Packet, SAMPLE_RATE, dimensions, expected_frames};
 
 /// Prefer the bundled, pinned build. A resident can override it explicitly
 /// for development; finally allow an FFmpeg already installed on the PATH.
@@ -26,11 +26,11 @@ pub(super) fn locate_encoder() -> Result<PathBuf, String> {
     if let Some(override_path) = std::env::var_os("WATERS_ROUX_FFMPEG") {
         paths.push(PathBuf::from(override_path));
     }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(root) = exe.parent() {
-            paths.push(root.join("tools").join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" }));
-            paths.push(root.join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" }));
-        }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(root) = exe.parent()
+    {
+        paths.push(root.join("tools").join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" }));
+        paths.push(root.join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" }));
     }
     paths.push(PathBuf::from("ffmpeg"));
 
@@ -85,11 +85,18 @@ impl VideoEncoder {
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| format!("Cannot launch H.264 encoder: {e}"))?;
-        Ok(Self { child, width, height, frames: 0 })
+        Ok(Self {
+            child,
+            width,
+            height,
+            frames: 0,
+        })
     }
 
     fn write(&mut self, rgba: &[u8]) -> Result<(), String> {
-        self.child.stdin.as_mut()
+        self.child
+            .stdin
+            .as_mut()
             .ok_or_else(|| "H.264 encoder input closed unexpectedly".to_owned())?
             .write_all(rgba)
             .map_err(|e| format!("H.264 encoder stopped accepting frames: {e}"))?;
@@ -106,7 +113,10 @@ impl VideoEncoder {
             let _ = stderr.read_to_string(&mut details);
         }
         if !status.success() {
-            return Err(format!("H.264 encoder failed ({status}): {}", details.trim().chars().take(800).collect::<String>()));
+            return Err(format!(
+                "H.264 encoder failed ({status}): {}",
+                details.trim().chars().take(800).collect::<String>()
+            ));
         }
         Ok(self.frames)
     }
@@ -155,7 +165,10 @@ pub(super) fn encode(
     let mux_work = path.with_extension("recording-final.mp4");
     for work in [&video_work, &audio_work, &mux_work] {
         if work.exists() {
-            return Err(format!("Previous unfinished recording exists: {}. Preserve it before recording again.", work.display()));
+            return Err(format!(
+                "Previous unfinished recording exists: {}. Preserve it before recording again.",
+                work.display()
+            ));
         }
     }
 
@@ -231,7 +244,9 @@ pub(super) fn encode(
         file.flush().map_err(|e| format!("Audio track flush: {e}"))?;
     }
     let Some(video) = encoder else {
-        if audio_work.exists() { let _ = fs::remove_file(&audio_work); }
+        if audio_work.exists() {
+            let _ = fs::remove_file(&audio_work);
+        }
         return Ok((path, 0, 0));
     };
     let frames = video.finish()?;
@@ -240,9 +255,11 @@ pub(super) fn encode(
     if audio_bytes > 0 {
         let result = Command::new(&ffmpeg)
             .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"])
-            .arg("-i").arg(&video_work)
+            .arg("-i")
+            .arg(&video_work)
             .args(["-f", "s16le", "-ar", &SAMPLE_RATE.to_string(), "-ac", &AUDIO_CHANNELS.to_string()])
-            .arg("-i").arg(&audio_work)
+            .arg("-i")
+            .arg(&audio_work)
             .args(["-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy"])
             .args(["-c:a", "aac", "-b:a", "192k", "-af", "aresample=async=1:first_pts=0,apad"])
             .args(["-shortest", "-movflags", "+faststart", "-f", "mp4"])
@@ -263,7 +280,9 @@ pub(super) fn encode(
         let _ = fs::remove_file(&audio_work);
     } else {
         fs::rename(&video_work, &path).map_err(|e| format!("Cannot save completed MP4: {e}"))?;
-        if audio_work.exists() { let _ = fs::remove_file(&audio_work); }
+        if audio_work.exists() {
+            let _ = fs::remove_file(&audio_work);
+        }
     }
     check_mp4(&path)?;
     Ok((path, frames, unique_frames))
@@ -287,10 +306,18 @@ mod tests {
         tx.send(Packet::Stop(Duration::from_secs(1))).expect("stop");
         drop(tx);
         let (output, total, unique) = encode(
-            rx, path.clone(),
-            Options { height: 0, fps: 30, ..Options::default() },
-            None, None, exe,
-        ).expect("H.264/MP4 encoding");
+            rx,
+            path.clone(),
+            Options {
+                height: 0,
+                fps: 30,
+                ..Options::default()
+            },
+            None,
+            None,
+            exe,
+        )
+        .expect("H.264/MP4 encoding");
         assert_eq!((total, unique), (30, 3));
         check_mp4(&output).expect("real MP4 container");
         fs::remove_file(&output).expect("cleanup fixture");
