@@ -297,7 +297,13 @@ mod tests {
         // CI opts in after staging a trusted, pinned FFmpeg binary.
         let Ok(_) = std::env::var("WATERS_ROUX_TEST_MP4") else { return };
         let exe = locate_encoder().expect("test must have bundled H.264 FFmpeg");
-        let path = std::env::temp_dir().join(format!("waters-roux-mp4-{}.mp4", uuid::Uuid::new_v4()));
+        // The Windows QA runner sets a known path so ffprobe can independently
+        // inspect the *viewer encoder's* output, not only a synthetic FFmpeg sample.
+        let fixture_path = std::env::var_os("WATERS_ROUX_TEST_MP4_OUTPUT");
+        let path = fixture_path
+            .as_ref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::temp_dir().join(format!("waters-roux-mp4-{}.mp4", uuid::Uuid::new_v4())));
         let (tx, rx) = std::sync::mpsc::sync_channel(8);
         let frames = [Duration::ZERO, Duration::from_millis(350), Duration::from_millis(700)];
         for elapsed in frames {
@@ -320,6 +326,8 @@ mod tests {
         .expect("H.264/MP4 encoding");
         assert_eq!((total, unique), (30, 3));
         check_mp4(&output).expect("real MP4 container");
-        fs::remove_file(&output).expect("cleanup fixture");
+        if fixture_path.is_none() {
+            fs::remove_file(&output).expect("cleanup fixture");
+        }
     }
 }
