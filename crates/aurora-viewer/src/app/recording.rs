@@ -1,11 +1,16 @@
-//! User-initiated high-quality MJPEG/AVI video with optional in-world audio.
+//! User-initiated H.264/MP4 recording with optional AAC in-world audio.
+//!
+//! The AVI/MJPEG writer below is retained for legacy regression tests; real
+//! capture uses a live FFmpeg H.264 encoder and writes MP4.
 //!
 //! The resident can explicitly opt into recording the viewer's OWN 48 kHz
 //! stereo mix, including incoming WebRTC voice, sounds, parcel music and media.
 //! It does not monitor other desktop applications or record the local microphone.
-//! Both video and audio are captured to one indexed AVI. Get consent before
-//! recording conversations. Encoding remains an experimental release blocker
-//! until real in-world playback tests pass.
+//! The opt-in audio stream is muxed as AAC when the recording is finalized.
+//! Get consent before recording conversations. In-world validation is required
+//! before public release.
+
+mod mp4;
 
 use std::{
     fs::{self, File, OpenOptions},
@@ -131,9 +136,11 @@ impl Recorder {
             .unwrap_or_else(|| crate::settings::config_dir().join("videos"))
             .join("Waters Roux");
         fs::create_dir_all(&root).map_err(|e| format!("Cannot create video folder: {e}"))?;
+        // Fail before opening a recording if the bundled encoder is missing.
+        let ffmpeg = mp4::locate_encoder()?;
         let base = crate::snapshot::local_stamp();
         let output = (0..1000u32)
-            .map(|i| root.join(format!("Waters-Roux-{base}-{i:03}.avi")))
+            .map(|i| root.join(format!("Waters-Roux-{base}-{i:03}.mp4")))
             .find(|p| !p.exists())
             .ok_or_else(|| "Could not choose an unused recording filename".to_owned())?;
         let (sender, rx) = mpsc::sync_channel(3);
@@ -150,7 +157,7 @@ impl Recorder {
         let has_audio = audio.is_some();
         let worker = thread::Builder::new()
             .name("waters-roux-video-encoder".into())
-            .spawn(move || encode_stream(rx, path, options, audio, Some(encoder_backlog)))
+            .spawn(move || mp4::encode(rx, path, options, audio, Some(encoder_backlog), ffmpeg))
             .map_err(|e| format!("Unable to start video encoder: {e}"))?;
         let now = Instant::now();
         self.session = Some(Session {
@@ -166,7 +173,7 @@ impl Recorder {
             queued_frames,
         });
         self.message = Some(format!(
-            "Recording started: {} ({} • {} fps • world audio {})",
+            "H.264 MP4 recording started: {} ({} • {} fps • AAC world audio {}); the file finalizes when you stop.",
             output.display(),
             recording_label(options),
             options.fps,
@@ -180,7 +187,7 @@ impl Recorder {
     pub fn needs_frame(&mut self, now: Instant) -> bool {
         let Some(s) = self.session.as_mut() else { return false };
         if s.started.elapsed().as_secs() >= LIMIT_SECONDS {
-            self.message = Some("Video reached 10-minute safety limit. Stop to save it.".into());
+            self.message = Some("Video reached 5-minute safety limit. Stop to finalize the MP4.".into());
             return false;
         }
         // Recover from an interrupted GPU frame rather than hanging forever.
@@ -202,8 +209,8 @@ impl Recorder {
     pub fn accept(&mut self, width: u32, height: u32, rgba: Vec<u8>) {
         let Some(s) = self.session.as_mut() else { return };
         // Timestamp the render request rather than the delayed GPU readback.
-        // The AVI encoder uses these wall-clock timestamps to fill missed frame
-        // slots; a 15-fps capture must not play back at double speed in 30-fps AVI.
+        // The H.264 encoder repeats frames on its constant frame-rate timeline;
+        // slow GPU captures must not speed up playback.
         let captured_at = s.requested.take().unwrap_or_else(Instant::now);
         let elapsed = captured_at.saturating_duration_since(s.started);
         let now = Instant::now();
@@ -239,7 +246,7 @@ impl Recorder {
         match result {
             Ok((path, frames, unique)) if frames > 0 => {
                 self.message = Some(format!(
-                    "Saved video: {} ({frames} frames; {unique} captured; {} repeated; {} dropped)",
+                    "Saved H.264 MP4: {} ({frames} frames; {unique} captured; {} repeated; {} dropped)",
                     path.display(),
                     frames.saturating_sub(unique),
                     s.dropped
@@ -252,7 +259,7 @@ impl Recorder {
                 Ok(None)
             }
             Err(error) => {
-                self.message = Some(format!("Video could not be finalized: {error}"));
+                self.message = Some(format!("MP4 could not be finalized: {error}. Any intermediate files are kept for recovery."));
                 Err(error)
             }
         }
@@ -261,12 +268,13 @@ impl Recorder {
 
 impl Drop for Recorder {
     fn drop(&mut self) {
-        // Best effort on ordinary shutdown: the owned encoder closes its AVI
-        // headers even when the machinima bar was not explicitly stopped.
+        // Best effort on ordinary shutdown: close the encoder and finalize MP4
+        // even when the machinima bar was not explicitly stopped.
         let _ = self.stop();
     }
 }
 
+#[cfg(test)]
 fn encode_stream(
     rx: Receiver<Packet>,
     path: PathBuf,
@@ -368,7 +376,7 @@ fn dimensions(w: u32, h: u32, max_height: u32) -> (u32, u32) {
     (even((w as f64 * scale).round() as u32), even((h as f64 * scale).round() as u32))
 }
 
-/// RIFF AVI with indexed MJPEG video plus optional 48-kHz stereo PCM.
+/// Legacy RIFF AVI fixture (tests only) with indexed MJPEG plus stereo PCM.
 /// Sound is the consented in-viewer mix, not an operating-system screen tap.
 struct Avi {
     file: File,
