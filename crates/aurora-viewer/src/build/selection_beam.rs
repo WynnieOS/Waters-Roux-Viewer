@@ -61,7 +61,6 @@ pub fn custom_texture(ctx: &egui::Context, path: &str) -> Option<TextureHandle> 
     })
 }
 
-
 /// True only for an editable world object; HUDs, avatars, an inactive build
 /// tool and an empty selection never draw a beam.
 fn ends(build: &BuildTool, world: &World, scene: &Scene, now: Instant) -> Option<(Vec3, Vec3)> {
