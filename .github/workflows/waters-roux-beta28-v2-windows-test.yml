@@ -10,6 +10,7 @@ on:
       - 'assets/branding/**'
       - 'scripts/package.ps1'
       - 'scripts/bundle-waters-roux-ffmpeg.ps1'
+      - 'scripts/integrate-waters-roux-mp4-ui.ps1'
       - 'docs/WATERS_ROUX_BETA28_PACKAGE_REQUEST.md'
       - 'crates/aurora-viewer/src/**'
   workflow_dispatch:
@@ -49,10 +50,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { git status --short; throw "Editing branch merge conflicted" }
           # Keep Beta 27 branded UI while bringing in H.264, MP4, and AAC
           # changes only. Do not merge the Aurora-based feature branch wholesale.
-          git restore --source origin/feat/waters-roux-h264-mp4-recorder -- crates/aurora-viewer/src/app/recording.rs crates/aurora-viewer/src/app/recording/mp4.rs crates/aurora-viewer/src/ui/machinima.rs scripts/bundle-waters-roux-ffmpeg.ps1
+          git restore --source origin/feat/waters-roux-h264-mp4-recorder -- crates/aurora-viewer/src/app/recording.rs crates/aurora-viewer/src/app/recording/mp4.rs crates/aurora-viewer/src/ui/machinima.rs scripts/bundle-waters-roux-ffmpeg.ps1 scripts/integrate-waters-roux-mp4-ui.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Could not import H.264 MP4 implementation' }
           git log -4 --format='%h %s'
           git status --short
+
+      - name: Wire asynchronous MP4 finalization into branded Waters Roux app
+        shell: pwsh
+        run: ./scripts/integrate-waters-roux-mp4-ui.ps1
 
       - name: Block unbranded source before compiling
         shell: pwsh
@@ -82,6 +87,8 @@ jobs:
           $recorder = Get-Content -LiteralPath 'crates/aurora-viewer/src/app/recording.rs' -Raw
           if (-not $recorder.Contains('mod mp4;') -or -not $recorder.Contains('Waters-Roux-{base}-{i:03}.mp4')) { throw 'H.264 MP4 recorder not integrated' }
           if (-not (Test-Path -LiteralPath 'crates/aurora-viewer/src/app/recording/mp4.rs')) { throw 'H.264 encoder backend missing' }
+          if (-not (Get-Content -LiteralPath 'crates/aurora-viewer/src/app.rs' -Raw).Contains('self.recorder.stop_async()')) { throw 'Nonblocking MP4 stop not wired to branded viewer' }
+          if (-not (Get-Content -LiteralPath 'crates/aurora-viewer/src/app.rs' -Raw).Contains('self.recorder.poll_finalization()')) { throw 'MP4 finalize notifications missing' }
           'Waters Roux branded login, customization modules, runtime logo, and Windows identity verified in source.'
 
       - name: Install Rust
@@ -164,7 +171,7 @@ jobs:
             'Direct RGBA-to-H.264 encoding (no MJPEG intermediary) and bounded encoder queue. In-world playback remains unverified.'
             'H.264 MP4/AAC implementation uses separately bundled GPLv3 FFmpeg. User microphone narration is NOT captured.'
             'Verify real-world MP4 playback, frame quality, recording stop/finalization and audio sync before any public release; respect participant consent.'
-            'Blocking current limitation: stopping a long recording may occupy the UI while the MP4 is finalized.'
+            'MP4 finalizes asynchronously after Stop; do not exit until saved confirmation. Verify real-world timing in-world.'
             'GPLv3 source/distribution compliance needs review before any public release.'
             'Image/GIF name-tag customization is local only and must be tested in-world.'
             'This is not a production release; a CI build does not prove in-world functionality.'
