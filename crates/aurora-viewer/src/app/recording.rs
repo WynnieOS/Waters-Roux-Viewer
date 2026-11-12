@@ -12,14 +12,16 @@
 
 mod mp4;
 
+#[cfg(test)]
+use std::{fs::{File, OpenOptions}, io::{Seek, SeekFrom, Write}, sync::mpsc::Receiver};
+
 use std::{
-    fs::{self, File, OpenOptions},
-    io::{Seek, SeekFrom, Write},
+    fs,
     path::PathBuf,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
-        mpsc::{self, Receiver, SyncSender, TrySendError},
+        mpsc::{self, SyncSender, TrySendError},
     },
     thread,
     time::{Duration, Instant},
@@ -28,7 +30,9 @@ use std::{
 const LIMIT_SECONDS: u64 = 300;
 const SAMPLE_RATE: u32 = 48_000;
 const AUDIO_CHANNELS: u16 = 2;
+#[cfg(test)]
 const AUDIO_BITS: u16 = 16;
+#[cfg(test)]
 const AUDIO_FRAME_BYTES: u32 = AUDIO_CHANNELS as u32 * AUDIO_BITS as u32 / 8;
 
 /// Configured from the Machinima Bar, persisted independently of PhotoTools.
@@ -378,6 +382,7 @@ fn dimensions(w: u32, h: u32, max_height: u32) -> (u32, u32) {
 
 /// Legacy RIFF AVI fixture (tests only) with indexed MJPEG plus stereo PCM.
 /// Sound is the consented in-viewer mix, not an operating-system screen tap.
+#[cfg(test)]
 struct Avi {
     file: File,
     width: u32,
@@ -392,6 +397,7 @@ struct Avi {
     index: Vec<([u8; 4], u32, u32, u32)>,
 }
 
+#[cfg(test)]
 impl Avi {
     fn new(path: &PathBuf, width: u32, height: u32, fps: u32, with_audio: bool) -> std::io::Result<Self> {
         let mut f = OpenOptions::new().create_new(true).write(true).read(true).open(path)?;
@@ -568,6 +574,7 @@ impl Avi {
     }
 }
 
+#[cfg(test)]
 fn u32le(f: &mut File, value: u32) -> std::io::Result<()> {
     f.write_all(&value.to_le_bytes())
 }
