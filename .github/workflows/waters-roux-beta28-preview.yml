@@ -97,6 +97,42 @@ jobs:
             'Chrome previously flagged a Beta 27 download; do not bypass browser warnings.'
           ) | Set-Content -LiteralPath (Join-Path $folder 'BETA28-TESTING-STATUS.txt') -Encoding utf8
 
+      - name: Verify official Waters Roux artwork in Windows package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sourceDir = Join-Path $PWD 'assets/branding'
+          $packageDir = Join-Path $PWD 'Waters-Roux-Creator-Beta28-V2-Windows/assets/branding'
+          $required = @(
+            'waters-roux-logo.png',
+            'waters-roux-background.png',
+            'waters-roux-loading-background.png',
+            'waters-roux.ico'
+          )
+          foreach ($name in $required) {
+            $sourcePath = Join-Path $sourceDir $name
+            $packagePath = Join-Path $packageDir $name
+            if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+              throw "Official artwork missing from source: $sourcePath"
+            }
+            if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+              throw "Official artwork missing from Windows package: $packagePath"
+            }
+            $expected = (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash
+            $actual = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash
+            if ($expected -ne $actual) {
+              throw "Official artwork changed during packaging: $name"
+            }
+            Write-Host "Verified packaged official artwork: $name"
+          }
+          $login = (Get-FileHash -LiteralPath (Join-Path $packageDir 'waters-roux-background.png') -Algorithm SHA256).Hash
+          $loading = (Get-FileHash -LiteralPath (Join-Path $packageDir 'waters-roux-loading-background.png') -Algorithm SHA256).Hash
+          if ($login -ne $loading) { throw 'Login and loading backgrounds must be identical.' }
+          if (Test-Path -LiteralPath (Join-Path $PWD 'Waters-Roux-Creator-Beta28-V2-Windows/MISSING-ARTWORK.txt')) {
+            throw 'Package still contains the MISSING-ARTWORK warning.'
+          }
+          'All four official artwork files are present and verified in the Windows package.'
+
       - name: Scan candidate using Microsoft Defender
         shell: pwsh
         run: |
