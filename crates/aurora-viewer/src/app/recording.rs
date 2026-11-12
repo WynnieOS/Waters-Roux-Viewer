@@ -331,10 +331,10 @@ impl Recorder {
     pub fn stop(&mut self) -> Result<Option<PathBuf>, String> {
         if let Some(state) = self.finalizing.take() {
             let result = state
-            .handle
-            .join()
-            .map_err(|_| "MP4 finalizer thread panicked".to_owned())
-            .and_then(|r| r);
+                .handle
+                .join()
+                .map_err(|_| "MP4 finalizer thread panicked".to_owned())
+                .and_then(|r| r);
             return self.finish_report(result, state.output, state.dropped);
         }
         let Some(s) = self.session.take() else { return Ok(None) };
