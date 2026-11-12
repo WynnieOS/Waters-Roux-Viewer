@@ -78,6 +78,8 @@ pub(super) enum Side {
 #[derive(Default)]
 pub(super) struct State {
     pub active: bool,
+    /// An independent self-only pose library/stand UI, never the multi-avatar poser.
+    pub stand_mode: bool,
     config: Config,
     settings_loaded: bool,
     subject: Uuid,
@@ -193,6 +195,7 @@ impl Editor {
     }
     pub fn open_poser(&mut self) {
         if self.poser.active {
+            self.poser.stand_mode = false;
             self.open = true;
             return;
         }
@@ -212,9 +215,21 @@ impl Editor {
             ..Default::default()
         };
     }
+    /// The real self-only Pose Stand has its own library and controls. No
+    /// consented nearby avatar becomes the stand's subject.
+    pub fn open_pose_stand(&mut self, world: &World) {
+        self.open_poser();
+        self.select_pose_subject(world, world.agent_id);
+        self.poser.stand_mode = true;
+    }
     /// The photo viewfinder's Poser button: closes the window as its own
     /// close button does when it shows, else opens it. True when opened.
     pub fn toggle_poser(&mut self) -> bool {
+        if self.poser.active && self.poser.stand_mode {
+            self.poser.stand_mode = false;
+            self.open = true;
+            return true;
+        }
         if self.open && self.poser.active {
             self.ask_close();
             false

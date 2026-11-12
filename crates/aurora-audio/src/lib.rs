@@ -51,7 +51,7 @@ pub use decode::SoundClip;
 pub use devices::{DeviceLister, DeviceLists, input_devices, output_devices};
 pub use mixer::{Channel, ChannelSettings, ENGINE_SAMPLE_RATE};
 pub use output::OutputInfo;
-pub use processing::{EchoReference, MicProcessing};
+pub use processing::{EchoReference, MicProcessing, RecordingTap};
 pub use reverb::ReverbParams;
 pub use stream::StreamStatus;
 pub use wind::WindTarget;
@@ -146,6 +146,13 @@ impl AudioEngine {
     /// Final playback reference for software microphone echo cancellation.
     pub fn echo_reference(&self) -> EchoReference {
         self.inner.echo_reference.clone()
+    }
+
+    /// Explicitly opt-in to a bounded copy of mixed viewer output audio:
+    /// ambience, effects, music/media and received voice. Does not capture
+    /// the local microphone, and does not capture unrelated desktop audio.
+    pub fn recording_tap(&self) -> RecordingTap {
+        self.inner.echo_reference.recording_tap()
     }
 
     /// Switches the output to the device called `name` (`None` = system

@@ -254,6 +254,8 @@ impl QuickPrefsUi {
                     aurora_i18n::tr!("ui-options-show-look-at-targets"),
                 )
                 .changed();
+                // Hand selection-beam controls live in PhotoTools; this
+                // compact floater must remain stable at every UI zoom.
                 widgets::divider(ui, p);
                 // the fixed part: Hover Height, Max Bandwidth, Max Complexity
                 out.changed |= self.hover_row(ui, p, settings, height, enabled);

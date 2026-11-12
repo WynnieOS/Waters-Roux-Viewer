@@ -571,6 +571,25 @@ fn version_panel(ui: &mut egui::Ui, p: &Palette, icons: &Icons, info: &LoginInfo
                 img(ui, icons, icon, r, col);
             });
         });
+        widgets::divider(ui, p);
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Grid status").size(12.5).color(p.muted));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let col = match info.grid.overview.health {
+                    super::login_grid::Health::Online => p.success,
+                    super::login_grid::Health::Degraded => p.amber,
+                    super::login_grid::Health::Offline => p.danger,
+                    _ => p.muted,
+                };
+                ui.label(RichText::new(info.grid.overview.status()).size(12.5).strong().color(col));
+            });
+        });
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Residents in-world").size(12.5).color(p.muted));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(RichText::new(info.grid.overview.population()).size(12.5).color(p.ink));
+            });
+        });
         if info.can_check_updates {
             ui.add_space(8.0);
             check_updates =
