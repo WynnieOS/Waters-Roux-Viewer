@@ -281,11 +281,7 @@ impl Recorder {
                 worker.join().map_err(|_| "H.264 worker thread panicked".to_owned())?
             })
             .map_err(|e| format!("Cannot start MP4 finalization thread: {e}"))?;
-        self.finalizing = Some(Finalizing {
-            handle,
-            output,
-            dropped,
-        });
+        self.finalizing = Some(Finalizing { handle, output, dropped });
         self.message = Some("Saving H.264 MP4 in the background. Keep the viewer open until the saved-video confirmation appears.".into());
         Ok(true)
     }
