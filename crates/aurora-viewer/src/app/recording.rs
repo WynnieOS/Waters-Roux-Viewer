@@ -85,7 +85,7 @@ enum Packet {
 
 struct Session {
     sender: SyncSender<Packet>,
-    worker: thread::JoinHandle<Result<(PathBuf, u64), String>>,
+    worker: thread::JoinHandle<Result<(PathBuf, u64, u64), String>>,
     output: PathBuf,
     options: Options,
     started: Instant,
@@ -300,12 +300,7 @@ fn encode_stream(
                 let scaled = if (w, h) == (writer.width, writer.height) {
                     rgba
                 } else {
-                    image::imageops::resize(
-                        &rgba,
-                        writer.width,
-                        writer.height,
-                        image::imageops::FilterType::Triangle,
-                    )
+                    image::imageops::resize(&rgba, writer.width, writer.height, image::imageops::FilterType::Triangle)
                 };
                 let mut rgb = Vec::with_capacity(writer.width as usize * writer.height as usize * 3);
                 for pixel in scaled.pixels() {
@@ -313,12 +308,7 @@ fn encode_stream(
                 }
                 let mut encoded = Vec::new();
                 image::codecs::jpeg::JpegEncoder::new_with_quality(&mut encoded, options.jpeg_quality)
-                    .encode(
-                        &rgb,
-                        writer.width,
-                        writer.height,
-                        image::ExtendedColorType::Rgb8,
-                    )
+                    .encode(&rgb, writer.width, writer.height, image::ExtendedColorType::Rgb8)
                     .map_err(|e| format!("JPEG encode: {e}"))?;
                 // AVI's MJPEG track is constant-frame-rate. Fill missed slots
                 // with the last valid frame, never speed up the timeline.
