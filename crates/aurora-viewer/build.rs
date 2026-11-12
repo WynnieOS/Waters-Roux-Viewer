@@ -77,7 +77,6 @@ fn dictionaries() {
 /// `links` metadata), never CARGO_PKG_VERSION. A failure stops the build: a
 /// release must not ship without its icon again.
 fn windows_resources(icon: &Path) {
-
     let display = std::env::var("DEP_AURORA_VERSION_DISPLAY").expect("aurora-version's build script supplies the version");
     let numeric = std::env::var("DEP_AURORA_VERSION_NUMERIC").expect("aurora-version's build script supplies the version");
     // "major.minor.patch.distance" packed as four 16-bit fields
@@ -112,8 +111,7 @@ fn branding() -> std::path::PathBuf {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("Cargo supplies CARGO_MANIFEST_DIR");
     let source = Path::new(&manifest).join("../../assets/branding/waters-roux-logo.png.base64");
     println!("cargo:rerun-if-changed={}", source.display());
-    let encoded =
-        std::fs::read_to_string(&source).expect("Waters Roux artwork must be included in the checkout");
+    let encoded = std::fs::read_to_string(&source).expect("Waters Roux artwork must be included in the checkout");
     let png = base64::engine::general_purpose::STANDARD
         .decode(encoded.trim())
         .expect("Waters Roux artwork base64 is invalid");
@@ -123,11 +121,7 @@ fn branding() -> std::path::PathBuf {
     );
     let width = u32::from_be_bytes(png[16..20].try_into().expect("PNG width"));
     let height = u32::from_be_bytes(png[20..24].try_into().expect("PNG height"));
-    assert_eq!(
-        (width, height),
-        (128, 128),
-        "Waters Roux icon dimensions must be 128x128"
-    );
+    assert_eq!((width, height), (128, 128), "Waters Roux icon dimensions must be 128x128");
     let out = Path::new(&std::env::var("OUT_DIR").expect("Cargo supplies OUT_DIR")).to_path_buf();
     std::fs::write(out.join("waters-roux-logo.png"), &png).expect("Cannot write embedded Waters Roux logo");
     // Modern Windows supports PNG-compressed images within an ICO container.
