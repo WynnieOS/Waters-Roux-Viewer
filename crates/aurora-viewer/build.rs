@@ -102,24 +102,32 @@ fn windows_resources(icon: &Path) {
     }
 }
 
-
 /// The original approved emblem is checked in as base64 text because the GitHub
 /// repository's text-only file updater cannot write binary assets directly.
 /// Decode exactly once during compilation. An absent or corrupted source is a
 /// hard error, not a viewer that silently has missing artwork.
 fn branding() -> std::path::PathBuf {
     use base64::Engine as _;
+
     let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("Cargo supplies CARGO_MANIFEST_DIR");
     let source = Path::new(&manifest).join("../../assets/branding/waters-roux-logo.png.base64");
     println!("cargo:rerun-if-changed={}", source.display());
-    let encoded = std::fs::read_to_string(&source).expect("Waters Roux artwork must be included in the checkout");
+    let encoded =
+        std::fs::read_to_string(&source).expect("Waters Roux artwork must be included in the checkout");
     let png = base64::engine::general_purpose::STANDARD
         .decode(encoded.trim())
         .expect("Waters Roux artwork base64 is invalid");
-    assert!(png.len() >= 24 && png.starts_with(b"\x89PNG\r\n\x1a\n"), "Waters Roux artwork must be a PNG");
+    assert!(
+        png.len() >= 24 && png.starts_with(b"\x5cx89PNG\x5cr\x5cn\x5cx1a\x5cn"),
+        "Waters Roux artwork must be a PNG"
+    );
     let width = u32::from_be_bytes(png[16..20].try_into().expect("PNG width"));
     let height = u32::from_be_bytes(png[20..24].try_into().expect("PNG height"));
-    assert_eq!((width, height), (128, 128), "Waters Roux icon dimensions must be 128x128");
+    assert_eq!(
+        (width, height),
+        (128, 128),
+        "Waters Roux icon dimensions must be 128x128"
+    );
     let out = Path::new(&std::env::var("OUT_DIR").expect("Cargo supplies OUT_DIR")).to_path_buf();
     std::fs::write(out.join("waters-roux-logo.png"), &png).expect("Cannot write embedded Waters Roux logo");
     // Modern Windows supports PNG-compressed images within an ICO container.
