@@ -67,6 +67,75 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
             if settings.build.show_selection_beam {
                 changed |=
                     widgets::switch_labeled(ui, p, &mut settings.build.selection_beam_animated, "Animate selection particles").changed();
+                ui.collapsing("Selection Beam Studio", |ui| {
+                    ui.label("Choose a local particle style for the hand-to-object editing beam.");
+                    ui.horizontal_wrapped(|ui| {
+                        for (style, label) in [
+                            ("dots", "Dots"),
+                            ("sparkles", "Sparkles"),
+                            ("stars", "Stars"),
+                            ("hearts", "Hearts"),
+                            ("custom", "My PNG"),
+                        ] {
+                            changed |= ui
+                                .selectable_value(&mut settings.build.selection_beam_style, style.to_owned(), label)
+                                .changed();
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Particle color");
+                        changed |= widgets::color_button(
+                            ui,
+                            p,
+                            "selection-beam-custom-color",
+                            &mut settings.build.selection_beam_color,
+                            true,
+                        )
+                        .changed();
+                    });
+                    changed |= ui
+                        .add(egui::Slider::new(&mut settings.build.selection_beam_size, 2.0..=20.0).text("Particle size"))
+                        .changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut settings.build.selection_beam_density, 25..=200).text("Density (%)"))
+                        .changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut settings.build.selection_beam_speed, 0.1..=4.0).text("Animation speed"))
+                        .changed();
+                    if settings.build.selection_beam_style == "custom" {
+                        ui.horizontal(|ui| {
+                            if ui.button("Import particle PNG...").clicked()
+                                && let Some(file) = rfd::FileDialog::new()
+                                    .add_filter("Transparent PNG", &["png"])
+                                    .pick_file()
+                            {
+                                settings.build.selection_beam_texture = file.to_string_lossy().into_owned();
+                                changed = true;
+                            }
+                            if ui.button("Clear image").clicked() {
+                                settings.build.selection_beam_texture.clear();
+                                changed = true;
+                            }
+                        });
+                        if let Some(texture) = crate::build::selection_beam::custom_texture(
+                            ctx,
+                            &settings.build.selection_beam_texture,
+                        ) {
+                            ui.add(egui::Image::new((texture.id(), egui::Vec2::splat(52.0))));
+                        } else if !settings.build.selection_beam_texture.is_empty() {
+                            ui.label("PNG could not be loaded. Use an image under 8 MB and 2048 × 2048 pixels.");
+                        }
+                        ui.label("Local PNG images only. Firestorm XML preset import is not supported yet.");
+                    }
+                    if ui.button("Restore default gold beam").clicked() {
+                        settings.build.selection_beam_style = "dots".into();
+                        settings.build.selection_beam_color = [253, 181, 21, 210];
+                        settings.build.selection_beam_size = 4.0;
+                        settings.build.selection_beam_density = 100;
+                        settings.build.selection_beam_speed = 1.0;
+                        changed = true;
+                    }
+                });
             }
         } else {
             ui.label("Photography-specific lens and depth-of-field controls");
