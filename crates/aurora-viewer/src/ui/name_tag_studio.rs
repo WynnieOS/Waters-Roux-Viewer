@@ -468,12 +468,9 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
         i.raw.dropped_files.iter().find_map(|f| {
             let path = f.path();
             (!path.as_os_str().is_empty()
-                && path.extension().is_some_and(|e| {
-                    matches!(
-                        e.to_string_lossy().to_ascii_lowercase().as_str(),
-                        "png" | "jpg" | "jpeg" | "gif"
-                    )
-                }))
+                && path
+                    .extension()
+                    .is_some_and(|e| matches!(e.to_string_lossy().to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg" | "gif")))
             .then(|| path.to_path_buf())
         })
     }) {
