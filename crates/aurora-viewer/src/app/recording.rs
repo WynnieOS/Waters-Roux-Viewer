@@ -11,7 +11,11 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{Seek, SeekFrom, Write},
     path::PathBuf,
-    sync::{Arc, atomic::{AtomicUsize, Ordering}, mpsc::{self, Receiver, SyncSender, TrySendError}},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+        mpsc::{self, Receiver, SyncSender, TrySendError},
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -234,7 +238,12 @@ impl Recorder {
         let result = s.worker.join().map_err(|_| "Video encoder thread panicked".to_owned())?;
         match result {
             Ok((path, frames, unique)) if frames > 0 => {
-                self.message = Some(format!("Saved video: {} ({frames} frames; {unique} captured; {} repeated; {} dropped)", path.display(), frames.saturating_sub(unique), s.dropped));
+                self.message = Some(format!(
+                    "Saved video: {} ({frames} frames; {unique} captured; {} repeated; {} dropped)",
+                    path.display(),
+                    frames.saturating_sub(unique),
+                    s.dropped
+                ));
                 Ok(Some(path))
             }
             Ok((_path, _, _)) => {
@@ -291,15 +300,25 @@ fn encode_stream(
                 let scaled = if (w, h) == (writer.width, writer.height) {
                     rgba
                 } else {
-                    image::imageops::resize(&rgba, writer.width, writer.height, image::imageops::FilterType::Triangle)
+                    image::imageops::resize(
+                        &rgba,
+                        writer.width,
+                        writer.height,
+                        image::imageops::FilterType::Triangle,
+                    )
                 };
-                let mut rgb = Vec::with_capacity((writer.width as usize) * (writer.height as usize) * 3);
+                let mut rgb = Vec::with_capacity(writer.width as usize * writer.height as usize * 3);
                 for pixel in scaled.pixels() {
                     rgb.extend_from_slice(&pixel.0[..3]);
                 }
                 let mut encoded = Vec::new();
                 image::codecs::jpeg::JpegEncoder::new_with_quality(&mut encoded, options.jpeg_quality)
-                    .encode(&rgb, writer.width, writer.height, image::ExtendedColorType::Rgb8)
+                    .encode(
+                        &rgb,
+                        writer.width,
+                        writer.height,
+                        image::ExtendedColorType::Rgb8,
+                    )
                     .map_err(|e| format!("JPEG encode: {e}"))?;
                 // AVI's MJPEG track is constant-frame-rate. Fill missed slots
                 // with the last valid frame, never speed up the timeline.
