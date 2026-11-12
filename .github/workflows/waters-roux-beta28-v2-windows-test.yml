@@ -50,7 +50,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { git status --short; throw "Editing branch merge conflicted" }
           # Keep Beta 27 branded UI while bringing in H.264, MP4, and AAC
           # changes only. Do not merge the Aurora-based feature branch wholesale.
-          git restore --source origin/feat/waters-roux-h264-mp4-recorder -- crates/aurora-viewer/src/app/recording.rs crates/aurora-viewer/src/app/recording/mp4.rs crates/aurora-viewer/src/ui/machinima.rs scripts/bundle-waters-roux-ffmpeg.ps1 scripts/integrate-waters-roux-mp4-ui.ps1 crates/aurora-render/src/renderer.rs
+          git restore --source origin/feat/waters-roux-h264-mp4-recorder -- crates/aurora-viewer/src/app/recording.rs crates/aurora-viewer/src/app/recording/mp4.rs crates/aurora-viewer/src/ui/machinima.rs scripts/bundle-waters-roux-ffmpeg.ps1 scripts/integrate-waters-roux-mp4-ui.ps1 crates/aurora-render/src/renderer.rs crates/aurora-viewer/src/build/manip.rs crates/aurora-viewer/src/world/eep.rs
           if ($LASTEXITCODE -ne 0) { throw 'Could not import H.264 MP4 implementation' }
           git log -4 --format='%h %s'
           git status --short
