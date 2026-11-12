@@ -29,6 +29,7 @@ pub fn show(
     open: &mut bool,
     pov: bool,
     recording: bool,
+    finalizing: bool,
     elapsed: std::time::Duration,
     settings: &mut Settings,
 ) -> (Action, bool) {
@@ -51,7 +52,9 @@ pub fn show(
     floater.show(ctx, p, open, |ui| {
         ui.horizontal(|ui| {
             ui.strong("Creator capture & cinematic controls");
-            if recording {
+            if finalizing {
+                ui.strong("SAVING MP4…");
+            } else if recording {
                 ui.label(egui::RichText::new(format!("REC {:02}:{:02}", elapsed.as_secs() / 60, elapsed.as_secs() % 60)).color(p.danger));
             }
         });
@@ -200,10 +203,12 @@ pub fn show(
                 ui.label("Recording other residents' conversations may require their consent.");
                 ui.label("Your microphone narration and unrelated desktop audio are not captured yet.");
                 ui.label("Records H.264 video to a real MP4 file; optional in-world audio is encoded as AAC. Recording requires the bundled FFmpeg encoder.");
-                ui.label("The MP4 file is finalized when you stop recording. Do not close the viewer or remove the recording folder until saving finishes.");
+                ui.label("MP4 finishing happens in the background after Stop. Wait for the Saved MP4 message before exiting.");
                 ui.label("Voice chat and in-world audio may require consent. Microphone narration is not captured.");
                 ui.horizontal(|ui| {
-                    if recording {
+                    if finalizing {
+                        ui.strong("Finalizing H.264 video and AAC audio… keep the viewer open.");
+                    } else if recording {
                         if widgets::action_button(
                             ui,
                             p,
