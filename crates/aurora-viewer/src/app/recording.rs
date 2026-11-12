@@ -265,19 +265,26 @@ impl Recorder {
             return Err("An MP4 is already being finalized".into());
         }
         let Some(s) = self.session.take() else { return Ok(false) };
-        // A full GPU-frame queue must never freeze the UI on Stop. If the
-        // queue is full, dropping the sender after spawning the finalizer
-        // closes the stream once its already-queued frames are processed.
-        let _ = s.sender.try_send(Packet::Stop(s.started.elapsed()));
+        let elapsed = s.started.elapsed();
+        let sender = s.sender;
         let worker = s.worker;
+        let output = s.output;
+        let dropped = s.dropped;
+        // Never block the UI when the encoder queue is full. The background
+        // finalizer waits for capacity and reliably delivers the Stop time
+        // so slow capture cannot cut off the tail of a recording.
         let handle = thread::Builder::new()
             .name("waters-roux-mp4-finalizer".into())
-            .spawn(move || worker.join().map_err(|_| "H.264 worker thread panicked".to_owned())?)
+            .spawn(move || {
+                let _ = sender.send(Packet::Stop(elapsed));
+                drop(sender);
+                worker.join().map_err(|_| "H.264 worker thread panicked".to_owned())?
+            })
             .map_err(|e| format!("Cannot start MP4 finalization thread: {e}"))?;
         self.finalizing = Some(Finalizing {
             handle,
-            output: s.output,
-            dropped: s.dropped,
+            output,
+            dropped,
         });
         self.message = Some("Saving H.264 MP4 in the background. Keep the viewer open until the saved-video confirmation appears.".into());
         Ok(true)
