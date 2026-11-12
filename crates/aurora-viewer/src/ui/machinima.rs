@@ -106,6 +106,13 @@ pub fn show(
                     .add(egui::Slider::new(&mut settings.camera.smoothing, 0.0..=50.0).text("Camera movement smoothing"))
                     .changed();
                 changed |= widgets::switch_labeled(ui, p, &mut settings.camera.track_focus_object, "Keep focused object tracked").changed();
+                changed |= widgets::switch_labeled(
+                    ui,
+                    p,
+                    &mut settings.camera.mouselook_stabilize,
+                    "Stabilize avatar POV (reduce head bob)",
+                )
+                .changed();
                 ui.label("For saved camera presets and precise orbit/pan, open Camera controls.");
             }
             1 => {
