@@ -554,8 +554,10 @@ mod tests {
         let (tx, rx) = mpsc::sync_channel(4);
         let pixels = vec![255; 4 * 4 * 4];
         tx.send(Packet::Frame(4, 4, pixels.clone(), Duration::ZERO)).expect("first frame");
-        tx.send(Packet::Frame(4, 4, pixels.clone(), Duration::from_millis(500))).expect("slow frame");
-        tx.send(Packet::Frame(4, 4, pixels, Duration::from_millis(900))).expect("last frame");
+        tx.send(Packet::Frame(4, 4, pixels.clone(), Duration::from_millis(500)))
+            .expect("slow frame");
+        tx.send(Packet::Frame(4, 4, pixels, Duration::from_millis(900)))
+            .expect("last frame");
         tx.send(Packet::Stop(Duration::from_secs(1))).expect("stop");
         drop(tx);
         let options = Options {
