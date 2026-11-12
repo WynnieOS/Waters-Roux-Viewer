@@ -4,9 +4,13 @@ name: Waters Roux Beta 28 v2 Windows Test
 # does not depend on macOS/Linux dry runs or the expensive dump_syms job.
 # Never publish a release or merge automatically.
 on:
-  push:
-    branches:
-      - fix/beta28-v2-camera-recorder-artwork
+  pull_request:
+    # This experimental workflow only needs to follow its repair PR.
+    paths:
+      - .github/workflows/waters-roux-beta28-v2-windows-test.yml
+      - crates/aurora-viewer/**
+      - assets/branding/**
+      - scripts/package.ps1
   workflow_dispatch:
 
 permissions:
@@ -19,6 +23,7 @@ concurrency:
 
 jobs:
   windows-test:
+    if: github.event_name != 'pull_request' || github.head_ref == 'fix/beta28-v2-camera-recorder-artwork'
     runs-on: windows-latest
     timeout-minutes: 180
     steps:
