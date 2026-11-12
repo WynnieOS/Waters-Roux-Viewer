@@ -118,7 +118,7 @@ fn branding() -> std::path::PathBuf {
         .decode(encoded.trim())
         .expect("Waters Roux artwork base64 is invalid");
     assert!(
-        png.len() >= 24 && png.starts_with(b"\x5cx89PNG\x5cr\x5cn\x5cx1a\x5cn"),
+        png.len() >= 24 && png.starts_with(b"\x89PNG\r\n\x1a\n"),
         "Waters Roux artwork must be a PNG"
     );
     let width = u32::from_be_bytes(png[16..20].try_into().expect("PNG width"));
