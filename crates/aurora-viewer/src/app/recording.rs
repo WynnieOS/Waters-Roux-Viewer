@@ -549,6 +549,30 @@ mod tests {
         assert_eq!(expected_frames(Duration::from_secs(360), 30), 9000);
     }
     #[test]
+    fn slow_capture_keeps_the_original_recording_duration() {
+        let path = std::env::temp_dir().join(format!("waters-roux-cfr-test-{}.avi", uuid::Uuid::new_v4()));
+        let (tx, rx) = mpsc::sync_channel(4);
+        let pixels = vec![255; 4 * 4 * 4];
+        tx.send(Packet::Frame(4, 4, pixels.clone(), Duration::ZERO)).expect("first frame");
+        tx.send(Packet::Frame(4, 4, pixels.clone(), Duration::from_millis(500))).expect("slow frame");
+        tx.send(Packet::Frame(4, 4, pixels, Duration::from_millis(900))).expect("last frame");
+        tx.send(Packet::Stop(Duration::from_secs(1))).expect("stop");
+        drop(tx);
+        let options = Options {
+            height: 0,
+            fps: 30,
+            jpeg_quality: 90,
+            ..Options::default()
+        };
+        let (_, frames) = encode_stream(rx, path.clone(), options, None).expect("encode");
+        assert_eq!(frames, 30, "one second of wall time must not become a tenth-second movie");
+        let file = fs::read(&path).expect("AVI exists");
+        assert!(file.starts_with(b"RIFF"));
+        assert!(file.windows(4).any(|b| b == b"idx1"));
+        fs::remove_file(path).expect("cleanup");
+    }
+
+    #[test]
     fn avi_container_writes_index_and_frame_counts() {
         let path = std::env::temp_dir().join(format!("waters-roux-test-{}.avi", uuid::Uuid::new_v4()));
         let mut w = Avi::new(&path, 4, 4, 30, true).expect("AVI create");
