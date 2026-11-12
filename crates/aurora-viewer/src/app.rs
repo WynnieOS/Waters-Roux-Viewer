@@ -715,6 +715,8 @@ pub struct App {
     scene_capture_pending: bool,
     /// Native, explicitly started local-only silent video recording.
     recorder: recording::Recorder,
+    /// Restore HUD visibility after an opt-in clean video capture.
+    recording_huds_restore: Option<bool>,
     scene_capture_place: Option<(crate::login_accounts::Account, String)>,
     /// Teleport screen: start, end (fade out), destination.
     tp_overlay: Option<TpOverlay>,
@@ -1676,6 +1678,7 @@ impl App {
             want_scene_capture: false,
             scene_capture_pending: false,
             recorder: recording::Recorder::default(),
+            recording_huds_restore: None,
             scene_capture_place: None,
             tp_overlay: None,
             was_teleporting: false,
@@ -11405,7 +11408,13 @@ impl App {
             && !gfx.renderer.capture_scene
             && self.recorder.needs_frame(Instant::now())
         {
-            gfx.renderer.capture_request = true;
+            // Capture the composited interface only if explicitly requested.
+            // Clean-world mode uses the existing UI-free renderer path.
+            if self.recorder.capture_interface() {
+                gfx.renderer.capture_request = true;
+            } else {
+                gfx.renderer.capture_scene = true;
+            }
             self.recorder.mark_requested(Instant::now());
         }
         self.frame_profile.lap(Lap::Actions);
@@ -13864,7 +13873,16 @@ impl App {
             BarAction::StartRecording => {
                 if self.in_world() {
                     match self.recorder.start(self.settings.recording, self.audio_engine.as_ref()) {
-                        Ok(path) => self.world.system_message(format!("Recording video to {}", path.display())),
+                        Ok(path) => {
+                            let before = self.settings.show_huds;
+                            if before != self.settings.recording.capture_huds {
+                                self.set_show_huds(self.settings.recording.capture_huds);
+                                if self.settings.show_huds != before {
+                                    self.recording_huds_restore = Some(before);
+                                }
+                            }
+                            self.world.system_message(format!("Recording video to {}", path.display()));
+                        }
                         Err(error) => self.world.system_message(format!("Recorder error: {error}")),
                     }
                 } else {
@@ -13872,11 +13890,17 @@ impl App {
                         .system_message("Enter Second Life before starting the video recorder.".to_owned());
                 }
             }
-            BarAction::StopRecording => match self.recorder.stop() {
-                Ok(Some(path)) => self.world.system_message(format!("Saved video: {}", path.display())),
-                Ok(None) => self.world.system_message("No recorded frames were saved.".to_owned()),
-                Err(error) => self.world.system_message(format!("Video finalize failed: {error}")),
-            },
+            BarAction::StopRecording => {
+                let result = self.recorder.stop();
+                if let Some(previous) = self.recording_huds_restore.take() {
+                    self.set_show_huds(previous);
+                }
+                match result {
+                    Ok(Some(path)) => self.world.system_message(format!("Saved video: {}", path.display())),
+                    Ok(None) => self.world.system_message("No recorded frames were saved.".to_owned()),
+                    Err(error) => self.world.system_message(format!("Video finalize failed: {error}")),
+                }
+            }
             BarAction::PhotoRoll => self.photo_reel_show_newest(),
             // The Destination Guide and Help pages run inside the viewer's
             // existing browser, rather than creating dead toolbar windows.

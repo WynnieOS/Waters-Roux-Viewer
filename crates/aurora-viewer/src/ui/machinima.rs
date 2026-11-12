@@ -106,6 +106,13 @@ pub fn show(
                     .add(egui::Slider::new(&mut settings.camera.smoothing, 0.0..=50.0).text("Camera movement smoothing"))
                     .changed();
                 changed |= widgets::switch_labeled(ui, p, &mut settings.camera.track_focus_object, "Keep focused object tracked").changed();
+                changed |= widgets::switch_labeled(
+                    ui,
+                    p,
+                    &mut settings.camera.mouselook_stabilize,
+                    "Stabilize avatar POV (reduce head bob)",
+                )
+                .changed();
                 ui.label("For saved camera presets and precise orbit/pan, open Camera controls.");
             }
             1 => {
@@ -149,12 +156,20 @@ pub fn show(
             _ => {
                 ui.strong("High-quality recording configuration");
                 ui.label("Captures the actual in-world renderer, not the desktop.");
-                ui.horizontal(|ui| {
-                    ui.label("Video resolution:");
-                    for (height, label) in [(720, "720p"), (1080, "1080p"), (1440, "1440p"), (2160, "4K")] {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("Recording size:");
+                    for (height, label) in [
+                        (0, "Full viewer"),
+                        (480, "480p"),
+                        (720, "720p"),
+                        (1080, "1080p"),
+                        (1440, "1440p"),
+                        (2160, "4K"),
+                    ] {
                         changed |= ui.selectable_value(&mut settings.recording.height, height, label).changed();
                     }
                 });
+                ui.label("Full viewer preserves the source viewport dimensions; maximize the window to capture the whole screen.");
                 ui.horizontal(|ui| {
                     ui.label("Target frame rate:");
                     for fps in [24, 30, 60] {
@@ -173,6 +188,15 @@ pub fn show(
                     "Include in-world sounds and received voice (48 kHz stereo)",
                 )
                 .changed();
+                changed |= widgets::switch_labeled(ui, p, &mut settings.recording.capture_huds, "Include my HUD attachments").changed();
+                changed |= widgets::switch_labeled(
+                    ui,
+                    p,
+                    &mut settings.recording.capture_interface,
+                    "Include viewer interface, menus and toolbars",
+                )
+                .changed();
+                ui.label("Turn either option off for a clean cinematic capture. Changes apply when starting a new recording.");
                 ui.label("Recording other residents' conversations may require their consent.");
                 ui.label("Your microphone narration and unrelated desktop audio are not captured yet.");
                 ui.label("AVI/MJPEG + PCM is experimental and can produce very large files. H.264/MP4 recording is not implemented yet.");

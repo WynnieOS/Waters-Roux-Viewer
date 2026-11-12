@@ -172,6 +172,16 @@ pub struct BuildSettings {
     pub selection_beam_color: [u8; 4],
     /// Off gives a static, reduced-motion selection trail.
     pub selection_beam_animated: bool,
+    /// Local-only selection beam motif: dots, sparkles, stars, hearts or custom.
+    pub selection_beam_style: String,
+    /// Custom local PNG texture used only with the custom motif.
+    pub selection_beam_texture: String,
+    /// Density multiplier expressed as a percentage, 25-200.
+    pub selection_beam_density: u32,
+    /// Size of an individual selection beam motif in UI points.
+    pub selection_beam_size: f32,
+    /// Animation speed multiplier; 0 disables movement.
+    pub selection_beam_speed: f32,
     /// Create tool: shape (index in `shapes::SHAPES`).
     pub create_shape: usize,
     /// CreateToolKeepSelected.
@@ -633,6 +643,11 @@ impl Default for BuildSettings {
             show_selection_beam: true,
             selection_beam_color: [253, 181, 21, 210],
             selection_beam_animated: true,
+            selection_beam_style: "dots".to_owned(),
+            selection_beam_texture: String::new(),
+            selection_beam_density: 100,
+            selection_beam_size: 4.0,
+            selection_beam_speed: 1.0,
             create_shape: 0,
             keep_tool: false,
             rez_under_land_group: true,
