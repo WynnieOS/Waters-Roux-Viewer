@@ -22,9 +22,13 @@ fn main() {
         .unwrap_or_default();
     println!("cargo:rustc-env=AURORA_BUILD_PROFILE={dir}");
     dictionaries();
+    // Decode the checked-in Waters Roux artwork at build time. Both the
+    // login logo and the Windows executable icon come from this one source.
+    // Fail the build rather than shipping an unbranded or missing icon.
+    let branded_icon = branding();
 
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
-        windows_resources();
+        windows_resources(&branded_icon);
         // The hybrid-GPU hints of main.rs (gpu_hints) in the exe's export
         // table, where the NVIDIA and AMD drivers look for them: a Rust
         // executable exports nothing on its own
@@ -72,11 +76,7 @@ fn dictionaries() {
 /// The version is the one aurora-version resolved from the Git tag (its
 /// `links` metadata), never CARGO_PKG_VERSION. A failure stops the build: a
 /// release must not ship without its icon again.
-fn windows_resources() {
-    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("Cargo supplies CARGO_MANIFEST_DIR");
-    let icon = Path::new(&manifest).join("../../assets/branding/aurora.ico");
-    println!("cargo:rerun-if-changed={}", icon.display());
-
+fn windows_resources(icon: &Path) {
     let display = std::env::var("DEP_AURORA_VERSION_DISPLAY").expect("aurora-version's build script supplies the version");
     let numeric = std::env::var("DEP_AURORA_VERSION_NUMERIC").expect("aurora-version's build script supplies the version");
     // "major.minor.patch.distance" packed as four 16-bit fields
@@ -88,8 +88,8 @@ fn windows_resources() {
 
     let mut res = winresource::WindowsResource::new();
     res.set_icon(&icon.to_string_lossy())
-        .set("ProductName", "Aurora Viewer")
-        .set("FileDescription", "Aurora Viewer")
+        .set("ProductName", "Waters Roux Viewer")
+        .set("FileDescription", "Waters Roux Viewer")
         .set("OriginalFilename", "aurora-viewer.exe")
         .set("ProductVersion", &display)
         .set("FileVersion", &display)
@@ -99,4 +99,41 @@ fn windows_resources() {
     if let Err(error) = res.compile_for("aurora-viewer") {
         panic!("Cannot embed the icon and version of aurora-viewer.exe (rc.exe of the Windows SDK): {error}");
     }
+}
+
+/// The original approved emblem is checked in as base64 text because the GitHub
+/// repository's text-only file updater cannot write binary assets directly.
+/// Decode exactly once during compilation. An absent or corrupted source is a
+/// hard error, not a viewer that silently has missing artwork.
+fn branding() -> std::path::PathBuf {
+    use base64::Engine as _;
+
+    let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("Cargo supplies CARGO_MANIFEST_DIR");
+    let source = Path::new(&manifest).join("../../assets/branding/waters-roux-logo.png.base64");
+    println!("cargo:rerun-if-changed={}", source.display());
+    let encoded = std::fs::read_to_string(&source).expect("Waters Roux artwork must be included in the checkout");
+    let png = base64::engine::general_purpose::STANDARD
+        .decode(encoded.trim())
+        .expect("Waters Roux artwork base64 is invalid");
+    assert!(
+        png.len() >= 24 && png.starts_with(b"\x89PNG\r\n\x1a\n"),
+        "Waters Roux artwork must be a PNG"
+    );
+    let width = u32::from_be_bytes(png[16..20].try_into().expect("PNG width"));
+    let height = u32::from_be_bytes(png[20..24].try_into().expect("PNG height"));
+    assert_eq!((width, height), (128, 128), "Waters Roux icon dimensions must be 128x128");
+    let out = Path::new(&std::env::var("OUT_DIR").expect("Cargo supplies OUT_DIR")).to_path_buf();
+    std::fs::write(out.join("waters-roux-logo.png"), &png).expect("Cannot write embedded Waters Roux logo");
+    // Modern Windows supports PNG-compressed images within an ICO container.
+    // ICONDIR: reserved, kind=icon, count=1; ICONDIRENTRY points to PNG data.
+    let mut ico = Vec::with_capacity(22 + png.len());
+    ico.extend_from_slice(&[0, 0, 1, 0, 1, 0, 128, 128, 0, 0]);
+    ico.extend_from_slice(&1u16.to_le_bytes());
+    ico.extend_from_slice(&32u16.to_le_bytes());
+    ico.extend_from_slice(&(png.len() as u32).to_le_bytes());
+    ico.extend_from_slice(&22u32.to_le_bytes());
+    ico.extend_from_slice(&png);
+    let icon = out.join("waters-roux.ico");
+    std::fs::write(&icon, ico).expect("Cannot write Waters Roux Windows icon");
+    icon
 }

@@ -106,6 +106,35 @@ jobs:
           $ghArgs = @($v, $env:ZIP, "$($env:ZIP).sha256", $env:SYMBOLS, "$($env:SYMBOLS).sha256", 'aurora-update-policy.json', '--title', "Aurora Viewer $v", '--notes-file', '.github/release-notes-header.md', '--generate-notes', '--verify-tag')
           if ($v -match '-') { $ghArgs += '--prerelease' }   # v0.3.0-beta.1
           gh release create @ghArgs
+      # This branch needs a real test ZIP without publishing a release.
+      - name: Waters Roux Beta 28 v2 Windows test package
+        if: ${{ false }} # Disabled: direct Aurora build bypasses Waters Roux branded integration
+        shell: pwsh
+        run: |
+          $dir = "Waters-Roux-Beta28-v2-${{ github.sha }}-Windows-x64"
+          ./scripts/package.ps1 -Exe target/release/aurora-viewer.exe -Out $dir
+          $exe = Join-Path $dir 'aurora-viewer.exe'
+          $logo = Join-Path $dir 'assets/branding/waters-roux-logo.png'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "Viewer executable missing from package" }
+          if (-not (Test-Path -LiteralPath $logo)) { throw "Waters Roux branded artwork missing from package" }
+          if ((Get-Item -LiteralPath $logo).Length -lt 512) { throw "Waters Roux logo unexpectedly empty" }
+          $desc = (Get-Item -LiteralPath $exe).VersionInfo.FileDescription
+          if ($desc -ne "Waters Roux Viewer") { throw "Executable not branded: $desc" }
+          Compress-Archive -Path $dir -DestinationPath "$dir.zip" -CompressionLevel Optimal
+          $hash = (Get-FileHash -LiteralPath "$dir.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $dir.zip" | Set-Content -Path "$dir.zip.sha256" -Encoding utf8
+          "WATERS_ROUX_TEST_ZIP=$dir.zip" >> $env:GITHUB_ENV
+          "WATERS_ROUX_TEST_HASH=$dir.zip.sha256" >> $env:GITHUB_ENV
+      - name: Upload Waters Roux Beta 28 v2 Windows test ZIP
+        if: ${{ false }} # Disabled: direct Aurora build bypasses Waters Roux branded integration
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Waters-Roux-Beta28-v2-Windows-test
+          path: |
+            ${{ env.WATERS_ROUX_TEST_ZIP }}
+            ${{ env.WATERS_ROUX_TEST_HASH }}
+          if-no-files-found: error
+          retention-days: 14
       - name: Dry-run symbols
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

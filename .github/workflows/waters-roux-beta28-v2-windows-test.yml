@@ -1,0 +1,204 @@
+name: Waters Roux Beta 28 V2 — BRANDING-SAFE Windows candidate
+
+# On a pull request this builds a separate portable *testing candidate*.
+# Never deploy or merge changes as part of packaging.
+on:
+  pull_request:
+    branches: [build/waters-roux-beta28-v2-candidate]
+    paths:
+      - '.github/workflows/waters-roux-beta28-v2-windows-test.yml'
+      - 'assets/branding/**'
+      - 'scripts/package.ps1'
+      - 'docs/WATERS_ROUX_BETA28_PACKAGE_REQUEST.md'
+      - 'crates/aurora-viewer/src/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: waters-roux-beta28-branded-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Integrate, test, scan and package Windows creator beta
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Integrate branded beta and creator fixes locally
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name "Waters Roux CI"
+          git config user.email "ci@users.noreply.github.com"
+          git fetch origin feat/waters-roux-beta27 fix/waters-roux-beta28-recording-beam fix/waters-roux-edit-transform-modes fix/beta28-v2-camera-recorder-artwork
+          if ($LASTEXITCODE -ne 0) { throw "Couldn't fetch creator integration branches" }
+          git checkout --detach origin/feat/waters-roux-beta27
+          if ($LASTEXITCODE -ne 0) { throw "Couldn't start branded Beta 27 source" }
+          git merge --no-edit --no-ff origin/fix/waters-roux-beta28-recording-beam
+          if ($LASTEXITCODE -ne 0) { git status --short; throw "Creator branch merge conflicted" }
+          git merge --no-edit --no-ff origin/fix/waters-roux-edit-transform-modes
+          if ($LASTEXITCODE -ne 0) { git status --short; throw "Editing branch merge conflicted" }
+          # Keep official Beta 27 branding and UI intact while importing only
+          # the optimized recorder file from the later repair PR.
+          git restore --source origin/fix/beta28-v2-camera-recorder-artwork -- crates/aurora-viewer/src/app/recording.rs
+          if ($LASTEXITCODE -ne 0) { throw 'Could not apply repaired recorder' }
+          git log -4 --format='%h %s'
+          git status --short
+
+      - name: Block unbranded source before compiling
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $required = @(
+            'crates/aurora-viewer/src/branding.rs',
+            'crates/aurora-viewer/src/ui/branding.rs',
+            'crates/aurora-viewer/src/ui/branding_runtime.rs',
+            'scripts/package-waters-roux-preview.ps1',
+            'assets/branding/waters-roux-logo.png',
+            'assets/branding/waters-roux-background.png',
+            'assets/branding/waters-roux-loading-background.png',
+            'assets/branding/waters-roux.ico'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Refusing unbranded build: missing $path" }
+          }
+          $login = Get-Content -LiteralPath 'crates/aurora-viewer/src/ui/login.rs' -Raw
+          if (-not $login.Contains('waters-roux-name')) { throw 'Refusing Aurora login UI: Waters Roux login heading missing' }
+          if ($login.Contains('RichText::new("Aurora Viewer")')) { throw 'Refusing unbranded login heading' }
+          $app = Get-Content -LiteralPath 'crates/aurora-viewer/src/app.rs' -Raw
+          if (-not $app.Contains('/waters-roux-logo.png')) { throw 'Refusing Aurora runtime logo' }
+          $build = Get-Content -LiteralPath 'crates/aurora-viewer/build.rs' -Raw
+          if (-not $build.Contains('ProductName", "Waters Roux Viewer"')) { throw 'Refusing Aurora Windows product identity' }
+          if (-not (Get-Content -LiteralPath 'crates/aurora-viewer/src/ui/mod.rs' -Raw).Contains('pub mod branding_runtime')) { throw 'Branding runtime module removed' }
+          'Waters Roux branded login, customization modules, runtime logo, and Windows identity verified in source.'
+
+      - name: Install Rust
+        shell: pwsh
+        run: rustup update stable --no-self-update
+
+      - name: Prepare Waters Roux icon
+        shell: pwsh
+        run: ./scripts/prepare-waters-roux-icon.ps1
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: waters-roux-beta28
+
+      - name: Strict formatting
+        shell: pwsh
+        run: cargo fmt --all -- --check
+
+      - name: Windows compile and lint
+        shell: pwsh
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+      - name: Windows viewer tests (including recorder and GIF/style tests)
+        shell: pwsh
+        run: cargo test --locked -p aurora-viewer --bin aurora-viewer
+
+      - name: Build portable Windows application
+        shell: pwsh
+        run: cargo build --release --locked -p aurora-viewer --features xr-static-loader
+
+      - name: Assemble portable Beta 28 candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $folder = 'Waters-Roux-Creator-Beta28-V2-Windows'
+          ./scripts/package-waters-roux-preview.ps1 -Exe target/release/aurora-viewer.exe -Out $folder
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+          @(
+            'Waters Roux Creator Beta 28 V2 — experimental Windows testing candidate'
+            'Built from branded Beta 27, Beta 28 creator repairs, and editing fixes.'
+            'PhotoTools, separate Pose Stand, hand-selection beam, machinima bar and Name Tag Studio.'
+            'Recorder: native viewport, 480p, 720p, 1080p, 1440p, 2160p and 24/30/60 fps; real-time playback requires in-world testing.'
+            'Video fixes: gap-filled CFR AVI playback, opt-in POV stabilization, independent HUD and interface capture controls.'
+            'Selection beam: presets, color, density, speed, PNG import; local to viewer.'
+            'Recorder CPU backpressure optimization carried from PR #13, in-world playback remains unverified.'
+            'MJPEG AVI supports optional mixed in-world output including received voice; mic narration and MP4/H.264 are NOT supported.'
+            'Verify AVI playback, frame quality and audio sync before any public release; respect participant consent.'
+            'Image/GIF name-tag customization is local only and must be tested in-world.'
+            'This is not a production release; a CI build does not prove in-world functionality.'
+            'Do not overwrite an earlier beta; extract to a NEW folder.'
+            'Chrome previously flagged a Beta 27 download; do not bypass browser warnings.'
+          ) | Set-Content -LiteralPath (Join-Path $folder 'BETA28-TESTING-STATUS.txt') -Encoding utf8
+
+      - name: Verify official Waters Roux artwork, launcher and branding in Windows package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sourceDir = Join-Path $PWD 'assets/branding'
+          $packageDir = Join-Path $PWD 'Waters-Roux-Creator-Beta28-V2-Windows/assets/branding'
+          foreach ($requiredFile in @('waters-roux-viewer.exe', 'Launch Waters Roux.cmd', 'waters-roux-portable.txt', 'START-HERE.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $PWD ('Waters-Roux-Creator-Beta28-V2-Windows/' + $requiredFile)) -PathType Leaf)) { throw "Missing branded viewer entry: $requiredFile" }
+          }
+          if (Test-Path -LiteralPath 'Waters-Roux-Creator-Beta28-V2-Windows/aurora-viewer.exe') { throw 'Aurora EXE packaged as Waters Roux' }
+          $required = @(
+            'waters-roux-logo.png',
+            'waters-roux-background.png',
+            'waters-roux-loading-background.png',
+            'waters-roux.ico'
+          )
+          foreach ($name in $required) {
+            $sourcePath = Join-Path $sourceDir $name
+            $packagePath = Join-Path $packageDir $name
+            if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+              throw "Official artwork missing from source: $sourcePath"
+            }
+            if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+              throw "Official artwork missing from Windows package: $packagePath"
+            }
+            $expected = (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash
+            $actual = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash
+            if ($expected -ne $actual) {
+              throw "Official artwork changed during packaging: $name"
+            }
+            Write-Host "Verified packaged official artwork: $name"
+          }
+          $login = (Get-FileHash -LiteralPath (Join-Path $packageDir 'waters-roux-background.png') -Algorithm SHA256).Hash
+          $loading = (Get-FileHash -LiteralPath (Join-Path $packageDir 'waters-roux-loading-background.png') -Algorithm SHA256).Hash
+          if ($login -ne $loading) { throw 'Login and loading backgrounds must be identical.' }
+          if (Test-Path -LiteralPath (Join-Path $PWD 'Waters-Roux-Creator-Beta28-V2-Windows/MISSING-ARTWORK.txt')) {
+            throw 'Package still contains the MISSING-ARTWORK warning.'
+          }
+          'All four official artwork files are present and verified in the Windows package.'
+
+      - name: Scan candidate using Microsoft Defender
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Update-MpSignature
+          $before = @(Get-MpThreatDetection | Select-Object -ExpandProperty ThreatID)
+          Start-MpScan -ScanType CustomScan -ScanPath (Join-Path $PWD 'Waters-Roux-Creator-Beta28-V2-Windows')
+          $after = @(Get-MpThreatDetection | Select-Object -ExpandProperty ThreatID)
+          $new = @($after | Where-Object { $_ -notin $before })
+          if ($new.Count -gt 0) { throw "Microsoft Defender reported new detections" }
+          'Manual Defender scan completed with no newly recorded detections.'
+
+      - name: ZIP and SHA256
+        shell: pwsh
+        run: |
+          $zip = 'Waters-Roux-Creator-Beta28-V2-Windows.zip'
+          Compress-Archive -Path 'Waters-Roux-Creator-Beta28-V2-Windows' -DestinationPath $zip
+          $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$sha  $zip" | Set-Content -LiteralPath "$zip.sha256" -Encoding utf8
+          "SHA256: $sha"
+
+      - name: Upload portable testing candidate
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Waters-Roux-Beta28-V2-BRANDED-Windows-Candidate
+          path: |
+            Waters-Roux-Creator-Beta28-V2-Windows.zip
+            Waters-Roux-Creator-Beta28-V2-Windows.zip.sha256
+          retention-days: 14
+          compression-level: 6
