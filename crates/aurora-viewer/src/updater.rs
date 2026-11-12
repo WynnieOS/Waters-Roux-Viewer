@@ -735,7 +735,12 @@ mod tests {
         let mut updater = Updater::new(rt.handle(), Channel::Stable);
         updater.enabled = true;
         updater.state = State::Current;
-        let settings = Settings::default();
+        // Waters Roux intentionally disables automatic updates for new profiles.
+        // Explicitly enable them here to test the periodic-check state machine.
+        let settings = Settings {
+            update_mode: Mode::Ask,
+            ..Default::default()
+        };
         let start = Instant::now();
         // the check at launch has not answered yet
         assert!(!updater.periodic_due(&settings, start));
@@ -778,7 +783,10 @@ mod tests {
         updater.enabled = true;
         updater.state = State::Current;
         updater.last_check = Some(Instant::now() - Duration::from_secs(3600));
-        let mut settings = Settings::default();
+        let mut settings = Settings {
+            update_mode: Mode::Ask,
+            ..Default::default()
+        };
         let mut info = LoginInfo::preview_release("0.3.0");
         // the poll starts the periodic check; its answer comes back
         updater.poll(&mut settings, &mut info, rt.handle());
@@ -805,7 +813,10 @@ mod tests {
         updater.enabled = true;
         updater.state = State::Current;
         updater.last_check = Some(Instant::now() - Duration::from_secs(3600));
-        let mut settings = Settings::default();
+        let mut settings = Settings {
+            update_mode: Mode::Ask,
+            ..Default::default()
+        };
         let mut info = LoginInfo::preview_release("0.3.0");
         updater.poll(&mut settings, &mut info, rt.handle());
         checked(&updater, Err(Failure::Network));

@@ -5,7 +5,8 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use crossbeam_channel::{Receiver, Sender, bounded};
+use crossbeam_channel::{Receiver, Sender, TrySendError, bounded};
+use parking_lot::Mutex;
 use sonora::config::{AdaptiveDigital, EchoCanceller, GainController2, HighPassFilter, NoiseSuppression, NoiseSuppressionLevel};
 use sonora::{AudioProcessing, Config, StreamConfig};
 
@@ -39,6 +40,8 @@ struct ReferenceInner {
     tx: Sender<[f32; BLOCK * 2]>,
     rx: Receiver<[f32; BLOCK * 2]>,
     delay_ms: AtomicI32,
+    /// Independent receiver: never steal samples used by microphone echo cancellation.
+    recording: Mutex<Option<Sender<[f32; BLOCK * 2]>>>,
 }
 
 impl Default for EchoReference {
@@ -48,6 +51,7 @@ impl Default for EchoReference {
             tx,
             rx,
             delay_ms: AtomicI32::new(0),
+            recording: Mutex::new(None),
         }))
     }
 }
@@ -61,11 +65,40 @@ impl EchoReference {
         self.0.delay_ms.store(ms.clamp(0, 500), Ordering::Relaxed);
     }
 
+    /// Record only the mixed output (world audio + incoming voice) when a
+    /// resident explicitly starts a capture. No microphone/input capture.
+    pub fn recording_tap(&self) -> RecordingTap {
+        let (tx, rx) = bounded(256);
+        *self.0.recording.lock() = Some(tx);
+        RecordingTap { rx }
+    }
+
     fn push(&self, block: [f32; BLOCK * 2]) {
+        if let Some(mut recording) = self.0.recording.try_lock()
+            && let Some(tx) = recording.as_ref()
+        {
+            match tx.try_send(block) {
+                Ok(()) | Err(TrySendError::Full(_)) => {}
+                Err(TrySendError::Disconnected(_)) => *recording = None,
+            }
+        }
         if let Err(crossbeam_channel::TrySendError::Full(block)) = self.0.tx.try_send(block) {
             let _ = self.0.rx.try_recv();
             let _ = self.0.tx.try_send(block);
         }
+    }
+}
+
+/// A bounded tap of the exact 48 kHz stereo output sent to the listener.
+/// Dropping the receiver disconnects it without affecting normal playback.
+pub struct RecordingTap {
+    rx: Receiver<[f32; BLOCK * 2]>,
+}
+
+impl RecordingTap {
+    /// A 10-ms stereo PCM chunk; None when no new audio is waiting.
+    pub fn try_pop(&self) -> Option<[f32; BLOCK * 2]> {
+        self.rx.try_recv().ok()
     }
 }
 

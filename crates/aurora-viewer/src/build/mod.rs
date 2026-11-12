@@ -35,6 +35,7 @@ pub mod place;
 mod property_query;
 pub mod replace;
 pub mod script_queue;
+pub mod selection_beam;
 #[cfg(test)]
 mod selection_tests;
 pub mod shapes;
@@ -165,6 +166,12 @@ pub struct BuildSettings {
     pub follow_edit_object: bool,
     /// RenderHighlightSelections.
     pub show_highlight: bool,
+    /// Local-only hand-to-object particle trail while selecting/using Build.
+    pub show_selection_beam: bool,
+    /// Selection beam color (RGBA), independent of object particle settings.
+    pub selection_beam_color: [u8; 4],
+    /// Off gives a static, reduced-motion selection trail.
+    pub selection_beam_animated: bool,
     /// Create tool: shape (index in `shapes::SHAPES`).
     pub create_shape: usize,
     /// CreateToolKeepSelected.
@@ -623,6 +630,9 @@ impl Default for BuildSettings {
             scale_stretch_textures: true,
             follow_edit_object: false,
             show_highlight: true,
+            show_selection_beam: true,
+            selection_beam_color: [253, 181, 21, 210],
+            selection_beam_animated: true,
             create_shape: 0,
             keep_tool: false,
             rez_under_land_group: true,
@@ -2530,6 +2540,11 @@ impl BuildTool {
         }
         if !self.open && !self.menu_selection {
             return;
+        }
+        // Particle selection feedback is local to the editing avatar and
+        // tracks the actual selected object and its animated wrist.
+        if self.open && !self.replacement_active() && !self.ui.color_picker.pipette {
+            selection_beam::draw(self, world, scene, s, ctx, &p.painter, &cam, now);
         }
         if !self.open || self.replacement_active() || self.ui.color_picker.pipette {
             return;

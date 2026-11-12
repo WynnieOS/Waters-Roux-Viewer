@@ -28,6 +28,8 @@ pub enum BarAction {
     ToggleVr,
     IkEdit,
     Poser,
+    /// Enter the existing pose editor with the local avatar selected.
+    PoseStand,
     /// Build › Edit particles (Object.EditParticles).
     EditParticles,
     Portals,
@@ -68,8 +70,28 @@ pub enum BarAction {
     ToggleFlyOverride,
     /// The toolbar's Snapshot to disk (File.TakeSnapshotToDisk).
     PhotoToDisk,
+    /// Real 360° six-face capture to a 2:1 equirectangular PNG.
+    CapturePanorama,
+    /// User explicitly requested recording: start/stop a local silent AVI.
+    StartRecording,
+    StopRecording,
     /// The toolbar's Photo roll: the reel's quick view on its newest photo.
     PhotoRoll,
+    /// Explore Second Life destinations in the built-in browser.
+    Destinations,
+    /// Open official Second Life help and how-to guides.
+    HowTo,
+    /// The selected conversation's real persisted transcript.
+    ConversationLog,
+    /// Open Inventory with its existing advanced filter controls shown.
+    InventoryFilters,
+    /// Rotate our own avatar toward the closest visible resident within 20 m.
+    FaceNearestAvatar,
+    /// Open the inventory Favorites tab filtered to wearable items.
+    WearableFavorites,
+    /// Open a trusted third-party service in the user's normal browser;
+    /// this does not claim in-viewer authentication or direct publishing.
+    ExternalService(&'static str),
     /// Our profile on its Picks tab, or closed when Picks is shown
     /// (Avatar.TogglePicks, llviewermenu.cpp).
     MyPicks,
@@ -2102,7 +2124,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         "inventory" => toggle("inventory", &mut panels.inventory),
         "texture_library" => toggle(panels.texture_library_presentation.window(), &mut panels.texture_library),
         "gestures" => toggle("gestures", &mut panels.gestures),
-        "appearance" => toggle("appearance", &mut panels.appearance),
+        "appearance" | "avatar" => toggle("appearance", &mut panels.appearance),
         "ao" => toggle("ao", &mut panels.ao),
         "minimap" => panels.minimap = !panels.minimap,
         "worldmap" => toggle("worldmap", &mut panels.world_map),
@@ -2121,10 +2143,38 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         // Aurora's Performance window
         "performance" | "statistics" => toggle("perf", &mut panels.perf),
         "snapshot" => toggle(super::snapshot::WINDOW, &mut panels.snapshot),
+        "machinima" => toggle(super::machinima::WINDOW, &mut panels.machinima),
+        "nametagstudio" => toggle(super::name_tag_studio::WINDOW, &mut panels.name_tag_studio),
+        // A dedicated producer's floater, not a second Snapshot button.
+        "phototools" => {
+            if panels.photo_tools && !panels.photo_tools_camera_tab {
+                toggle(super::phototools::WINDOW, &mut panels.photo_tools);
+            } else {
+                panels.photo_tools_camera_tab = false;
+                super::widgets::open_floater(ctx, super::phototools::WINDOW, &mut panels.photo_tools);
+            }
+        }
+        // An old saved PhotoTools Camera toolbar button opens PhotoTools.
+        // The duplicate command is no longer in the toolbar catalogue.
+        "phototools_view" => {
+            panels.photo_tools_camera_tab = false;
+            super::widgets::open_floater(ctx, super::phototools::WINDOW, &mut panels.photo_tools);
+        }
         // File.TakeSnapshotToDisk: a photo saved with the last settings,
         // without the window (the keyboard's Save to disk)
         "snapshot_to_disk" => return BarAction::PhotoToDisk,
+        "360capture" => return BarAction::CapturePanorama,
         "photo_roll" => return BarAction::PhotoRoll,
+        "destinations" => return BarAction::Destinations,
+        "howto" => return BarAction::HowTo,
+        "conversation_log" => return BarAction::ConversationLog,
+        "omnifilter" => return BarAction::InventoryFilters,
+        "face_nearest_avatar" => return BarAction::FaceNearestAvatar,
+        "wearable_favorites" => return BarAction::WearableFavorites,
+        "flickr" => return BarAction::ExternalService("https://www.flickr.com/"),
+        "primfeed" => return BarAction::ExternalService("https://www.primfeed.com/"),
+        // No project-specific Discord invite has been configured.
+        "discord" => return BarAction::ExternalService("https://discord.com/app"),
         "beacons" => toggle(super::beacons::WINDOW, &mut panels.beacons),
         // Floater.Toggle quickprefs
         "quickprefs" => toggle(super::quick_prefs::WINDOW, &mut panels.quick_prefs),
@@ -2144,6 +2194,8 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
                 toggle: true,
             };
         }
+        "avatar_align" => toggle("avatar_align", &mut panels.avatar_align),
+        "regiontracker" => toggle("region_tracker", &mut panels.region_tracker),
         "view" => {
             return BarAction::Controls {
                 movement: false,
@@ -2178,6 +2230,7 @@ pub fn run_command(ctx: &egui::Context, cmd: &str, panels: &mut Panels) -> BarAc
         "build" => return BarAction::Build(0),
         "ik_edit" => return BarAction::IkEdit,
         "poser" => return BarAction::TogglePoser,
+        "pose_stand" => return BarAction::PoseStand,
         "profile" => return BarAction::ToggleMyProfile,
         "reporter" => return BarAction::ToggleReportAbuse,
         "teleport_history" => return BarAction::TeleportHistory,
@@ -2205,7 +2258,7 @@ fn command_active(cmd: &str, panels: &Panels, flying: bool, seated: bool, mousel
         "inventory" => panels.inventory,
         "texture_library" => panels.texture_library,
         "gestures" => panels.gestures,
-        "appearance" => panels.appearance,
+        "appearance" | "avatar" => panels.appearance,
         "minimap" => panels.minimap,
         "worldmap" => panels.world_map,
         "places" => panels.places,
@@ -2219,12 +2272,18 @@ fn command_active(cmd: &str, panels: &Panels, flying: bool, seated: bool, mousel
         "voice" => panels.voice_controls,
         "performance" | "statistics" => panels.perf,
         "snapshot" => panels.snapshot,
+        "machinima" => panels.machinima,
+        "nametagstudio" => panels.name_tag_studio,
+        "phototools" => panels.photo_tools && !panels.photo_tools_camera_tab,
+        "phototools_view" => panels.photo_tools,
         "beacons" => panels.beacons,
         "quickprefs" => panels.quick_prefs,
         "settings_debug" => panels.debug_settings,
         "preferences" => panels.settings,
         "move" => panels.movement_controls,
         "view" => panels.camera_controls,
+        "avatar_align" => panels.avatar_align,
+        "regiontracker" => panels.region_tracker,
         "fly" => flying,
         "sit" => seated,
         "mouselook" => mouselook,
@@ -3691,12 +3750,98 @@ mod tests {
     }
 
     #[test]
+    fn avatar_destinations_help_and_conversation_history_dispatch_real_actions() {
+        let ctx = egui::Context::default();
+        let mut panels = Panels::from_settings(&crate::settings::Settings::default());
+        for command in ["avatar", "destinations", "howto", "conversation_log"] {
+            assert!(super::super::toolbar::ready(command), "{command} must be usable");
+        }
+        panels.appearance = false;
+        run_command(&ctx, "avatar", &mut panels);
+        assert!(panels.appearance);
+        assert!(command_active("avatar", &panels, false, false, false));
+        run_command(&ctx, "avatar", &mut panels);
+        assert!(!panels.appearance);
+
+        assert!(matches!(run_command(&ctx, "destinations", &mut panels), BarAction::Destinations));
+        assert!(matches!(run_command(&ctx, "howto", &mut panels), BarAction::HowTo));
+        assert!(matches!(
+            run_command(&ctx, "conversation_log", &mut panels),
+            BarAction::ConversationLog
+        ));
+        assert!(super::super::toolbar::ready("regiontracker"));
+        run_command(&ctx, "regiontracker", &mut panels);
+        assert!(panels.region_tracker);
+        assert!(command_active("regiontracker", &panels, false, false, false));
+        run_command(&ctx, "regiontracker", &mut panels);
+        assert!(!panels.region_tracker);
+        assert!(super::super::toolbar::ready("avatar_align"));
+        run_command(&ctx, "avatar_align", &mut panels);
+        assert!(panels.avatar_align);
+        assert!(command_active("avatar_align", &panels, false, false, false));
+        run_command(&ctx, "avatar_align", &mut panels);
+        assert!(!panels.avatar_align);
+        assert!(super::super::toolbar::ready("face_nearest_avatar"));
+        assert!(matches!(
+            run_command(&ctx, "face_nearest_avatar", &mut panels),
+            BarAction::FaceNearestAvatar
+        ));
+        assert!(super::super::toolbar::ready("pose_stand"));
+        assert!(matches!(run_command(&ctx, "pose_stand", &mut panels), BarAction::PoseStand));
+        assert!(super::super::toolbar::ready("wearable_favorites"));
+        assert!(matches!(
+            run_command(&ctx, "wearable_favorites", &mut panels),
+            BarAction::WearableFavorites
+        ));
+        assert!(super::super::toolbar::ready("omnifilter"));
+        assert!(matches!(run_command(&ctx, "omnifilter", &mut panels), BarAction::InventoryFilters));
+        for (cmd, target) in [
+            ("flickr", "https://www.flickr.com/"),
+            ("primfeed", "https://www.primfeed.com/"),
+            ("discord", "https://discord.com/app"),
+        ] {
+            assert!(super::super::toolbar::ready(cmd));
+            assert!(matches!(run_command(&ctx, cmd, &mut panels), BarAction::ExternalService(url) if url == target));
+        }
+    }
+
+    #[test]
+    fn photo_tools_is_one_floater_with_legacy_alias_and_not_snapshot() {
+        let ctx = egui::Context::default();
+        let mut panels = Panels::from_settings(&crate::settings::Settings::default());
+        assert!(super::super::toolbar::ready("phototools"));
+        assert!(
+            !super::super::toolbar::COMMANDS
+                .iter()
+                .any(|command| command.id == "phototools_view")
+        );
+        assert!(!panels.snapshot && !panels.camera_controls && !panels.photo_tools);
+
+        assert!(matches!(run_command(&ctx, "phototools", &mut panels), BarAction::None));
+        assert!(panels.photo_tools && !panels.photo_tools_camera_tab);
+        assert!(!panels.snapshot && !panels.camera_controls);
+        assert!(command_active("phototools", &panels, false, false, false));
+
+        assert!(matches!(run_command(&ctx, "phototools_view", &mut panels), BarAction::None));
+        assert!(panels.photo_tools && !panels.photo_tools_camera_tab);
+        assert!(!panels.snapshot && !panels.camera_controls);
+        assert!(command_active("phototools_view", &panels, false, false, false));
+        assert!(command_active("phototools", &panels, false, false, false));
+
+        assert!(matches!(run_command(&ctx, "snapshot", &mut panels), BarAction::None));
+        assert!(panels.snapshot);
+        assert!(panels.photo_tools && !panels.photo_tools_camera_tab);
+    }
+
+    #[test]
     fn snapshot_to_disk_saves_without_opening_the_snapshot_window() {
         let ctx = egui::Context::default();
         let mut panels = Panels::from_settings(&crate::settings::Settings::default());
         panels.snapshot = false;
         assert!(super::super::toolbar::ready("snapshot_to_disk"));
         assert!(matches!(run_command(&ctx, "snapshot_to_disk", &mut panels), BarAction::PhotoToDisk));
+        assert!(super::super::toolbar::ready("360capture"));
+        assert!(matches!(run_command(&ctx, "360capture", &mut panels), BarAction::CapturePanorama));
         assert!(!panels.snapshot);
     }
 
