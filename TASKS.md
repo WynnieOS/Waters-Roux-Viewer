@@ -1,3 +1,8 @@
+## Waters Roux Beta 27
+
+- 🟡 Implemented four independent login/loading artwork controls with local-only imports, preview/Apply/Cancel/Reset, persistent transforms and glass preferences. Removed rejected orange login perimeter and procedural trees. Native picker and Second Life regression validation remain required.
+- ⬜ Official logo PNG, derived icon and approved standalone background: source files unavailable; no substitute logo or mockup wallpaper committed.
+
 ## Waters Roux branded Windows beta
 
 - 🔧 Branded portable beta (2026-11-09, task `branded-beta`): retain PR #1's glass foundation and PR #2's Quick Preferences; new first-account glass card, readable rose/slate text, temporary bayou dusk background with matching blurred glass, translated prominent application branding, embedded original-logo support without Aurora emblem fallback, Windows resource identity, and isolated portable profile/vault scope. Verification in progress; no merge or production release authorized.

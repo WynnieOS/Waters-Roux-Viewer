@@ -849,6 +849,8 @@ pub struct App {
     worldmap_ui: ui::worldmap::WorldMapUi,
     map_tiles: ui::map_tiles::MapTiles,
     options_ui: ui::options::OptionsUi,
+    branding_ui: ui::branding::Editor,
+    branding_open: bool,
     grids_ui: ui::grids::Manager,
     audio_ui: ui::audio::AudioUi,
     notif_ui: ui::notifications::NotifUi,
@@ -1774,6 +1776,8 @@ impl App {
             worldmap_ui: Default::default(),
             map_tiles: ui::map_tiles::MapTiles::new(),
             options_ui: Default::default(),
+            branding_ui: Default::default(),
+            branding_open: false,
             grids_ui: Default::default(),
             audio_ui: Default::default(),
             notif_ui: Default::default(),
@@ -13540,7 +13544,9 @@ impl App {
                 }
             }
             LoginAction::Quit => self.request_exit(),
-            LoginAction::Preferences => ui::widgets::toggle_floater(&self.egui_ctx, ui::options::WINDOW, &mut self.panels.settings),
+            LoginAction::Preferences => {
+                self.branding_open = true;
+            }
             LoginAction::Accessibility => {
                 ui::widgets::open_floater(&self.egui_ctx, ui::options::WINDOW, &mut self.panels.settings);
                 self.options_ui.open(ui::options::Page::Accessibility, 0);
@@ -15109,8 +15115,11 @@ impl App {
         self.world.refresh_rlva_privacy();
         self.notif_ui.privacy = self.world.rlva_privacy.clone();
         let mut a = UiActions::default();
-        let p = self.palette;
         let ctx = ui.ctx().clone();
+        if ui::branding::take_open(&ctx) {
+            self.branding_open = true;
+        }
+        let p = ui::branding_runtime::palette(&ctx, &self.palette);
         ui::inventory::view::set_picker_sort(&ctx, self.settings.inventory.sort);
         ui::widgets::local_texture::sync(
             &ctx,
@@ -17770,6 +17779,12 @@ impl App {
                 }
             }
         }
+        if let Some(saved) = self.branding_ui.show(&ctx, &p, &mut self.branding_open) {
+            self.settings.interface_colors.glass_alpha = Some(((f32::from(saved.glass.opacity) / 100.0) * 255.0).round() as u8);
+            crate::interface_colors::set(self.settings.interface_colors.clone());
+            self.palette = self.skin.theme.palette();
+            self.settings.save();
+        }
         // Bug report form (disabled, see main.rs):
         // if self.demo && self.frame_count == 550 && std::env::var_os("AURORA_DEMO_BUG_REPORT").is_some() {
         //     self.bug_report.requested = true;
@@ -18081,6 +18096,9 @@ impl ApplicationHandler for App {
                 self.world.anti_spam.configure(self.settings.anti_spam);
                 self.panels.settings = true;
                 self.options_ui.open(ui::options::Page::Protections, 0);
+            }
+            if std::env::var_os("AURORA_DEMO_BRANDING").is_some() {
+                self.branding_open = true;
             }
             if std::env::var_os("AURORA_DEMO_OPTIONS").is_some() {
                 self.panels.settings = true;

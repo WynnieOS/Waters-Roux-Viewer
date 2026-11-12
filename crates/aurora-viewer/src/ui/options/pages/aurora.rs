@@ -152,6 +152,22 @@ pub fn page(cx: &mut Cx, tab: usize) {
     use aurora_i18n::tr;
     let aurora = tr!("ui-options-aurora-about-land-aurora");
     let classic = tr!("ui-options-aurora-about-land-classic");
+    let branding_palette = cx.p;
+    cx.row(aurora_i18n::tr!("branding-title"), "", &super::super::cx::Nothing, |ui, _| {
+        if crate::ui::widgets::action_button(
+            ui,
+            &branding_palette,
+            "photo-filled",
+            aurora_i18n::tr!("branding-title"),
+            crate::ui::widgets::ActionKind::Flat,
+            Vec2::new(0.0, 30.0),
+        )
+        .clicked()
+        {
+            crate::ui::branding::request_open(ui.ctx());
+        }
+        false
+    });
     match tab {
         0 => cx.group(tr!("ui-options-aurora-redrawn-windows"), |cx| {
             cx.wide().choice(

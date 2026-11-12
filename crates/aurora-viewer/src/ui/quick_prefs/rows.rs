@@ -63,7 +63,7 @@ impl Default for Editor {
 }
 
 impl Editor {
-    pub fn show(&mut self, ui: &mut egui::Ui) {
+    pub fn show(&mut self, ui: &mut egui::Ui, p: &crate::theme::Palette) {
         ui.horizontal(|ui| {
             let label = if self.editing {
                 aurora_i18n::tr!("common-close")
@@ -81,11 +81,11 @@ impl Editor {
         if !self.editing {
             return;
         }
-        ui.separator();
+        crate::ui::widgets::divider(ui, p);
         for slot in Slot::ROWS {
             let mut checked = self.visible.contains(&slot);
             ui.horizontal(|ui| {
-                if ui.checkbox(&mut checked, slot.label()).changed() {
+                if crate::ui::widgets::checkbox(ui, p, &mut checked, slot.label()).changed() {
                     if checked {
                         self.visible.push(slot);
                     } else {
@@ -111,7 +111,7 @@ impl Editor {
                 }
             });
         }
-        ui.separator();
+        crate::ui::widgets::divider(ui, p);
     }
 }
 

@@ -176,6 +176,18 @@ pub fn show(
     let available_height = (screen.height() - if first_account { 84.0 } else { 148.0 }).max(100.0);
     let content_height = if form.content_height > 0.0 { form.content_height } else { 650.0 };
     let top = ((screen.height() - 112.0 - content_height.min(available_height)) / 2.0).max(12.0);
+    // The logo yields space to measured form/card content, including MFA.
+    // This keeps whole buttons in the scroll viewport, rather than merely
+    // keeping their labels visible. Re-evaluate when the window is resized.
+    let logo_height_id = Id::unique("accounts_logo_height");
+    let previous_logo_height = ctx.data(|data| data.get_temp::<f32>(logo_height_id)).unwrap_or(0.0);
+    let preferred_logo_height = (screen.height() * 0.22).clamp(100.0, 220.0);
+    let logo_height = if form.content_height > 0.0 {
+        (available_height - (form.content_height - previous_logo_height) - 2.0).clamp(48.0, preferred_logo_height)
+    } else {
+        preferred_logo_height.min((screen.height() - 640.0).max(72.0))
+    };
+    ctx.data_mut(|data| data.insert_temp(logo_height_id, if logo.is_some() { logo_height } else { 0.0 }));
     let portrait_height =
         ((screen.height() - 560.0) * 0.15 + 88.0).clamp(88.0, if screen.height() < 800.0 { 100.0 } else { 160.0 }) * layout.scale;
     let place_height = (if screen.height() < 800.0 { 84.0 } else { 112.0 }) * layout.scale;
@@ -207,12 +219,10 @@ pub fn show(
                 .show(ui, |ui| {
                     let brand = |ui: &mut egui::Ui| {
                         ui.vertical_centered(|ui| {
-                            if let Some(logo) = logo {
-                                ui.add(egui::Image::new(logo).fit_to_exact_size(
-                                    Vec2::new(logo.aspect_ratio(), 1.0)
-                                        * (if screen.height() < 800.0 { 86.0 } else { 138.0 })
-                                        * layout.scale,
-                                ));
+                            if logo.is_some() {
+                                let (bounds, _) =
+                                    ui.allocate_exact_size(Vec2::new(ui.available_width(), logo_height), egui::Sense::hover());
+                                super::super::branding_runtime::paint_logo(ui.ctx(), ui.painter(), bounds, false, logo, 1.0);
                             }
                             ui.label(
                                 RichText::new(aurora_i18n::tr!("waters-roux-name"))
@@ -1610,7 +1620,9 @@ mod tests {
         fn strips(shape: &egui::Shape, result: &mut Vec<Rect>) {
             match shape {
                 egui::Shape::Vec(shapes) => shapes.iter().for_each(|shape| strips(shape, result)),
-                egui::Shape::Mesh(mesh) if mesh.vertices.len() == 4 && (mesh.calc_bounds().height() - 2.0).abs() < 0.1 => {
+                egui::Shape::Mesh(mesh)
+                    if mesh.vertices.len() == 6 && (mesh.calc_bounds().height() - 1.0).abs() < 0.1 && mesh.vertices[0].color.a() > 0 =>
+                {
                     result.push(mesh.calc_bounds());
                 }
                 _ => {}
@@ -1621,9 +1633,10 @@ mod tests {
             strips(&source.shape, &mut accent);
         }
         assert_eq!(accent.len(), 1, "one selected-card accent");
+        let beta = text_rect(&output, "synthetic-beta").expect("other card");
         assert!(
-            (accent[0].left() - (alpha.left() - 12.0)).abs() < 1.0,
-            "accent must follow the selected card: {accent:?}, {alpha:?}"
+            accent[0].x_range().contains(alpha.center().x) && !accent[0].x_range().contains(beta.center().x),
+            "the reflection belongs to the selected card, independent of the theme's corner radius: {accent:?}, {alpha:?}, {beta:?}"
         );
         assert!(
             form.motion.viewport.contains_rect(accent[0]),
@@ -1925,6 +1938,11 @@ mod tests {
             )));
         }
         let output = last.expect("synthetic frame");
+        assert!(
+            form.motion.viewport.bottom() <= 603.0,
+            "the whole saved card must fit above the footer: {:?}",
+            form.motion.viewport
+        );
         for label in [
             aurora_i18n::tr!("ui-login-grid"),
             aurora_i18n::tr!("ui-login-start"),

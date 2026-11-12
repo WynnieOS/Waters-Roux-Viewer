@@ -4,13 +4,14 @@ name: Waters Roux — Windows preview
 # installer. Do not trigger upstream Aurora's tag/release workflows.
 on:
   push:
-    branches: [feat/waters-roux-branded-beta]
+    branches: [feat/waters-roux-branded-beta, feat/waters-roux-beta27]
   pull_request:
     paths:
       - '.github/workflows/waters-roux-preview.yml'
       - 'crates/**'
       - 'assets/branding/**'
       - 'scripts/package*.ps1'
+      - 'scripts/prepare-waters-roux-icon.ps1'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -21,7 +22,8 @@ permissions:
 
 concurrency:
   group: waters-roux-preview-${{ github.ref }}
-  cancel-in-progress: false
+  # The release dependency cache is established; supersede stale Beta 27 builds.
+  cancel-in-progress: ${{ github.ref == 'refs/heads/feat/waters-roux-beta27' }}
 
 jobs:
   preview:
@@ -50,13 +52,13 @@ jobs:
       - name: Assemble development preview
         shell: pwsh
         run: |
-          $folder = "Waters-Roux-Beta-${{ github.run_number }}-${{ github.sha }}"
+          $folder = "Waters-Roux-Viewer-Beta-27-${{ github.sha }}"
           ./scripts/package-waters-roux-preview.ps1 -Exe target/release/aurora-viewer.exe -Out $folder
-          Compress-Archive -LiteralPath $folder -DestinationPath Waters-Roux-Windows-Beta.zip
+          Compress-Archive -LiteralPath $folder -DestinationPath Waters-Roux-Viewer-Beta-27-Windows.zip
       - name: Upload portable preview
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Waters-Roux-Windows-Beta-${{ github.run_number }}
-          path: Waters-Roux-Windows-Beta.zip
+          name: Waters-Roux-Viewer-Beta-27-Windows
+          path: Waters-Roux-Viewer-Beta-27-Windows.zip
           retention-days: 14
           compression-level: 6

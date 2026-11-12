@@ -230,8 +230,8 @@ pub fn with_desktop_id(attrs: winit::window::WindowAttributes) -> winit::window:
 
 fn title_with(title: Option<&str>, profile_dir: &str, version: &str) -> String {
     let base = match title {
-        Some(t) => format!("Waters Roux Viewer {version} - {t}"),
-        None => format!("Waters Roux Viewer {version}"),
+        Some(t) => format!("Waters Roux Viewer — Beta 27 {version} - {t}"),
+        None => format!("Waters Roux Viewer — Beta 27 {version}"),
     };
     match profile_label(profile_dir) {
         Some(p) => format!("{base} ({p})"),
@@ -299,14 +299,14 @@ mod tests {
     fn title_ends_with_the_build_profile() {
         assert_eq!(
             title_with(Some("Test ombres"), "debug", "0.2.0"),
-            "Waters Roux Viewer 0.2.0 - Test ombres (Dev)"
+            "Waters Roux Viewer — Beta 27 0.2.0 - Test ombres (Dev)"
         );
-        assert_eq!(title_with(None, "release", "0.2.0"), "Waters Roux Viewer 0.2.0 (Release)");
-        assert_eq!(title_with(None, "debugging", "0.2.0"), "Waters Roux Viewer 0.2.0 (Debug)");
-        assert_eq!(title_with(Some("X"), "unknown", "0.2.0"), "Waters Roux Viewer 0.2.0 - X");
+        assert_eq!(title_with(None, "release", "0.2.0"), "Waters Roux Viewer — Beta 27 0.2.0 (Release)");
+        assert_eq!(title_with(None, "debugging", "0.2.0"), "Waters Roux Viewer — Beta 27 0.2.0 (Debug)");
+        assert_eq!(title_with(Some("X"), "unknown", "0.2.0"), "Waters Roux Viewer — Beta 27 0.2.0 - X");
         assert_eq!(
             title_with(None, "debug", "0.2.0+7.gabcdef123"),
-            "Waters Roux Viewer 0.2.0+7.gabcdef123 (Dev)"
+            "Waters Roux Viewer — Beta 27 0.2.0+7.gabcdef123 (Dev)"
         );
     }
 

@@ -13,8 +13,9 @@ This is a development preview, not a production release.
 
 Glass opacity: **Preferences → Appearance → Skin**, 10–100%, applied live and
 saved on exit. **Preferences → Accessibility → High Contrast** gives opaque
-panels. The login uses temporary bayou dusk art until the approved standalone
-background is supplied. Missing original-logo PNG/ICO files are explicitly
+panels. The Beta 27 login uses a neutral gradient until the approved standalone
+background is supplied. Open the login gear for independent Login and Loading
+background/logo selections, previews, Apply/Cancel and Glass controls. Missing original-logo PNG/ICO files are explicitly
 reported in `MISSING-ARTWORK.txt`; no substitute logo is used.
 
 ---

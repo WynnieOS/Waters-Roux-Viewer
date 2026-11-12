@@ -503,6 +503,7 @@ fn glass_card<R>(
     edge: Option<Color32>,
     body: impl FnOnce(&mut egui::Ui) -> R,
 ) -> egui::InnerResponse<R> {
+    let glow = super::branding_runtime::current(ui.ctx()).glass.glow;
     let behind = (ui.painter().clone(), ui.painter().add(egui::Shape::Noop));
     let mut pane = None;
     let mut frame = widgets::overlay_frame(ui.ctx(), p);
@@ -515,7 +516,10 @@ fn glass_card<R>(
         if p.high_contrast {
             frame.stroke.color
         } else {
-            p.amber.lerp_to_gamma(p.rose, hover * 0.5)
+            p.field
+                .lerp_to_gamma(p.bar, 0.4)
+                .lerp_to_gamma(p.ink, hover * 0.15)
+                .gamma_multiply(0.25 + glow * 0.4)
         }
     });
     let response = frame.inner_margin(Margin::same(margin)).show(ui, |ui| {
@@ -527,19 +531,19 @@ fn glass_card<R>(
         let outer = response.response.rect;
         // inside the border of the frame
         let rect = outer.shrink(1.0);
-        let strength = if accent { 1.0 } else { 0.6 } + hover * 0.45;
+        let strength = (if accent { 1.0 } else { 0.6 } + hover * 0.45) * glow;
         let lights = vec![
             super::aurora_bg::radial_glow_shape(
                 outer.left_top() + Vec2::new(outer.width() * 0.18, outer.height() * 0.12),
                 outer.width() * 0.95,
-                p.violet,
-                0.24 * strength,
+                p.rose,
+                0.10 * strength,
             ),
             super::aurora_bg::radial_glow_shape(
                 outer.right_bottom() - Vec2::new(outer.width() * 0.12, outer.height() * 0.14),
                 outer.width() * 0.8,
-                p.teal,
-                0.13 * strength,
+                p.bar,
+                0.10 * strength,
             ),
         ];
         behind.0.set(behind.1, egui::Shape::Vec(lights.clone()));
@@ -563,7 +567,14 @@ fn glass_card<R>(
             )
         };
         if accent {
-            shapes.push(strip(top(2.0), &[(0.0, p.amber), (1.0, p.rose)]));
+            shapes.push(strip(
+                top(1.0),
+                &[
+                    (0.0, p.rose.gamma_multiply(0.45)),
+                    (0.5, p.field.gamma_multiply(0.65)),
+                    (1.0, p.bar.gamma_multiply(0.45)),
+                ],
+            ));
         } else {
             let lit = p.ink.gamma_multiply(0.30);
             shapes.push(strip(
@@ -713,6 +724,8 @@ pub fn show(
     info: &LoginInfo,
     progress: Option<(&str, f32)>,
 ) -> LoginAction {
+    let selected_logo = super::branding_runtime::logo(ui.ctx(), false, logo);
+    let logo = selected_logo.as_ref();
     if form.accounts_loaded {
         return carousel::show(ui, p, icons, logo, settings, form, info, progress);
     }
@@ -753,9 +766,8 @@ pub fn show(
             ui.set_width(card_w);
             ui.vertical_centered(|ui| {
                 if let Some(l) = logo {
-                    let r = ui
-                        .add(egui::Image::new(l).fit_to_exact_size(Vec2::new(logo_size * l.aspect_ratio(), logo_size)))
-                        .rect;
+                    let (r, _) = ui.allocate_exact_size(Vec2::new(card_w, logo_size), Sense::hover());
+                    super::branding_runtime::paint_logo(&ctx, ui.painter(), r, false, Some(l), 1.0);
                     // soft light behind the logo (additive)
                     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::unique("halo")));
                     super::aurora_bg::radial_glow(&painter, r.center(), 150.0, p.violet, 0.42);

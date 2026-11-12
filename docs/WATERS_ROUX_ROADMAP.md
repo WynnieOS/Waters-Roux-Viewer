@@ -99,3 +99,7 @@ and preserves all upstream license notices. PR #3's test-only constant warning
 is fixed separately on its existing branch; its workspaces are not silently
 merged into the beta. Original downloadable logo/background files remain
 artwork blockers until supplied. Build results will be recorded after checks.
+
+## Beta 27 continuation
+
+Continues Beta 26 commit 1264a7c4 on feat/waters-roux-beta27. Local-only four-slot artwork imports, transactional editor, independent loading transitions and soft glass edges are implemented. See WATERS_ROUX_BETA27.md for per-item validation status. Official artwork remains blocked on original downloadable assets. No workspace branches merged; no main merge or production release authorized.
