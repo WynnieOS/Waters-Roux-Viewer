@@ -106,15 +106,26 @@ struct Session {
     queued_frames: Arc<AtomicUsize>,
 }
 
+struct Finalizing {
+    handle: thread::JoinHandle<Result<(PathBuf, u64, u64), String>>,
+    output: PathBuf,
+    dropped: u64,
+}
+
 #[derive(Default)]
 pub struct Recorder {
     session: Option<Session>,
+    finalizing: Option<Finalizing>,
     pub message: Option<String>,
 }
 
 impl Recorder {
     pub fn active(&self) -> bool {
         self.session.is_some()
+    }
+
+    pub fn finalizing(&self) -> bool {
+        self.finalizing.is_some()
     }
 
     /// A recorder-exclusive GPU readback is outstanding.
@@ -132,8 +143,8 @@ impl Recorder {
 
     pub fn start(&mut self, mut options: Options, audio_engine: Option<&aurora_audio::AudioEngine>) -> Result<PathBuf, String> {
         options.sanitize();
-        if self.active() {
-            return Err("A recording is already running".into());
+        if self.active() || self.finalizing() {
+            return Err("Finish saving the previous MP4 before starting another recording".into());
         }
         let root = directories::UserDirs::new()
             .and_then(|u| u.video_dir().map(|p| p.to_path_buf()))
@@ -243,30 +254,76 @@ impl Recorder {
         }
     }
 
-    pub fn stop(&mut self) -> Result<Option<PathBuf>, String> {
-        let Some(s) = self.session.take() else { return Ok(None) };
+    /// Request finalization without blocking the viewer's render/UI thread.
+    /// The worker continues closing H.264 and muxing AAC on a background thread.
+    pub fn stop_async(&mut self) -> Result<bool, String> {
+        if self.finalizing.is_some() {
+            return Err("An MP4 is already being finalized".into());
+        }
+        let Some(s) = self.session.take() else { return Ok(false) };
         let _ = s.sender.send(Packet::Stop(s.started.elapsed()));
-        let result = s.worker.join().map_err(|_| "Video encoder thread panicked".to_owned())?;
+        let worker = s.worker;
+        let handle = thread::Builder::new()
+            .name("waters-roux-mp4-finalizer".into())
+            .spawn(move || worker.join().map_err(|_| "H.264 worker thread panicked".to_owned())?)
+            .map_err(|e| format!("Cannot start MP4 finalization thread: {e}"))?;
+        self.finalizing = Some(Finalizing {
+            handle,
+            output: s.output,
+            dropped: s.dropped,
+        });
+        self.message = Some("Saving H.264 MP4 in the background. Keep the viewer open until the saved-video confirmation appears.".into());
+        Ok(true)
+    }
+
+    /// Called each viewer frame. Never waits on a running encoder.
+    pub fn poll_finalization(&mut self) -> Option<Result<Option<PathBuf>, String>> {
+        if !self.finalizing.as_ref()?.handle.is_finished() {
+            return None;
+        }
+        let state = self.finalizing.take()?;
+        let result = state.handle.join().map_err(|_| "MP4 finalizer thread panicked".to_owned()).and_then(|r| r);
+        Some(self.finish_report(result, state.output, state.dropped))
+    }
+
+    fn finish_report(
+        &mut self,
+        result: Result<(PathBuf, u64, u64), String>,
+        output: PathBuf,
+        dropped: u64,
+    ) -> Result<Option<PathBuf>, String> {
         match result {
             Ok((path, frames, unique)) if frames > 0 => {
                 self.message = Some(format!(
                     "Saved H.264 MP4: {} ({frames} frames; {unique} captured; {} repeated; {} dropped)",
                     path.display(),
                     frames.saturating_sub(unique),
-                    s.dropped
+                    dropped
                 ));
                 Ok(Some(path))
             }
             Ok((_path, _, _)) => {
-                let _ = fs::remove_file(&s.output);
-                self.message = Some("No frames were captured; the empty recording was discarded.".into());
+                let _ = fs::remove_file(&output);
+                self.message = Some("No frames were captured; no MP4 was saved.".into());
                 Ok(None)
             }
             Err(error) => {
-                self.message = Some(format!("MP4 could not be finalized: {error}. Any intermediate files are kept for recovery."));
+                self.message = Some(format!("MP4 could not be finalized: {error}. Intermediate files are kept for recovery."));
                 Err(error)
             }
         }
+    }
+
+    /// Synchronous close for process shutdown or a headless caller.
+    pub fn stop(&mut self) -> Result<Option<PathBuf>, String> {
+        if let Some(state) = self.finalizing.take() {
+            let result = state.handle.join().map_err(|_| "MP4 finalizer thread panicked".to_owned()).and_then(|r| r);
+            return self.finish_report(result, state.output, state.dropped);
+        }
+        let Some(s) = self.session.take() else { return Ok(None) };
+        let _ = s.sender.send(Packet::Stop(s.started.elapsed()));
+        let result = s.worker.join().map_err(|_| "H.264 worker thread panicked".to_owned())?;
+        self.finish_report(result, s.output, s.dropped)
     }
 }
 
