@@ -188,13 +188,7 @@ pub fn show(
                     "Include in-world sounds and received voice (48 kHz stereo)",
                 )
                 .changed();
-                changed |= widgets::switch_labeled(
-                    ui,
-                    p,
-                    &mut settings.recording.capture_huds,
-                    "Include my HUD attachments",
-                )
-                .changed();
+                changed |= widgets::switch_labeled(ui, p, &mut settings.recording.capture_huds, "Include my HUD attachments").changed();
                 changed |= widgets::switch_labeled(
                     ui,
                     p,
