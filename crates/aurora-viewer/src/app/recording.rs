@@ -261,7 +261,10 @@ impl Recorder {
             return Err("An MP4 is already being finalized".into());
         }
         let Some(s) = self.session.take() else { return Ok(false) };
-        let _ = s.sender.send(Packet::Stop(s.started.elapsed()));
+        // A full GPU-frame queue must never freeze the UI on Stop. If the
+        // queue is full, dropping the sender after spawning the finalizer
+        // closes the stream once its already-queued frames are processed.
+        let _ = s.sender.try_send(Packet::Stop(s.started.elapsed()));
         let worker = s.worker;
         let handle = thread::Builder::new()
             .name("waters-roux-mp4-finalizer".into())
