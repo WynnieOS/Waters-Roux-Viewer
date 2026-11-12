@@ -84,14 +84,9 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
                     });
                     ui.horizontal(|ui| {
                         ui.label("Particle color");
-                        changed |= widgets::color_button(
-                            ui,
-                            p,
-                            "selection-beam-custom-color",
-                            &mut settings.build.selection_beam_color,
-                            true,
-                        )
-                        .changed();
+                        changed |=
+                            widgets::color_button(ui, p, "selection-beam-custom-color", &mut settings.build.selection_beam_color, true)
+                                .changed();
                     });
                     changed |= ui
                         .add(egui::Slider::new(&mut settings.build.selection_beam_size, 2.0..=20.0).text("Particle size"))
@@ -105,9 +100,7 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
                     if settings.build.selection_beam_style == "custom" {
                         ui.horizontal(|ui| {
                             if ui.button("Import particle PNG...").clicked()
-                                && let Some(file) = rfd::FileDialog::new()
-                                    .add_filter("Transparent PNG", &["png"])
-                                    .pick_file()
+                                && let Some(file) = rfd::FileDialog::new().add_filter("Transparent PNG", &["png"]).pick_file()
                             {
                                 settings.build.selection_beam_texture = file.to_string_lossy().into_owned();
                                 changed = true;
@@ -117,10 +110,7 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
                                 changed = true;
                             }
                         });
-                        if let Some(texture) = crate::build::selection_beam::custom_texture(
-                            ctx,
-                            &settings.build.selection_beam_texture,
-                        ) {
+                        if let Some(texture) = crate::build::selection_beam::custom_texture(ctx, &settings.build.selection_beam_texture) {
                             ui.add(egui::Image::new((texture.id(), egui::Vec2::splat(52.0))));
                         } else if !settings.build.selection_beam_texture.is_empty() {
                             ui.label("PNG could not be loaded. Use an image under 8 MB and 2048 × 2048 pixels.");
