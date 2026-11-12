@@ -14,7 +14,7 @@ const MIN_BEAM_METRES: f32 = 0.08;
 const MAX_DOTS: usize = 80;
 const MAX_CUSTOM_PNG: u64 = 8 * 1024 * 1024;
 
-/// Cache only the resident's chosen local texture, never issue simulator particles.
+// Cache only the resident's chosen local texture, never issue simulator particles.
 thread_local! {
     static CUSTOM_BEAM: RefCell<Option<(String, Option<TextureHandle>)>> = const { RefCell::new(None) };
 }
