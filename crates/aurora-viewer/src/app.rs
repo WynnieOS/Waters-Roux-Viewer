@@ -13903,7 +13903,9 @@ impl App {
                     self.set_show_huds(previous);
                 }
                 match result {
-                    Ok(true) => self.world.system_message("Finalizing H.264 MP4 in the background. Keep Waters Roux open until saved confirmation.".to_owned()),
+                    Ok(true) => self.world.system_message(
+                        "Finalizing H.264 MP4 in the background. Keep Waters Roux open until saved confirmation.".to_owned(),
+                    ),
                     Ok(false) => self.world.system_message("No recording is active.".to_owned()),
                     Err(error) => self.world.system_message(format!("MP4 finalize failed: {error}")),
                 }
