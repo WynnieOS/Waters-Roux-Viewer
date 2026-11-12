@@ -13,7 +13,11 @@
 mod mp4;
 
 #[cfg(test)]
-use std::{fs::{File, OpenOptions}, io::{Seek, SeekFrom, Write}, sync::mpsc::Receiver};
+use std::{
+    fs::{File, OpenOptions},
+    io::{Seek, SeekFrom, Write},
+    sync::mpsc::Receiver,
+};
 
 use std::{
     fs,
@@ -285,7 +289,11 @@ impl Recorder {
             return None;
         }
         let state = self.finalizing.take()?;
-        let result = state.handle.join().map_err(|_| "MP4 finalizer thread panicked".to_owned()).and_then(|r| r);
+        let result = state
+            .handle
+            .join()
+            .map_err(|_| "MP4 finalizer thread panicked".to_owned())
+            .and_then(|r| r);
         Some(self.finish_report(result, state.output, state.dropped))
     }
 
@@ -311,7 +319,9 @@ impl Recorder {
                 Ok(None)
             }
             Err(error) => {
-                self.message = Some(format!("MP4 could not be finalized: {error}. Intermediate files are kept for recovery."));
+                self.message = Some(format!(
+                    "MP4 could not be finalized: {error}. Intermediate files are kept for recovery."
+                ));
                 Err(error)
             }
         }
@@ -320,7 +330,11 @@ impl Recorder {
     /// Synchronous close for process shutdown or a headless caller.
     pub fn stop(&mut self) -> Result<Option<PathBuf>, String> {
         if let Some(state) = self.finalizing.take() {
-            let result = state.handle.join().map_err(|_| "MP4 finalizer thread panicked".to_owned()).and_then(|r| r);
+            let result = state
+            .handle
+            .join()
+            .map_err(|_| "MP4 finalizer thread panicked".to_owned())
+            .and_then(|r| r);
             return self.finish_report(result, state.output, state.dropped);
         }
         let Some(s) = self.session.take() else { return Ok(None) };
