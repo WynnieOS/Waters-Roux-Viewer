@@ -122,6 +122,8 @@ jobs:
           if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Verified FFmpeg missing' }
           "WATERS_ROUX_FFMPEG=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           'WATERS_ROUX_TEST_MP4=1' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $fixture = Join-Path $env:RUNNER_TEMP 'waters-roux-recorder-output.mp4'
+          "WATERS_ROUX_TEST_MP4_OUTPUT=$fixture" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Windows compile and lint
         shell: pwsh
@@ -130,6 +132,28 @@ jobs:
       - name: Windows viewer tests (including recorder and GIF/style tests)
         shell: pwsh
         run: cargo test --locked -p aurora-viewer --bin aurora-viewer
+
+      - name: Independently verify output from Waters Roux recording code
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = $env:WATERS_ROUX_TEST_MP4_OUTPUT
+          if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Viewer recorder did not output an MP4 fixture' }
+          $staged = Join-Path $env:RUNNER_TEMP 'waters-roux-qa-codecs/tools'
+          $ffmpeg = Join-Path $staged 'ffmpeg.exe'
+          $ffprobe = Join-Path $staged 'ffprobe.exe'
+          $probeJson = & $ffprobe -v error -show_entries 'stream=codec_name,codec_type,width,height,r_frame_rate,nb_frames' -show_entries 'format=duration' -of json $path | Out-String
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot probe Waters Roux-generated MP4' }
+          $metadata = $probeJson | ConvertFrom-Json
+          $video = @($metadata.streams | Where-Object { $_.codec_type -eq 'video' })[0]
+          if ($null -eq $video -or $video.codec_name -ne 'h264' -or $video.width -ne 64 -or $video.height -ne 64 -or $video.r_frame_rate -ne '30/1') {
+            throw "Viewer-generated MP4 failed H.264/size/FPS verification: $probeJson"
+          }
+          if ($video.nb_frames -and [int]$video.nb_frames -ne 30) { throw 'Viewer MP4 is not 30 frames as requested' }
+          if ([double]$metadata.format.duration -lt 0.95 -or [double]$metadata.format.duration -gt 1.1) { throw 'Viewer-generated MP4 duration drift' }
+          & $ffmpeg -hide_banner -loglevel error -i $path -f null -
+          if ($LASTEXITCODE -ne 0) { throw 'Viewer-generated MP4 cannot be fully decoded' }
+          'Waters Roux actual recorder fixture passed ffprobe duration/FPS/H.264 and full decode.'
 
       - name: Independently validate H.264 MP4 + AAC encoder playback fixture
         shell: pwsh
