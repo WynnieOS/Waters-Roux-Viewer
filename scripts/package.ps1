@@ -19,6 +19,31 @@ param(
 
 New-Item -ItemType Directory -Force -Path (Join-Path $Out 'assets/emoji') -ErrorAction Stop | Out-Null
 Copy-Item -LiteralPath $Exe -Destination $Out -ErrorAction Stop
+
+# Ship approved artwork alongside the executable. Fail packaging if absent.
+
+$logoEncoded = Join-Path $Source 'assets/branding/waters-roux-logo.png.base64'
+
+if (-not (Test-Path -LiteralPath $logoEncoded)) {
+
+    throw "Missing Waters Roux artwork: $logoEncoded"
+
+}
+
+$brandingOut = Join-Path $Out 'assets/branding'
+
+New-Item -ItemType Directory -Force -Path $brandingOut -ErrorAction Stop | Out-Null
+
+$logoBytes = [Convert]::FromBase64String(([IO.File]::ReadAllText($logoEncoded)).Trim())
+
+if ($logoBytes.Length -lt 24 -or $logoBytes[0] -ne 137 -or $logoBytes[1] -ne 80) {
+
+    throw "Invalid Waters Roux logo asset"
+
+}
+
+[IO.File]::WriteAllBytes((Join-Path $brandingOut 'waters-roux-logo.png'), $logoBytes)
+
 # The emoji font is inside the exe; its licence ships, and the assets folder
 # stays: the updater of the published versions refuses a package without it.
 Copy-Item -LiteralPath (Join-Path $Source 'assets/emoji/LICENSE-OFL.txt') -Destination (Join-Path $Out 'assets/emoji') -ErrorAction Stop
