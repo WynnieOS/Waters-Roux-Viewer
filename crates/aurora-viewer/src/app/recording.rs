@@ -30,6 +30,8 @@ pub struct Options {
     pub fps: u32,
     pub jpeg_quality: u8,
     pub capture_world_audio: bool,
+    /// Include the viewer's UI; otherwise capture only the rendered scene.
+    pub capture_interface: bool,
 }
 
 impl Default for Options {
@@ -39,6 +41,7 @@ impl Default for Options {
             fps: 30,
             jpeg_quality: 95,
             capture_world_audio: false,
+            capture_interface: false,
         }
     }
 }
@@ -46,7 +49,7 @@ impl Default for Options {
 impl Options {
     pub fn sanitize(&mut self) {
         self.height = match self.height {
-            720 | 1080 | 1440 | 2160 => self.height,
+            0 | 480 | 720 | 1080 | 1440 | 2160 => self.height,
             _ => 1080,
         };
         self.fps = match self.fps {
@@ -59,6 +62,8 @@ impl Options {
 
 pub const fn recording_label(options: Options) -> &'static str {
     match options.height {
+        0 => "Native viewport",
+        480 => "SD 480p",
         720 => "HD 720p",
         1440 => "QHD 1440p",
         2160 => "UHD 2160p",
@@ -67,8 +72,8 @@ pub const fn recording_label(options: Options) -> &'static str {
 }
 
 enum Packet {
-    Frame(u32, u32, Vec<u8>),
-    Stop,
+    Frame(u32, u32, Vec<u8>, Duration),
+    Stop(Duration),
 }
 
 struct Session {
@@ -95,6 +100,10 @@ impl Recorder {
     }
 
     /// A recorder-exclusive GPU readback is outstanding.
+    pub fn capture_interface(&self) -> bool {
+        self.session.as_ref().is_some_and(|s| s.options.capture_interface)
+    }
+
     pub fn pending(&self) -> bool {
         self.session.as_ref().is_some_and(|session| session.requested.is_some())
     }
@@ -178,13 +187,22 @@ impl Recorder {
 
     pub fn accept(&mut self, width: u32, height: u32, rgba: Vec<u8>) {
         let Some(s) = self.session.as_mut() else { return };
-        s.requested = None;
-        s.next_frame = Instant::now() + Duration::from_secs_f32(1.0 / s.options.fps as f32);
+        // Timestamp the render request rather than the delayed GPU readback.
+        // The AVI encoder uses these wall-clock timestamps to fill missed frame
+        // slots; a 15-fps capture must not play back at double speed in 30-fps AVI.
+        let captured_at = s.requested.take().unwrap_or_else(Instant::now);
+        let elapsed = captured_at.saturating_duration_since(s.started);
+        let now = Instant::now();
+        let period = Duration::from_secs_f64(1.0 / f64::from(s.options.fps));
+        s.next_frame += period;
+        if s.next_frame < now {
+            s.next_frame = now;
+        }
         if width == 0 || height == 0 || rgba.len() != (width as usize).saturating_mul(height as usize).saturating_mul(4) {
             s.dropped += 1;
             return;
         }
-        match s.sender.try_send(Packet::Frame(width, height, rgba)) {
+        match s.sender.try_send(Packet::Frame(width, height, rgba, elapsed)) {
             Ok(()) => s.sent += 1,
             Err(TrySendError::Full(_)) => s.dropped += 1,
             Err(TrySendError::Disconnected(_)) => {
@@ -196,7 +214,7 @@ impl Recorder {
 
     pub fn stop(&mut self) -> Result<Option<PathBuf>, String> {
         let Some(s) = self.session.take() else { return Ok(None) };
-        let _ = s.sender.send(Packet::Stop);
+        let _ = s.sender.send(Packet::Stop(s.started.elapsed()));
         let result = s.worker.join().map_err(|_| "Video encoder thread panicked".to_owned())?;
         match result {
             Ok((path, frames)) if frames > 0 => {
@@ -231,15 +249,20 @@ fn encode_stream(
     audio: Option<aurora_audio::RecordingTap>,
 ) -> Result<(PathBuf, u64), String> {
     let mut avi: Option<Avi> = None;
+    let mut previous_jpeg: Option<Vec<u8>> = None;
     loop {
         let mut stop = false;
         match rx.recv_timeout(Duration::from_millis(20)) {
-            Ok(Packet::Frame(w, h, pixels)) => {
+            Ok(Packet::Frame(w, h, pixels, elapsed)) => {
                 if avi.is_none() {
                     let size = dimensions(w, h, options.height);
                     avi = Some(Avi::new(&path, size.0, size.1, options.fps, audio.is_some()).map_err(|e| e.to_string())?);
                 }
                 let writer = avi.as_mut().expect("created on first frame");
+                let target = expected_frames(elapsed, options.fps).max(1);
+                if writer.video_frames >= target {
+                    continue;
+                }
                 let rgba = image::RgbaImage::from_raw(w, h, pixels).ok_or_else(|| "Invalid frame dimensions".to_owned())?;
                 let scaled = image::imageops::resize(&rgba, writer.width, writer.height, image::imageops::FilterType::Lanczos3);
                 let rgb = image::RgbImage::from_fn(writer.width, writer.height, |x, y| {
@@ -250,9 +273,24 @@ fn encode_stream(
                 image::codecs::jpeg::JpegEncoder::new_with_quality(&mut encoded, options.jpeg_quality)
                     .encode(rgb.as_raw(), writer.width, writer.height, image::ExtendedColorType::Rgb8)
                     .map_err(|e| format!("JPEG encode: {e}"))?;
+                // AVI's MJPEG track is constant-frame-rate. Fill missed slots
+                // with the last valid frame, never speed up the timeline.
+                let previous = previous_jpeg.as_deref().unwrap_or(&encoded);
+                while writer.video_frames + 1 < target {
+                    writer.push_frame(previous).map_err(|e| format!("AVI frame repeat: {e}"))?;
+                }
                 writer.push_frame(&encoded).map_err(|e| format!("AVI frame write: {e}"))?;
+                previous_jpeg = Some(encoded);
             }
-            Ok(Packet::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => stop = true,
+            Ok(Packet::Stop(elapsed)) => {
+                if let (Some(writer), Some(previous)) = (avi.as_mut(), previous_jpeg.as_ref()) {
+                    while writer.video_frames < expected_frames(elapsed, options.fps) {
+                        writer.push_frame(previous).map_err(|e| format!("AVI final frame repeat: {e}"))?;
+                    }
+                }
+                stop = true;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => stop = true,
             Err(mpsc::RecvTimeoutError::Timeout) => {}
         }
         // Audio is received on its OWN queue. A slow JPEG encoder cannot
@@ -274,12 +312,21 @@ fn encode_stream(
     Ok((path, frames))
 }
 
+/// Number of constant-frame-rate AVI slots covering the elapsed real time.
+fn expected_frames(elapsed: Duration, fps: u32) -> u64 {
+    let nanos = elapsed.as_nanos().min(u128::from(LIMIT_SECONDS) * 1_000_000_000);
+    ((nanos * u128::from(fps) + 999_999_999) / 1_000_000_000) as u64
+}
+
 fn dimensions(w: u32, h: u32, max_height: u32) -> (u32, u32) {
+    let even = |value: u32| (value / 2 * 2).max(2);
+    if max_height == 0 {
+        return (even(w), even(h));
+    }
     let max_width = max_height * 16 / 9;
     let scale = (max_width as f64 / w.max(1) as f64)
         .min(max_height as f64 / h.max(1) as f64)
         .min(1.0);
-    let even = |value: u32| (value / 2 * 2).max(2);
     (even((w as f64 * scale).round() as u32), even((h as f64 * scale).round() as u32))
 }
 
@@ -485,9 +532,18 @@ mod tests {
     #[test]
     fn recording_dimensions_remain_even_and_within_budget() {
         assert_eq!(dimensions(1920, 1080, 1080), (1920, 1080));
+        assert_eq!(dimensions(1920, 1200, 0), (1920, 1200));
+        assert_eq!(dimensions(960, 540, 480), (852, 478));
         assert_eq!(dimensions(800, 600, 1080), (800, 600));
         assert_eq!(dimensions(3840, 2160, 1440), (2560, 1440));
         assert_eq!(dimensions(3840, 2160, 2160), (3840, 2160));
+    }
+    #[test]
+    fn capture_timeline_preserves_duration_at_low_frame_rate() {
+        assert_eq!(expected_frames(Duration::from_secs(2), 30), 60);
+        assert_eq!(expected_frames(Duration::from_millis(1500), 30), 45);
+        assert_eq!(expected_frames(Duration::ZERO, 30), 0);
+        assert_eq!(expected_frames(Duration::from_secs(360), 30), 9000);
     }
     #[test]
     fn avi_container_writes_index_and_frame_counts() {
