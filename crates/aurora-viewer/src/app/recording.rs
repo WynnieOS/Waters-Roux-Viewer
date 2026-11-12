@@ -32,6 +32,8 @@ pub struct Options {
     pub capture_world_audio: bool,
     /// Include the viewer's UI; otherwise capture only the rendered scene.
     pub capture_interface: bool,
+    /// Include HUD attachments in the captured world view.
+    pub capture_huds: bool,
 }
 
 impl Default for Options {
@@ -42,6 +44,7 @@ impl Default for Options {
             jpeg_quality: 95,
             capture_world_audio: false,
             capture_interface: false,
+            capture_huds: true,
         }
     }
 }
