@@ -11,7 +11,7 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{Seek, SeekFrom, Write},
     path::PathBuf,
-    sync::mpsc::{self, Receiver, SyncSender, TrySendError},
+    sync::{Arc, atomic::{AtomicUsize, Ordering}, mpsc::{self, Receiver, SyncSender, TrySendError}},
     thread,
     time::{Duration, Instant},
 };
@@ -89,6 +89,8 @@ struct Session {
     requested: Option<Instant>,
     sent: u64,
     dropped: u64,
+    /// Successful packets waiting for the CPU encoder; keeps GPU readbacks bounded.
+    queued_frames: Arc<AtomicUsize>,
 }
 
 #[derive(Default)]
@@ -131,6 +133,8 @@ impl Recorder {
             .find(|p| !p.exists())
             .ok_or_else(|| "Could not choose an unused recording filename".to_owned())?;
         let (sender, rx) = mpsc::sync_channel(3);
+        let queued_frames = Arc::new(AtomicUsize::new(0));
+        let encoder_backlog = Arc::clone(&queued_frames);
         let path = output.clone();
         // A second, separate audio receiver: the microphone's echo-reference
         // samples are NEVER consumed by the recorder.
@@ -142,7 +146,7 @@ impl Recorder {
         let has_audio = audio.is_some();
         let worker = thread::Builder::new()
             .name("waters-roux-video-encoder".into())
-            .spawn(move || encode_stream(rx, path, options, audio))
+            .spawn(move || encode_stream(rx, path, options, audio, Some(encoder_backlog)))
             .map_err(|e| format!("Unable to start video encoder: {e}"))?;
         let now = Instant::now();
         self.session = Some(Session {
@@ -155,6 +159,7 @@ impl Recorder {
             requested: None,
             sent: 0,
             dropped: 0,
+            queued_frames,
         });
         self.message = Some(format!(
             "Recording started: {} ({} • {} fps • world audio {})",
@@ -179,7 +184,9 @@ impl Recorder {
             s.requested = None;
             s.dropped += 1;
         }
-        s.requested.is_none() && now >= s.next_frame
+        // Avoid an expensive synchronous GPU readback when the CPU JPEG encoder
+        // is already behind. Backpressure must not further stall the live camera.
+        s.requested.is_none() && s.queued_frames.load(Ordering::Relaxed) < 2 && now >= s.next_frame
     }
 
     pub fn mark_requested(&mut self, now: Instant) {
@@ -205,10 +212,16 @@ impl Recorder {
             s.dropped += 1;
             return;
         }
+        // Increment before publication: the worker may receive immediately.
+        s.queued_frames.fetch_add(1, Ordering::Relaxed);
         match s.sender.try_send(Packet::Frame(width, height, rgba, elapsed)) {
             Ok(()) => s.sent += 1,
-            Err(TrySendError::Full(_)) => s.dropped += 1,
+            Err(TrySendError::Full(_)) => {
+                s.queued_frames.fetch_sub(1, Ordering::Relaxed);
+                s.dropped += 1;
+            }
             Err(TrySendError::Disconnected(_)) => {
+                s.queued_frames.fetch_sub(1, Ordering::Relaxed);
                 s.dropped += 1;
                 self.message = Some("Video encoder stopped unexpectedly; stop recording to inspect the error.".into());
             }
@@ -220,11 +233,11 @@ impl Recorder {
         let _ = s.sender.send(Packet::Stop(s.started.elapsed()));
         let result = s.worker.join().map_err(|_| "Video encoder thread panicked".to_owned())?;
         match result {
-            Ok((path, frames)) if frames > 0 => {
-                self.message = Some(format!("Saved video: {} ({frames} frames; {} dropped)", path.display(), s.dropped));
+            Ok((path, frames, unique)) if frames > 0 => {
+                self.message = Some(format!("Saved video: {} ({frames} frames; {unique} captured; {} repeated; {} dropped)", path.display(), frames.saturating_sub(unique), s.dropped));
                 Ok(Some(path))
             }
-            Ok((_path, _)) => {
+            Ok((_path, _, _)) => {
                 let _ = fs::remove_file(&s.output);
                 self.message = Some("No frames were captured; the empty recording was discarded.".into());
                 Ok(None)
@@ -250,13 +263,18 @@ fn encode_stream(
     path: PathBuf,
     options: Options,
     audio: Option<aurora_audio::RecordingTap>,
-) -> Result<(PathBuf, u64), String> {
+    queued_frames: Option<Arc<AtomicUsize>>,
+) -> Result<(PathBuf, u64, u64), String> {
     let mut avi: Option<Avi> = None;
     let mut previous_jpeg: Option<Vec<u8>> = None;
+    let mut unique_frames = 0u64;
     loop {
         let mut stop = false;
         match rx.recv_timeout(Duration::from_millis(20)) {
             Ok(Packet::Frame(w, h, pixels, elapsed)) => {
+                if let Some(backlog) = queued_frames.as_ref() {
+                    backlog.fetch_sub(1, Ordering::Relaxed);
+                }
                 if avi.is_none() {
                     let size = dimensions(w, h, options.height);
                     avi = Some(Avi::new(&path, size.0, size.1, options.fps, audio.is_some()).map_err(|e| e.to_string())?);
@@ -267,14 +285,21 @@ fn encode_stream(
                     continue;
                 }
                 let rgba = image::RgbaImage::from_raw(w, h, pixels).ok_or_else(|| "Invalid frame dimensions".to_owned())?;
-                let scaled = image::imageops::resize(&rgba, writer.width, writer.height, image::imageops::FilterType::Lanczos3);
-                let rgb = image::RgbImage::from_fn(writer.width, writer.height, |x, y| {
-                    let p = scaled.get_pixel(x, y).0;
-                    image::Rgb([p[0], p[1], p[2]])
-                });
+                // The usual 1080p recording is already at its output resolution.
+                // Always running Lanczos3 on every full-resolution frame made the
+                // CPU encoder fall behind while the user turned the camera.
+                let scaled = if (w, h) == (writer.width, writer.height) {
+                    rgba
+                } else {
+                    image::imageops::resize(&rgba, writer.width, writer.height, image::imageops::FilterType::Triangle)
+                };
+                let mut rgb = Vec::with_capacity((writer.width as usize) * (writer.height as usize) * 3);
+                for pixel in scaled.pixels() {
+                    rgb.extend_from_slice(&pixel.0[..3]);
+                }
                 let mut encoded = Vec::new();
                 image::codecs::jpeg::JpegEncoder::new_with_quality(&mut encoded, options.jpeg_quality)
-                    .encode(rgb.as_raw(), writer.width, writer.height, image::ExtendedColorType::Rgb8)
+                    .encode(&rgb, writer.width, writer.height, image::ExtendedColorType::Rgb8)
                     .map_err(|e| format!("JPEG encode: {e}"))?;
                 // AVI's MJPEG track is constant-frame-rate. Fill missed slots
                 // with the last valid frame, never speed up the timeline.
@@ -283,6 +308,7 @@ fn encode_stream(
                     writer.push_frame(previous).map_err(|e| format!("AVI frame repeat: {e}"))?;
                 }
                 writer.push_frame(&encoded).map_err(|e| format!("AVI frame write: {e}"))?;
+                unique_frames += 1;
                 previous_jpeg = Some(encoded);
             }
             Ok(Packet::Stop(elapsed)) => {
@@ -309,10 +335,10 @@ fn encode_stream(
             break;
         }
     }
-    let Some(avi) = avi else { return Ok((path, 0)) };
+    let Some(avi) = avi else { return Ok((path, 0, 0)) };
     let frames = avi.video_frames;
     avi.finish().map_err(|e| format!("AVI finalize: {e}"))?;
-    Ok((path, frames))
+    Ok((path, frames, unique_frames))
 }
 
 /// Number of constant-frame-rate AVI slots covering the elapsed real time.
@@ -566,7 +592,8 @@ mod tests {
             jpeg_quality: 90,
             ..Options::default()
         };
-        let (_, frames) = encode_stream(rx, path.clone(), options, None).expect("encode");
+        let (_, frames, unique) = encode_stream(rx, path.clone(), options, None, None).expect("encode");
+        assert_eq!(unique, 3, "only fresh GPU frames count as unique");
         assert_eq!(frames, 30, "one second of wall time must not become a tenth-second movie");
         let file = fs::read(&path).expect("AVI exists");
         assert!(file.starts_with(b"RIFF"));
