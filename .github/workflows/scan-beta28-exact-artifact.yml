@@ -18,9 +18,10 @@ permissions:
   actions: read
 
 jobs:
-  scan-windows-zip:
-    runs-on: windows-latest
-    timeout-minutes: 30
+  independent-clamav-scan:
+    name: Independent antivirus scan (exact blocked ZIP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Download exact previously blocked GitHub build artifact
         uses: actions/download-artifact@v4
@@ -31,44 +32,70 @@ jobs:
           github-token: ${{ github.token }}
           path: scan-input
 
-      - name: Verify exact inner ZIP hash, check archive contents without executing
-        shell: pwsh
+      - name: Verify signed-off ZIP SHA-256 and extract without executing
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          $zip = Join-Path $PWD 'scan-input/Waters-Roux-H264-MP4-UNVERIFIED-Windows.zip'
-          $checksum = Join-Path $PWD 'scan-input/Waters-Roux-H264-MP4-UNVERIFIED-Windows.zip.sha256'
-          if (-not (Test-Path -LiteralPath $zip)) { throw 'Expected artifact ZIP is missing' }
-          if (-not (Test-Path -LiteralPath $checksum)) { throw 'Embedded checksum file is missing' }
-          $expected = 'ab6f569f9d602baca6a0499fb58eaddd059a874b9954cd07f9981793118ff6b2'
-          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne $expected) { throw "Artifact hash mismatch: $actual" }
-          if (-not ((Get-Content -LiteralPath $checksum -Raw).ToLowerInvariant().Contains($expected))) { throw 'Embedded checksum does not match' }
-          New-Item -ItemType Directory -Path 'extracted' -Force | Out-Null
-          Expand-Archive -LiteralPath $zip -DestinationPath 'extracted' -Force
-          $exe = @(Get-ChildItem -LiteralPath 'extracted' -Recurse -File -Filter '*.exe')
-          if ($exe.Count -ne 3) { throw "Unexpected number of executables: $($exe.Count)" }
-          foreach ($item in $exe) {
-            $sha = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            $signature = Get-AuthenticodeSignature -FilePath $item.FullName
-            Write-Host "$($item.Name): SHA256=$sha; Authenticode=$($signature.Status)"
-          }
-          "ZIP SHA256: $actual" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          "Executable count: $($exe.Count). No executable was launched." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import pathlib
+          import zipfile
+          root = pathlib.Path.cwd()
+          zip_path = root/'scan-input'/'Waters-Roux-H264-MP4-UNVERIFIED-Windows.zip'
+          checksum = zip_path.with_name(zip_path.name+'.sha256')
+          expected = 'ab6f569f9d602baca6a0499fb58eaddd059a874b9954cd07f9981793118ff6b2'
+          assert zip_path.is_file() and checksum.is_file(), 'Nested ZIP/checksum not found'
+          observed = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+          assert observed == expected, f'ZIP SHA256 mismatch: {observed}'
+          assert expected in checksum.read_text().lower(), 'Checksum sidecar mismatch'
+          dest = root/'extracted'
+          dest.mkdir(exist_ok=True)
+          with zipfile.ZipFile(zip_path) as z:
+            assert z.testzip() is None, 'Corrupt ZIP entry'
+            for item in z.infolist():
+              candidate = (dest/item.filename).resolve()
+              assert candidate.is_relative_to(dest.resolve()), f'Unsafe ZIP path {item.filename}'
+              assert not ((item.external_attr >> 16) & 0o170000 == 0o120000), 'Symlink in ZIP'
+            z.extractall(dest)
+          exes = sorted(p.relative_to(dest).as_posix() for p in dest.rglob('*.exe'))
+          print('Exact ZIP verified:', observed)
+          print('Executables found:', exes)
+          assert len(exes) == 3, f'Unexpected EXE count: {len(exes)}'
+          with (root/'scan-manifest.txt').open('w') as out:
+            out.write(f'Inner ZIP SHA256: {observed}\n')
+            out.write('EXEs (not executed):\n'+'\n'.join(exes)+'\n')
+          PY
 
-      - name: Update Microsoft Defender signatures and scan ZIP plus extracted contents
-        shell: pwsh
+      - name: Install ClamAV and update signature databases
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          Update-MpSignature -ErrorAction Stop
-          $status = Get-MpComputerStatus -ErrorAction Stop
-          if (-not $status.AntivirusEnabled -or -not $status.RealTimeProtectionEnabled) { throw 'Defender is not enabled' }
-          Write-Host "Defender signatures updated: $($status.AntivirusSignatureVersion)"
-          Start-MpScan -ScanType CustomScan -ScanPath (Join-Path $PWD 'scan-input') -ErrorAction Stop
-          Start-MpScan -ScanType CustomScan -ScanPath (Join-Path $PWD 'extracted') -ErrorAction Stop
-          $detections = @(Get-MpThreatDetection -ErrorAction SilentlyContinue)
-          if ($detections.Count -gt 0) {
-            $detections | Format-List | Out-String | Write-Host
-            throw 'Microsoft Defender reported a threat detection'
-          }
-          'Defender scan of exact artifact ZIP and extracted files: no detections reported.' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          Write-Host 'Defender scan of exact artifact ZIP and extracted files: no detections reported.'
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clamav clamav-freshclam
+          sudo systemctl stop clamav-freshclam || true
+          sudo freshclam --stdout
+          clamscan --version
+
+      - name: Independently scan exact ZIP and all extracted files
+        shell: bash
+        run: |
+          set -euo pipefail
+          clamscan --recursive --infected --scan-archive=yes --max-filesize=256M --max-scansize=1024M --max-recursion=20 --log=clamav-scan.log scan-input extracted
+          grep -q 'Infected files: 0' clamav-scan.log
+          grep -q 'Total errors: 0' clamav-scan.log
+          {
+            echo '### ClamAV result for exact browser-blocked artifact'
+            echo 'Verified inner ZIP SHA256: `ab6f569f9d602baca6a0499fb58eaddd059a874b9954cd07f9981793118ff6b2`'
+            echo 'ClamAV signature database updated; zero detections and zero scan errors reported.'
+            echo 'No viewer executable was launched. Clean ClamAV is not a guarantee of safety or Chrome clearance.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload scan manifest and log (even if scanner fails)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Waters-Roux-Beta28-Independent-Scan-Report
+          path: |
+            scan-manifest.txt
+            clamav-scan.log
+          if-no-files-found: ignore
