@@ -6,6 +6,11 @@ on:
       - security/scan-beta28-exact-artifact
     paths:
       - .github/workflows/scan-beta28-exact-artifact.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/scan-beta28-exact-artifact.yml
   workflow_dispatch:
 
 permissions:
