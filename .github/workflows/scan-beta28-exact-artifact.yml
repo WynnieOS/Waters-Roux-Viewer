@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Download exact previously blocked GitHub build artifact
+      - name: Download exact browser-blocked GitHub artifact
         uses: actions/download-artifact@v4
         with:
           name: Waters-Roux-Beta28-V2-H264-MP4-Windows-QA-ONLY
@@ -32,7 +32,7 @@ jobs:
           github-token: ${{ github.token }}
           path: scan-input
 
-      - name: Verify signed-off ZIP SHA-256 and extract without executing
+      - name: Verify exact ZIP hash and safely extract without executing
         shell: bash
         run: |
           set -euo pipefail
@@ -41,32 +41,31 @@ jobs:
           import pathlib
           import zipfile
           root = pathlib.Path.cwd()
-          zip_path = root/'scan-input'/'Waters-Roux-H264-MP4-UNVERIFIED-Windows.zip'
-          checksum = zip_path.with_name(zip_path.name+'.sha256')
+          path = root / 'scan-input' / 'Waters-Roux-H264-MP4-UNVERIFIED-Windows.zip'
+          sidecar = path.with_name(path.name + '.sha256')
           expected = 'ab6f569f9d602baca6a0499fb58eaddd059a874b9954cd07f9981793118ff6b2'
-          assert zip_path.is_file() and checksum.is_file(), 'Nested ZIP/checksum not found'
-          observed = hashlib.sha256(zip_path.read_bytes()).hexdigest()
-          assert observed == expected, f'ZIP SHA256 mismatch: {observed}'
-          assert expected in checksum.read_text().lower(), 'Checksum sidecar mismatch'
-          dest = root/'extracted'
+          assert path.is_file() and sidecar.is_file(), 'Exact ZIP or checksum missing'
+          with path.open('rb') as stream:
+              observed = hashlib.file_digest(stream, 'sha256').hexdigest()
+          assert observed == expected, 'ZIP digest mismatch: ' + observed
+          assert expected in sidecar.read_text().lower(), 'Sidecar checksum mismatch'
+          dest = root / 'extracted'
           dest.mkdir(exist_ok=True)
-          with zipfile.ZipFile(zip_path) as z:
-            assert z.testzip() is None, 'Corrupt ZIP entry'
-            for item in z.infolist():
-              candidate = (dest/item.filename).resolve()
-              assert candidate.is_relative_to(dest.resolve()), f'Unsafe ZIP path {item.filename}'
-              assert not ((item.external_attr >> 16) & 0o170000 == 0o120000), 'Symlink in ZIP'
-            z.extractall(dest)
-          exes = sorted(p.relative_to(dest).as_posix() for p in dest.rglob('*.exe'))
-          print('Exact ZIP verified:', observed)
-          print('Executables found:', exes)
-          assert len(exes) == 3, f'Unexpected EXE count: {len(exes)}'
-          with (root/'scan-manifest.txt').open('w') as out:
-            out.write(f'Inner ZIP SHA256: {observed}\n')
-            out.write('EXEs (not executed):\n'+'\n'.join(exes)+'\n')
+          with zipfile.ZipFile(path) as archive:
+              assert archive.testzip() is None, 'Corrupt ZIP'
+              for member in archive.infolist():
+                  target = (dest / member.filename).resolve()
+                  assert target.is_relative_to(dest.resolve()), 'Unsafe ZIP path'
+                  assert ((member.external_attr >> 16) & 0o170000) != 0o120000, 'Symlink in ZIP'
+              archive.extractall(dest)
+          files = sorted(p.relative_to(dest).as_posix() for p in dest.rglob('*.exe'))
+          print('Verified SHA256:', observed)
+          print('Executable files:', files)
+          assert len(files) == 3, 'Unexpected executable count'
+          (root / 'scan-manifest.txt').write_text('ZIP SHA256: ' + observed + '\\nEXEs (not launched):\\n' + '\\n'.join(files) + '\\n')
           PY
 
-      - name: Install ClamAV and update signature databases
+      - name: Install ClamAV and refresh malware signatures
         shell: bash
         run: |
           set -euo pipefail
@@ -76,43 +75,24 @@ jobs:
           sudo freshclam --stdout
           clamscan --version
 
-      - name: Independently scan exact ZIP and all extracted files
+      - name: Scan ZIP and extracted contents with independent antivirus
         shell: bash
         run: |
           set -euo pipefail
-          # clamscan returns 0 for a completed clean scan, 1 for detections,
-          # and 2 for errors. Do not require a nonexistent "Total errors" line.
           clamscan --recursive --infected --scan-archive=yes --max-filesize=256M --max-scansize=1024M --max-recursion=20 --log=clamav-scan.log scan-input extracted
-          grep -Eq '^Infected files:[[:space:]]+0
-          {
-            echo '### ClamAV result for exact browser-blocked artifact'
-            echo 'Verified inner ZIP SHA256: `ab6f569f9d602baca6a0499fb58eaddd059a874b9954cd07f9981793118ff6b2`'
-            echo 'ClamAV signature database updated; zero detections and zero scan errors reported.'
-            echo 'No viewer executable was launched. Clean ClamAV is not a guarantee of safety or Chrome clearance.'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload scan manifest and log (even if scanner fails)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Waters-Roux-Beta28-Independent-Scan-Report
-          path: |
-            scan-manifest.txt
-            clamav-scan.log
-          if-no-files-found: ignore
- clamav-scan.log
-          if grep -Eq '(^|[[:space:]])(ERROR|FOUND)[:[:space:]]' clamav-scan.log; then
-            echo 'ClamAV output contains an error or detection; inspect scan report' >&2
+          grep -Fq 'Infected files: 0' clamav-scan.log
+          if grep -Eiq 'ERROR:| FOUND' clamav-scan.log; then
+            echo 'Scan log contains error or detection; see report' >&2
             exit 1
           fi
           {
-            echo '### ClamAV result for exact browser-blocked artifact'
-            echo 'Verified inner ZIP SHA256: `ab6f569f9d602baca6a0499fb58eaddd059a874b9954cd07f9981793118ff6b2`'
-            echo 'ClamAV signature database updated; zero detections and zero scan errors reported.'
-            echo 'No viewer executable was launched. Clean ClamAV is not a guarantee of safety or Chrome clearance.'
+            echo '### ClamAV independent scan'
+            echo 'Exact original nested ZIP verified by SHA256.'
+            echo 'No infected files reported; scanner exited successfully.'
+            echo 'The browser security warning remains a separate open issue.'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload scan manifest and log (even if scanner fails)
+      - name: Upload scan report, even if the scan fails
         if: always()
         uses: actions/upload-artifact@v4
         with:
