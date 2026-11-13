@@ -12043,6 +12043,13 @@ impl App {
         {
             self.recorder.accept(w, h, pixels);
         }
+        if let Some(result) = self.recorder.poll_finalization() {
+            match result {
+                Ok(Some(path)) => self.world.system_message(format!("Saved H.264 MP4: {}", path.display())),
+                Ok(None) => self.world.system_message("No recording frames were saved.".to_owned()),
+                Err(error) => self.world.system_message(format!("H.264 MP4 recording failed: {error}")),
+            }
+        }
         if let Some((files, exit)) = &mut self.capture {
             if !self.inventory_images.auto_capture_pending
                 && files.iter().any(|(at, _)| *at <= self.frame_count)
@@ -13891,14 +13898,16 @@ impl App {
                 }
             }
             BarAction::StopRecording => {
-                let result = self.recorder.stop();
+                let result = self.recorder.stop_async();
                 if let Some(previous) = self.recording_huds_restore.take() {
                     self.set_show_huds(previous);
                 }
                 match result {
-                    Ok(Some(path)) => self.world.system_message(format!("Saved video: {}", path.display())),
-                    Ok(None) => self.world.system_message("No recorded frames were saved.".to_owned()),
-                    Err(error) => self.world.system_message(format!("Video finalize failed: {error}")),
+                    Ok(true) => self.world.system_message(
+                        "Finalizing H.264 MP4 in the background. Keep Waters Roux open until saved confirmation.".to_owned(),
+                    ),
+                    Ok(false) => self.world.system_message("No recording is active.".to_owned()),
+                    Err(error) => self.world.system_message(format!("MP4 finalize failed: {error}")),
                 }
             }
             BarAction::PhotoRoll => self.photo_reel_show_newest(),
@@ -16156,6 +16165,7 @@ impl App {
                     &mut self.panels.machinima,
                     self.camera.mouselook(),
                     self.recorder.active(),
+                    self.recorder.finalizing(),
                     self.recorder.elapsed(),
                     &mut self.settings,
                 );

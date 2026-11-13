@@ -1,20 +1,31 @@
-//! User-initiated high-quality MJPEG/AVI video with optional in-world audio.
+//! User-initiated H.264/MP4 recording with optional AAC in-world audio.
+//!
+//! The AVI/MJPEG writer below is retained for legacy regression tests; real
+//! capture uses a live FFmpeg H.264 encoder and writes MP4.
 //!
 //! The resident can explicitly opt into recording the viewer's OWN 48 kHz
 //! stereo mix, including incoming WebRTC voice, sounds, parcel music and media.
 //! It does not monitor other desktop applications or record the local microphone.
-//! Both video and audio are captured to one indexed AVI. Get consent before
-//! recording conversations. Encoding remains an experimental release blocker
-//! until real in-world playback tests pass.
+//! The opt-in audio stream is muxed as AAC when the recording is finalized.
+//! Get consent before recording conversations. In-world validation is required
+//! before public release.
+
+mod mp4;
+
+#[cfg(test)]
+use std::{
+    fs::{File, OpenOptions},
+    io::{Seek, SeekFrom, Write},
+    sync::mpsc::Receiver,
+};
 
 use std::{
-    fs::{self, File, OpenOptions},
-    io::{Seek, SeekFrom, Write},
+    fs,
     path::PathBuf,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
-        mpsc::{self, Receiver, SyncSender, TrySendError},
+        mpsc::{self, SyncSender, TrySendError},
     },
     thread,
     time::{Duration, Instant},
@@ -23,7 +34,9 @@ use std::{
 const LIMIT_SECONDS: u64 = 300;
 const SAMPLE_RATE: u32 = 48_000;
 const AUDIO_CHANNELS: u16 = 2;
+#[cfg(test)]
 const AUDIO_BITS: u16 = 16;
+#[cfg(test)]
 const AUDIO_FRAME_BYTES: u32 = AUDIO_CHANNELS as u32 * AUDIO_BITS as u32 / 8;
 
 /// Configured from the Machinima Bar, persisted independently of PhotoTools.
@@ -97,15 +110,26 @@ struct Session {
     queued_frames: Arc<AtomicUsize>,
 }
 
+struct Finalizing {
+    handle: thread::JoinHandle<Result<(PathBuf, u64, u64), String>>,
+    output: PathBuf,
+    dropped: u64,
+}
+
 #[derive(Default)]
 pub struct Recorder {
     session: Option<Session>,
+    finalizing: Option<Finalizing>,
     pub message: Option<String>,
 }
 
 impl Recorder {
     pub fn active(&self) -> bool {
         self.session.is_some()
+    }
+
+    pub fn finalizing(&self) -> bool {
+        self.finalizing.is_some()
     }
 
     /// A recorder-exclusive GPU readback is outstanding.
@@ -123,17 +147,19 @@ impl Recorder {
 
     pub fn start(&mut self, mut options: Options, audio_engine: Option<&aurora_audio::AudioEngine>) -> Result<PathBuf, String> {
         options.sanitize();
-        if self.active() {
-            return Err("A recording is already running".into());
+        if self.active() || self.finalizing() {
+            return Err("Finish saving the previous MP4 before starting another recording".into());
         }
         let root = directories::UserDirs::new()
             .and_then(|u| u.video_dir().map(|p| p.to_path_buf()))
             .unwrap_or_else(|| crate::settings::config_dir().join("videos"))
             .join("Waters Roux");
         fs::create_dir_all(&root).map_err(|e| format!("Cannot create video folder: {e}"))?;
+        // Fail before opening a recording if the bundled encoder is missing.
+        let ffmpeg = mp4::locate_encoder()?;
         let base = crate::snapshot::local_stamp();
         let output = (0..1000u32)
-            .map(|i| root.join(format!("Waters-Roux-{base}-{i:03}.avi")))
+            .map(|i| root.join(format!("Waters-Roux-{base}-{i:03}.mp4")))
             .find(|p| !p.exists())
             .ok_or_else(|| "Could not choose an unused recording filename".to_owned())?;
         let (sender, rx) = mpsc::sync_channel(3);
@@ -150,7 +176,7 @@ impl Recorder {
         let has_audio = audio.is_some();
         let worker = thread::Builder::new()
             .name("waters-roux-video-encoder".into())
-            .spawn(move || encode_stream(rx, path, options, audio, Some(encoder_backlog)))
+            .spawn(move || mp4::encode(rx, path, options, audio, Some(encoder_backlog), ffmpeg))
             .map_err(|e| format!("Unable to start video encoder: {e}"))?;
         let now = Instant::now();
         self.session = Some(Session {
@@ -166,7 +192,7 @@ impl Recorder {
             queued_frames,
         });
         self.message = Some(format!(
-            "Recording started: {} ({} • {} fps • world audio {})",
+            "H.264 MP4 recording started: {} ({} • {} fps • AAC world audio {}); the file finalizes when you stop.",
             output.display(),
             recording_label(options),
             options.fps,
@@ -180,7 +206,7 @@ impl Recorder {
     pub fn needs_frame(&mut self, now: Instant) -> bool {
         let Some(s) = self.session.as_mut() else { return false };
         if s.started.elapsed().as_secs() >= LIMIT_SECONDS {
-            self.message = Some("Video reached 10-minute safety limit. Stop to save it.".into());
+            self.message = Some("Video reached 5-minute safety limit. Stop to finalize the MP4.".into());
             return false;
         }
         // Recover from an interrupted GPU frame rather than hanging forever.
@@ -202,8 +228,8 @@ impl Recorder {
     pub fn accept(&mut self, width: u32, height: u32, rgba: Vec<u8>) {
         let Some(s) = self.session.as_mut() else { return };
         // Timestamp the render request rather than the delayed GPU readback.
-        // The AVI encoder uses these wall-clock timestamps to fill missed frame
-        // slots; a 15-fps capture must not play back at double speed in 30-fps AVI.
+        // The H.264 encoder repeats frames on its constant frame-rate timeline;
+        // slow GPU captures must not speed up playback.
         let captured_at = s.requested.take().unwrap_or_else(Instant::now);
         let elapsed = captured_at.saturating_duration_since(s.started);
         let now = Instant::now();
@@ -232,41 +258,104 @@ impl Recorder {
         }
     }
 
-    pub fn stop(&mut self) -> Result<Option<PathBuf>, String> {
-        let Some(s) = self.session.take() else { return Ok(None) };
-        let _ = s.sender.send(Packet::Stop(s.started.elapsed()));
-        let result = s.worker.join().map_err(|_| "Video encoder thread panicked".to_owned())?;
+    /// Request finalization without blocking the viewer's render/UI thread.
+    /// The worker continues closing H.264 and muxing AAC on a background thread.
+    pub fn stop_async(&mut self) -> Result<bool, String> {
+        if self.finalizing.is_some() {
+            return Err("An MP4 is already being finalized".into());
+        }
+        let Some(s) = self.session.take() else { return Ok(false) };
+        let elapsed = s.started.elapsed();
+        let sender = s.sender;
+        let worker = s.worker;
+        let output = s.output;
+        let dropped = s.dropped;
+        // Never block the UI when the encoder queue is full. The background
+        // finalizer waits for capacity and reliably delivers the Stop time
+        // so slow capture cannot cut off the tail of a recording.
+        let handle = thread::Builder::new()
+            .name("waters-roux-mp4-finalizer".into())
+            .spawn(move || {
+                let _ = sender.send(Packet::Stop(elapsed));
+                drop(sender);
+                worker.join().map_err(|_| "H.264 worker thread panicked".to_owned())?
+            })
+            .map_err(|e| format!("Cannot start MP4 finalization thread: {e}"))?;
+        self.finalizing = Some(Finalizing { handle, output, dropped });
+        self.message = Some("Saving H.264 MP4 in the background. Keep the viewer open until the saved-video confirmation appears.".into());
+        Ok(true)
+    }
+
+    /// Called each viewer frame. Never waits on a running encoder.
+    pub fn poll_finalization(&mut self) -> Option<Result<Option<PathBuf>, String>> {
+        if !self.finalizing.as_ref()?.handle.is_finished() {
+            return None;
+        }
+        let state = self.finalizing.take()?;
+        let result = state
+            .handle
+            .join()
+            .map_err(|_| "MP4 finalizer thread panicked".to_owned())
+            .and_then(|r| r);
+        Some(self.finish_report(result, state.output, state.dropped))
+    }
+
+    fn finish_report(
+        &mut self,
+        result: Result<(PathBuf, u64, u64), String>,
+        output: PathBuf,
+        dropped: u64,
+    ) -> Result<Option<PathBuf>, String> {
         match result {
             Ok((path, frames, unique)) if frames > 0 => {
                 self.message = Some(format!(
-                    "Saved video: {} ({frames} frames; {unique} captured; {} repeated; {} dropped)",
+                    "Saved H.264 MP4: {} ({frames} frames; {unique} captured; {} repeated; {} dropped)",
                     path.display(),
                     frames.saturating_sub(unique),
-                    s.dropped
+                    dropped
                 ));
                 Ok(Some(path))
             }
             Ok((_path, _, _)) => {
-                let _ = fs::remove_file(&s.output);
-                self.message = Some("No frames were captured; the empty recording was discarded.".into());
+                let _ = fs::remove_file(&output);
+                self.message = Some("No frames were captured; no MP4 was saved.".into());
                 Ok(None)
             }
             Err(error) => {
-                self.message = Some(format!("Video could not be finalized: {error}"));
+                self.message = Some(format!(
+                    "MP4 could not be finalized: {error}. Intermediate files are kept for recovery."
+                ));
                 Err(error)
             }
         }
+    }
+
+    /// Synchronous close for process shutdown or a headless caller.
+    pub fn stop(&mut self) -> Result<Option<PathBuf>, String> {
+        if let Some(state) = self.finalizing.take() {
+            let result = state
+                .handle
+                .join()
+                .map_err(|_| "MP4 finalizer thread panicked".to_owned())
+                .and_then(|r| r);
+            return self.finish_report(result, state.output, state.dropped);
+        }
+        let Some(s) = self.session.take() else { return Ok(None) };
+        let _ = s.sender.send(Packet::Stop(s.started.elapsed()));
+        let result = s.worker.join().map_err(|_| "H.264 worker thread panicked".to_owned())?;
+        self.finish_report(result, s.output, s.dropped)
     }
 }
 
 impl Drop for Recorder {
     fn drop(&mut self) {
-        // Best effort on ordinary shutdown: the owned encoder closes its AVI
-        // headers even when the machinima bar was not explicitly stopped.
+        // Best effort on ordinary shutdown: close the encoder and finalize MP4
+        // even when the machinima bar was not explicitly stopped.
         let _ = self.stop();
     }
 }
 
+#[cfg(test)]
 fn encode_stream(
     rx: Receiver<Packet>,
     path: PathBuf,
@@ -368,8 +457,9 @@ fn dimensions(w: u32, h: u32, max_height: u32) -> (u32, u32) {
     (even((w as f64 * scale).round() as u32), even((h as f64 * scale).round() as u32))
 }
 
-/// RIFF AVI with indexed MJPEG video plus optional 48-kHz stereo PCM.
+/// Legacy RIFF AVI fixture (tests only) with indexed MJPEG plus stereo PCM.
 /// Sound is the consented in-viewer mix, not an operating-system screen tap.
+#[cfg(test)]
 struct Avi {
     file: File,
     width: u32,
@@ -384,6 +474,7 @@ struct Avi {
     index: Vec<([u8; 4], u32, u32, u32)>,
 }
 
+#[cfg(test)]
 impl Avi {
     fn new(path: &PathBuf, width: u32, height: u32, fps: u32, with_audio: bool) -> std::io::Result<Self> {
         let mut f = OpenOptions::new().create_new(true).write(true).read(true).open(path)?;
@@ -560,6 +651,7 @@ impl Avi {
     }
 }
 
+#[cfg(test)]
 fn u32le(f: &mut File, value: u32) -> std::io::Result<()> {
     f.write_all(&value.to_le_bytes())
 }

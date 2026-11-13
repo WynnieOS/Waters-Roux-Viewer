@@ -1,14 +1,16 @@
-name: Waters Roux Beta 28 V2 — BRANDING-SAFE Windows candidate
+name: Waters Roux Beta 28 V2 — H264 MP4 Windows QA candidate
 
 # On a pull request this builds a separate portable *testing candidate*.
 # Never deploy or merge changes as part of packaging.
 on:
   pull_request:
-    branches: [build/waters-roux-beta28-v2-candidate]
+    branches: [fix/beta28-v2-camera-recorder-artwork]
     paths:
       - '.github/workflows/waters-roux-beta28-v2-windows-test.yml'
       - 'assets/branding/**'
       - 'scripts/package.ps1'
+      - 'scripts/bundle-waters-roux-ffmpeg.ps1'
+      - 'scripts/integrate-waters-roux-mp4-ui.ps1'
       - 'docs/WATERS_ROUX_BETA28_PACKAGE_REQUEST.md'
       - 'crates/aurora-viewer/src/**'
   workflow_dispatch:
@@ -24,7 +26,7 @@ jobs:
   build:
     name: Integrate, test, scan and package Windows creator beta
     runs-on: windows-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - name: Checkout source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,7 +40,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           git config user.name "Waters Roux CI"
           git config user.email "ci@users.noreply.github.com"
-          git fetch origin feat/waters-roux-beta27 fix/waters-roux-beta28-recording-beam fix/waters-roux-edit-transform-modes fix/beta28-v2-camera-recorder-artwork
+          git fetch origin feat/waters-roux-beta27 fix/waters-roux-beta28-recording-beam fix/waters-roux-edit-transform-modes fix/beta28-v2-camera-recorder-artwork feat/waters-roux-h264-mp4-recorder
           if ($LASTEXITCODE -ne 0) { throw "Couldn't fetch creator integration branches" }
           git checkout --detach origin/feat/waters-roux-beta27
           if ($LASTEXITCODE -ne 0) { throw "Couldn't start branded Beta 27 source" }
@@ -46,12 +48,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { git status --short; throw "Creator branch merge conflicted" }
           git merge --no-edit --no-ff origin/fix/waters-roux-edit-transform-modes
           if ($LASTEXITCODE -ne 0) { git status --short; throw "Editing branch merge conflicted" }
-          # Keep official Beta 27 branding and UI intact while importing only
-          # the optimized recorder file from the later repair PR.
-          git restore --source origin/fix/beta28-v2-camera-recorder-artwork -- crates/aurora-viewer/src/app/recording.rs
-          if ($LASTEXITCODE -ne 0) { throw 'Could not apply repaired recorder' }
+          # Keep Beta 27 branded UI while bringing in H.264, MP4, and AAC
+          # changes only. Do not merge the Aurora-based feature branch wholesale.
+          git restore --source origin/feat/waters-roux-h264-mp4-recorder -- crates/aurora-viewer/src/app/recording.rs crates/aurora-viewer/src/app/recording/mp4.rs crates/aurora-viewer/src/ui/machinima.rs scripts/bundle-waters-roux-ffmpeg.ps1 scripts/integrate-waters-roux-mp4-ui.ps1 crates/aurora-render/src/renderer.rs crates/aurora-viewer/src/build/manip.rs crates/aurora-viewer/src/world/eep.rs
+          if ($LASTEXITCODE -ne 0) { throw 'Could not import H.264 MP4 implementation' }
           git log -4 --format='%h %s'
           git status --short
+
+      - name: Wire asynchronous MP4 finalization into branded Waters Roux app
+        shell: pwsh
+        run: ./scripts/integrate-waters-roux-mp4-ui.ps1
 
       - name: Block unbranded source before compiling
         shell: pwsh
@@ -78,6 +84,11 @@ jobs:
           $build = Get-Content -LiteralPath 'crates/aurora-viewer/build.rs' -Raw
           if (-not $build.Contains('ProductName", "Waters Roux Viewer"')) { throw 'Refusing Aurora Windows product identity' }
           if (-not (Get-Content -LiteralPath 'crates/aurora-viewer/src/ui/mod.rs' -Raw).Contains('pub mod branding_runtime')) { throw 'Branding runtime module removed' }
+          $recorder = Get-Content -LiteralPath 'crates/aurora-viewer/src/app/recording.rs' -Raw
+          if (-not $recorder.Contains('mod mp4;') -or -not $recorder.Contains('Waters-Roux-{base}-{i:03}.mp4')) { throw 'H.264 MP4 recorder not integrated' }
+          if (-not (Test-Path -LiteralPath 'crates/aurora-viewer/src/app/recording/mp4.rs')) { throw 'H.264 encoder backend missing' }
+          if (-not (Get-Content -LiteralPath 'crates/aurora-viewer/src/app.rs' -Raw).Contains('self.recorder.stop_async()')) { throw 'Nonblocking MP4 stop not wired to branded viewer' }
+          if (-not (Get-Content -LiteralPath 'crates/aurora-viewer/src/app.rs' -Raw).Contains('self.recorder.poll_finalization()')) { throw 'MP4 finalize notifications missing' }
           'Waters Roux branded login, customization modules, runtime logo, and Windows identity verified in source.'
 
       - name: Install Rust
@@ -93,9 +104,26 @@ jobs:
         with:
           prefix-key: waters-roux-beta28
 
+      - name: Normalize integrated Rust formatting (QA only)
+        shell: pwsh
+        run: cargo fmt --all
+
       - name: Strict formatting
         shell: pwsh
         run: cargo fmt --all -- --check
+
+      - name: Download and stage pinned FFmpeg encoder for tests
+        shell: pwsh
+        run: |
+          $staged = Join-Path $env:RUNNER_TEMP 'waters-roux-qa-codecs'
+          ./scripts/bundle-waters-roux-ffmpeg.ps1 -Out $staged
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned H.264 FFmpeg stage failed' }
+          $exe = Join-Path $staged 'tools/ffmpeg.exe'
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Verified FFmpeg missing' }
+          "WATERS_ROUX_FFMPEG=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          'WATERS_ROUX_TEST_MP4=1' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $fixture = Join-Path $env:RUNNER_TEMP 'waters-roux-recorder-output.mp4'
+          "WATERS_ROUX_TEST_MP4_OUTPUT=$fixture" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Windows compile and lint
         shell: pwsh
@@ -104,6 +132,47 @@ jobs:
       - name: Windows viewer tests (including recorder and GIF/style tests)
         shell: pwsh
         run: cargo test --locked -p aurora-viewer --bin aurora-viewer
+
+      - name: Independently verify output from Waters Roux recording code
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = $env:WATERS_ROUX_TEST_MP4_OUTPUT
+          if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Viewer recorder did not output an MP4 fixture' }
+          $staged = Join-Path $env:RUNNER_TEMP 'waters-roux-qa-codecs/tools'
+          $ffmpeg = Join-Path $staged 'ffmpeg.exe'
+          $ffprobe = Join-Path $staged 'ffprobe.exe'
+          $probeJson = & $ffprobe -v error -show_entries 'stream=codec_name,codec_type,width,height,r_frame_rate,nb_frames' -show_entries 'format=duration' -of json $path | Out-String
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot probe Waters Roux-generated MP4' }
+          $metadata = $probeJson | ConvertFrom-Json
+          $video = @($metadata.streams | Where-Object { $_.codec_type -eq 'video' })[0]
+          if ($null -eq $video -or $video.codec_name -ne 'h264' -or $video.width -ne 64 -or $video.height -ne 64 -or $video.r_frame_rate -ne '30/1') {
+            throw "Viewer-generated MP4 failed H.264/size/FPS verification: $probeJson"
+          }
+          if ($video.nb_frames -and [int]$video.nb_frames -ne 30) { throw 'Viewer MP4 is not 30 frames as requested' }
+          if ([double]$metadata.format.duration -lt 0.95 -or [double]$metadata.format.duration -gt 1.1) { throw 'Viewer-generated MP4 duration drift' }
+          & $ffmpeg -hide_banner -loglevel error -i $path -f null -
+          if ($LASTEXITCODE -ne 0) { throw 'Viewer-generated MP4 cannot be fully decoded' }
+          'Waters Roux actual recorder fixture passed ffprobe duration/FPS/H.264 and full decode.'
+
+      - name: Independently validate H.264 MP4 + AAC encoder playback fixture
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $staged = Join-Path $env:RUNNER_TEMP 'waters-roux-qa-codecs/tools'
+          $ffmpeg = Join-Path $staged 'ffmpeg.exe'
+          $ffprobe = Join-Path $staged 'ffprobe.exe'
+          $sample = Join-Path $env:RUNNER_TEMP 'h264-aac-playback-test.mp4'
+          & $ffmpeg -hide_banner -loglevel error -f lavfi -i 'testsrc2=size=640x360:rate=30' -f lavfi -i 'sine=frequency=440:sample_rate=48000' -t 2 -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart -y $sample
+          if ($LASTEXITCODE -ne 0) { throw 'FFmpeg H.264/AAC playback fixture failed' }
+          $data = & $ffprobe -v error -show_entries 'stream=codec_name,codec_type,width,height,r_frame_rate' -show_entries 'format=duration' -of json $sample | Out-String | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'FFprobe cannot decode MP4 fixture' }
+          $v = @($data.streams | Where-Object { $_.codec_type -eq 'video' })[0]
+          $a = @($data.streams | Where-Object { $_.codec_type -eq 'audio' })[0]
+          if ($v.codec_name -ne 'h264' -or $v.width -ne 640 -or $v.height -ne 360 -or $v.r_frame_rate -ne '30/1') { throw 'MP4 video codec/resolution/FPS invalid' }
+          if ($a.codec_name -ne 'aac') { throw 'MP4 audio codec invalid' }
+          if ([double]$data.format.duration -lt 1.8 -or [double]$data.format.duration -gt 2.3) { throw 'MP4 duration invalid' }
+          'Verified FFmpeg output: playable H.264 640x360 30 FPS MP4 + AAC, ~2 seconds.'
 
       - name: Build portable Windows application
         shell: pwsh
@@ -121,16 +190,30 @@ jobs:
             'Built from branded Beta 27, Beta 28 creator repairs, and editing fixes.'
             'PhotoTools, separate Pose Stand, hand-selection beam, machinima bar and Name Tag Studio.'
             'Recorder: native viewport, 480p, 720p, 1080p, 1440p, 2160p and 24/30/60 fps; real-time playback requires in-world testing.'
-            'Video fixes: gap-filled CFR AVI playback, opt-in POV stabilization, independent HUD and interface capture controls.'
+            'Video fixes: H.264 MP4 output, timestamp-based CFR capture, opt-in POV stabilization and independent HUD and interface capture controls.'
             'Selection beam: presets, color, density, speed, PNG import; local to viewer.'
-            'Recorder CPU backpressure optimization carried from PR #13, in-world playback remains unverified.'
-            'MJPEG AVI supports optional mixed in-world output including received voice; mic narration and MP4/H.264 are NOT supported.'
-            'Verify AVI playback, frame quality and audio sync before any public release; respect participant consent.'
+            'Direct RGBA-to-H.264 encoding (no MJPEG intermediary) and bounded encoder queue. In-world playback remains unverified.'
+            'H.264 MP4/AAC implementation uses separately bundled GPLv3 FFmpeg. User microphone narration is NOT captured.'
+            'Verify real-world MP4 playback, frame quality, recording stop/finalization and audio sync before any public release; respect participant consent.'
+            'MP4 finalizes asynchronously after Stop; do not exit until saved confirmation. Verify real-world timing in-world.'
+            'GPLv3 source/distribution compliance needs review before any public release.'
             'Image/GIF name-tag customization is local only and must be tested in-world.'
             'This is not a production release; a CI build does not prove in-world functionality.'
             'Do not overwrite an earlier beta; extract to a NEW folder.'
             'Chrome previously flagged a Beta 27 download; do not bypass browser warnings.'
           ) | Set-Content -LiteralPath (Join-Path $folder 'BETA28-TESTING-STATUS.txt') -Encoding utf8
+
+      - name: Bundle separately licensed H.264 encoder in portable test package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $staged = Join-Path $env:RUNNER_TEMP 'waters-roux-qa-codecs'
+          $destination = 'Waters-Roux-Creator-Beta28-V2-Windows'
+          Copy-Item -LiteralPath (Join-Path $staged 'tools') -Destination (Join-Path $destination 'tools') -Recurse -Force
+          Copy-Item -LiteralPath (Join-Path $staged 'third-party') -Destination (Join-Path $destination 'third-party') -Recurse -Force
+          Copy-Item -LiteralPath (Join-Path $staged 'THIRD-PARTY-FFMPEG.txt') -Destination $destination -Force
+          if (-not (Test-Path -LiteralPath (Join-Path $destination 'tools/ffmpeg.exe'))) { throw 'MP4 encoder missing in package' }
+          if (-not (Test-Path -LiteralPath (Join-Path $destination 'third-party/ffmpeg') -PathType Container)) { throw 'FFmpeg GPL license missing from package' }
 
       - name: Verify official Waters Roux artwork, launcher and branding in Windows package
         shell: pwsh
@@ -138,7 +221,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $sourceDir = Join-Path $PWD 'assets/branding'
           $packageDir = Join-Path $PWD 'Waters-Roux-Creator-Beta28-V2-Windows/assets/branding'
-          foreach ($requiredFile in @('waters-roux-viewer.exe', 'Launch Waters Roux.cmd', 'waters-roux-portable.txt', 'START-HERE.txt')) {
+          foreach ($requiredFile in @('waters-roux-viewer.exe', 'Launch Waters Roux.cmd', 'waters-roux-portable.txt', 'START-HERE.txt', 'tools/ffmpeg.exe', 'tools/ffprobe.exe', 'THIRD-PARTY-FFMPEG.txt')) {
             if (-not (Test-Path -LiteralPath (Join-Path $PWD ('Waters-Roux-Creator-Beta28-V2-Windows/' + $requiredFile)) -PathType Leaf)) { throw "Missing branded viewer entry: $requiredFile" }
           }
           if (Test-Path -LiteralPath 'Waters-Roux-Creator-Beta28-V2-Windows/aurora-viewer.exe') { throw 'Aurora EXE packaged as Waters Roux' }
@@ -187,18 +270,26 @@ jobs:
       - name: ZIP and SHA256
         shell: pwsh
         run: |
-          $zip = 'Waters-Roux-Creator-Beta28-V2-Windows.zip'
+          $zip = 'Waters-Roux-H264-MP4-UNVERIFIED-Windows.zip'
           Compress-Archive -Path 'Waters-Roux-Creator-Beta28-V2-Windows' -DestinationPath $zip
           $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$sha  $zip" | Set-Content -LiteralPath "$zip.sha256" -Encoding utf8
           "SHA256: $sha"
 
-      - name: Upload portable testing candidate
+      # GitHub upload-artifact v7 supports direct single-file downloads.
+      # Keep the distribution ZIP directly inspectable instead of uploading
+      # an inner ZIP plus SHA manifest inside another GitHub-generated ZIP.
+      # This is QA-only packaging; it does NOT imply Safe Browsing approval.
+      - name: Upload direct distribution ZIP (QA only, not approved for installation)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Waters-Roux-Beta28-V2-BRANDED-Windows-Candidate
-          path: |
-            Waters-Roux-Creator-Beta28-V2-Windows.zip
-            Waters-Roux-Creator-Beta28-V2-Windows.zip.sha256
+          path: Waters-Roux-H264-MP4-UNVERIFIED-Windows.zip
+          archive: false
           retention-days: 14
-          compression-level: 6
+
+      - name: Upload separate SHA256 manifest for QA verification
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Waters-Roux-Beta28-V2-DirectZIP-SHA256-QA-ONLY
+          path: Waters-Roux-H264-MP4-UNVERIFIED-Windows.zip.sha256
+          retention-days: 14
