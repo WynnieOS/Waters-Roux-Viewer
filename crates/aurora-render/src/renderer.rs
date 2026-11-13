@@ -7435,8 +7435,8 @@ impl Backend {
             let c = self.cull.last;
             stats.draws += c.main_draws() + c.bins[BIN_WATER_EXCLUSION];
             stats.shadow_draws += c.shadow_draws();
-            for k in 0..CASCADES {
-                stats.shadow.draws[k] += c.cascade_draws(k);
+            for (k, draw_count) in stats.shadow.draws.iter_mut().enumerate().take(CASCADES) {
+                *draw_count += c.cascade_draws(k);
             }
             stats.shadow.triangles = c.shadow_triangles;
             stats.shadow.rigged_draws = c.shadow_rigged;
