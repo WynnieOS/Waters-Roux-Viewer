@@ -1,0 +1,92 @@
+name: Verify Beta 28 bundled FFmpeg against upstream
+
+on:
+  push:
+    branches:
+      - security/scan-beta28-exact-artifact
+    paths:
+      - .github/workflows/verify-beta28-ffmpeg-upstream.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/verify-beta28-ffmpeg-upstream.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify-upstream:
+    name: Compare exact packaged FFmpeg binaries with official upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download exact archived Waters Roux Beta 28 package
+        uses: actions/download-artifact@v4
+        with:
+          name: Waters-Roux-Beta28-V2-H264-MP4-Windows-QA-ONLY
+          run-id: 43318363971
+          repository: WynnieOS/Waters-Roux-Viewer
+          github-token: ${{ github.token }}
+          path: scan-input
+
+      - name: Download FFmpeg 9.0.2 essentials release from original publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --connect-timeout 20 --max-time 480 \
+            'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' \
+            -o upstream-ffmpeg.zip
+          echo '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba  upstream-ffmpeg.zip' | sha256sum --check -
+
+      - name: Verify original package SHA256 and compare actual FFmpeg/FFprobe bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import hashlib
+          root=Path.cwd()
+          original=root/'scan-input'/'Waters-Roux-H264-MP4-UNVERIFIED-Windows.zip'
+          reference=root/'upstream-ffmpeg.zip'
+          sha=lambda b: hashlib.sha256(b).hexdigest()
+          expected_package='ab6f569f9d602baca6a0499fb58eaddd059a874b9954cd07f9981793118ff6b2'
+          assert sha(original.read_bytes()) == expected_package, 'Original artifact digest mismatch'
+          expected_exes={
+             'ffmpeg.exe': '3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec',
+             'ffprobe.exe': 'f0d36ecbbdd3bcfac3efa078c96c7271c2e68b3810595552ac3b7f17e9a65c52',
+          }
+          with ZipFile(original) as a, ZipFile(reference) as b:
+             assert a.testzip() is None and b.testzip() is None, 'Damaged archive'
+             for filename,pinned_sha in expected_exes.items():
+                packaged=[s for s in a.namelist() if s.endswith('/tools/'+filename)]
+                upstream=[s for s in b.namelist() if s.endswith('/bin/'+filename)]
+                assert len(packaged)==1, f'Expected exactly one packaged {filename}: {packaged}'
+                assert len(upstream)==1, f'Expected exactly one upstream {filename}: {upstream}'
+                psha=sha(a.read(packaged[0]))
+                usha=sha(b.read(upstream[0]))
+                print(f'{filename}: packaged={psha}, upstream={usha}')
+                assert psha == pinned_sha, f'Unexpected packaged {filename} hash'
+                assert usha == pinned_sha, f'Packaged {filename} differs from upstream publisher binary'
+          with (root/'upstream-verification.txt').open('w') as report:
+             report.write('Original Beta 28 ZIP verified by SHA256.\\n')
+             report.write('Original bundled ffmpeg.exe and ffprobe.exe exactly match pinned official gyan.dev 9.0.2 essentials ZIP.\\n')
+             report.write('This does not determine Chrome Safe Browsing verdict or certify the viewer executable.\\n')
+          PY
+          {
+            echo '### FFmpeg 9.0.2 upstream byte-for-byte verification'
+            echo 'Verified original ZIP and official publisher archive against pinned SHA256 values.'
+            echo 'Compared the exact ffmpeg.exe and ffprobe.exe bytes from both archives.'
+            echo 'This does not override Chrome security warnings or certify the viewer itself.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish comparison report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Waters-Roux-FFmpeg-Upstream-Verification
+          path: upstream-verification.txt
+          if-no-files-found: ignore
