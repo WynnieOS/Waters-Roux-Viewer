@@ -80,9 +80,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # clamscan returns 0 for a completed clean scan, 1 for detections,
+          # and 2 for errors. Do not require a nonexistent "Total errors" line.
           clamscan --recursive --infected --scan-archive=yes --max-filesize=256M --max-scansize=1024M --max-recursion=20 --log=clamav-scan.log scan-input extracted
-          grep -q 'Infected files: 0' clamav-scan.log
-          grep -q 'Total errors: 0' clamav-scan.log
+          grep -Eq '^Infected files:[[:space:]]+0
+          {
+            echo '### ClamAV result for exact browser-blocked artifact'
+            echo 'Verified inner ZIP SHA256: `ab6f569f9d602baca6a0499fb58eaddd059a874b9954cd07f9981793118ff6b2`'
+            echo 'ClamAV signature database updated; zero detections and zero scan errors reported.'
+            echo 'No viewer executable was launched. Clean ClamAV is not a guarantee of safety or Chrome clearance.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload scan manifest and log (even if scanner fails)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Waters-Roux-Beta28-Independent-Scan-Report
+          path: |
+            scan-manifest.txt
+            clamav-scan.log
+          if-no-files-found: ignore
+ clamav-scan.log
+          if grep -Eq '(^|[[:space:]])(ERROR|FOUND)[:[:space:]]' clamav-scan.log; then
+            echo 'ClamAV output contains an error or detection; inspect scan report' >&2
+            exit 1
+          fi
           {
             echo '### ClamAV result for exact browser-blocked artifact'
             echo 'Verified inner ZIP SHA256: `ab6f569f9d602baca6a0499fb58eaddd059a874b9954cd07f9981793118ff6b2`'
