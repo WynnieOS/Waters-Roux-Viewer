@@ -19,6 +19,21 @@ use std::{
 
 use super::{AUDIO_CHANNELS, Options, Packet, SAMPLE_RATE, dimensions, expected_frames};
 
+/// FFmpeg is a console application on Windows, but Waters Roux is a GUI.
+/// Without CREATE_NO_WINDOW, each probe/record/mux can flash a command prompt
+/// and steal focus from the viewer. Background throttling can then freeze
+/// the in-world scene that the recorder is supposed to capture.
+fn ffmpeg_command(executable: &Path) -> Command {
+    let mut command = Command::new(executable);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
 /// Prefer the bundled, pinned build. A resident can override it explicitly
 /// for development; finally allow an FFmpeg already installed on the PATH.
 pub(super) fn locate_encoder() -> Result<PathBuf, String> {
@@ -35,7 +50,7 @@ pub(super) fn locate_encoder() -> Result<PathBuf, String> {
     paths.push(PathBuf::from("ffmpeg"));
 
     for candidate in paths {
-        let Ok(probe) = Command::new(&candidate)
+        let Ok(probe) = ffmpeg_command(&candidate)
             .args(["-hide_banner", "-encoders"])
             .stdin(Stdio::null())
             .output()
@@ -73,7 +88,7 @@ impl VideoEncoder {
         // The old persisted field name remains for backwards compatibility.
         // Lower x264 CRF means higher visual quality: range 16..26.
         let crf = (16 + (100 - u32::from(options.jpeg_quality)) / 2).to_string();
-        let child = Command::new(ffmpeg)
+        let child = ffmpeg_command(ffmpeg)
             .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"])
             .args(["-f", "rawvideo", "-pixel_format", "rgba", "-video_size", &size])
             .args(["-framerate", &fps, "-i", "pipe:0"])
@@ -253,7 +268,7 @@ pub(super) fn encode(
     check_mp4(&video_work)?;
 
     if audio_bytes > 0 {
-        let result = Command::new(&ffmpeg)
+        let result = ffmpeg_command(&ffmpeg)
             .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"])
             .arg("-i")
             .arg(&video_work)
