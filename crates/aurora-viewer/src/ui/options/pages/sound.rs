@@ -527,6 +527,8 @@ fn voice(cx: &mut Cx) {
         );
     });
     cx.group(tr!("voice-indicators"), |cx| {
+        // Color overrides share the existing saved color preferences while
+        // keeping all voice controls discoverable in one settings page.
         cx.row(
             "Quiet speaking color",
             "Voice outlines, microphone badges, and nameplate glow. Keep Theme to match the active skin.",
