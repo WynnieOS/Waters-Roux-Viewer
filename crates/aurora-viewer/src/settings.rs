@@ -1571,6 +1571,11 @@ pub struct ColorSettings {
     pub voice_quiet: Option<Rgba>,
     pub voice_medium: Option<Rgba>,
     pub voice_loud: Option<Rgba>,
+    /// Idle microphone: participant is in voice but not speaking.
+    pub voice_idle: Option<Rgba>,
+    /// Microphone-off badge: participant is unavailable/not in voice.
+    /// Do not confuse this with proof the participant muted themselves.
+    pub voice_unavailable: Option<Rgba>,
     // minimap
     pub map_me: Rgba,
     pub map_other: Rgba,
@@ -1624,6 +1629,8 @@ impl Default for ColorSettings {
             voice_quiet: None,
             voice_medium: None,
             voice_loud: None,
+            voice_idle: None,
+            voice_unavailable: None,
             map_me: hex(0x8B5CF6),
             map_other: hex(0x4ADE80),
             map_friend: hex(0x818CF8),
