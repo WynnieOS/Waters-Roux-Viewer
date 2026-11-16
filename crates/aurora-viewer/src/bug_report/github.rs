@@ -6,11 +6,12 @@ use crossbeam_channel::{Receiver, Sender};
 use serde_json::Value;
 use std::time::{Duration, Instant};
 
-pub const ISSUES: &str = "https://github.com/Aurora-Viewer/Aurora-Viewer/issues";
-const API: &str = "https://api.github.com/repos/Aurora-Viewer/Aurora-Viewer/issues";
+pub const ISSUES: &str = crate::links::FEATURE_REQUESTS;
+const API: &str = "https://api.github.com/repos/WynnieOS/Waters-Roux-Viewer/issues";
 pub const VERIFY: &str = "https://github.com/login/device";
-// Public identifier, supplied by the project's GitHub App registration.
-pub const CLIENT_ID: &str = "Iv23liT7PLWClMLztI1W";
+// No dedicated Waters Roux GitHub App has been verified. Disable direct OAuth
+// until its own public client ID is configured; the browser flow stays available.
+pub const CLIENT_ID: &str = "";
 
 pub struct BrowserDraft {
     pub url: String,
@@ -20,8 +21,6 @@ pub struct BrowserDraft {
 pub fn browser_draft(title: &str, body: &str) -> BrowserDraft {
     let mut url = reqwest::Url::parse(&format!("{ISSUES}/new")).expect("constant project URL");
     url.query_pairs_mut()
-        .append_pair("template", "bug_report.md")
-        .append_pair("labels", "bug,alpha")
         .append_pair("title", title)
         .append_pair("body", body);
     // Percent encoding grows non-ASCII text substantially. Preserve the full
@@ -30,8 +29,6 @@ pub fn browser_draft(title: &str, body: &str) -> BrowserDraft {
     if paste_body {
         url.set_query(None);
         url.query_pairs_mut()
-            .append_pair("template", "bug_report.md")
-            .append_pair("labels", "bug,alpha")
             .append_pair("title", title);
     }
     BrowserDraft {
@@ -331,7 +328,7 @@ fn create_issue(token: &str, title: String, body: String) -> Result<u64, Failure
 }
 
 async fn create_request(client: &reqwest::Client, url: &str, token: &str, title: &str, body: &str) -> Result<u64, Failure> {
-    let body = serde_json::to_vec(&serde_json::json!({ "title": title, "body": body, "labels": ["bug", "alpha"] }))
+    let body = serde_json::to_vec(&serde_json::json!({ "title": title, "body": body }))
         .map_err(|_| Failure::Invalid)?;
     // A create request is never retried automatically: a timeout can mean
     // the server created the issue but its reply was lost.
@@ -446,7 +443,7 @@ mod tests {
             let sent: Value = serde_json::from_str(body).unwrap();
             assert_eq!(sent["title"], report.title);
             assert_eq!(sent["body"], preview);
-            assert_eq!(sent["labels"], serde_json::json!(["bug", "alpha"]));
+            assert!(sent.get("labels").is_none(), "resident bug reports must not require triage permissions");
             assert!(!body.contains("UNCHECKED_"));
             assert!(!body.contains("test-only"));
         }

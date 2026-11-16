@@ -17,7 +17,7 @@ fn preserved_report_keeps_crashed_session_language_draft_and_privacy_choices() {
         true,
     );
     assert!(state.open);
-    assert!(state.delivery == Delivery::Direct);
+    assert!(state.delivery == Delivery::Browser);
     assert!(!state.include_image);
     assert!(!state.report.include_excerpt);
     assert_eq!(state.capture_requested, None);
@@ -141,7 +141,7 @@ fn new_report_opens_description_even_without_automatic_fields() {
     };
     state.begin(vec![], false);
     assert_eq!(state.tab, 0);
-    assert!(state.delivery == Delivery::Direct);
+    assert!(state.delivery == Delivery::Browser);
     state.report.title = "Draft with no automatic fields".into();
     state.tab = 1;
     state.open = false;
@@ -201,7 +201,7 @@ fn failed_delivery_keeps_draft_but_confirmed_issue_starts_a_fresh_description() 
     state.begin(vec![Field::new("bug-location", "Location", "NEW_LOCATION", true)], false);
     assert!(state.open);
     assert_eq!(state.tab, 0);
-    assert!(state.delivery == Delivery::Direct);
+    assert!(state.delivery == Delivery::Browser);
     assert!(state.report.title.is_empty());
     assert_eq!(state.report.fields[0].value, "NEW_LOCATION");
     assert!(state.report.fields[0].included);
@@ -227,7 +227,7 @@ fn browser_draft_is_only_reset_after_explicit_publication_confirmation() {
     state.confirm_browser_publication();
     state.begin(vec![], false);
     assert_eq!(state.tab, 0);
-    assert!(state.delivery == Delivery::Direct);
+    assert!(state.delivery == Delivery::Browser);
     assert!(state.report.title.is_empty());
     assert!(!state.browser_opened);
 }

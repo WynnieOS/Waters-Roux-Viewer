@@ -1,0 +1,29 @@
+name: Waters Roux Feature Request
+description: Suggest a new feature or improvement for Waters Roux Viewer
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Waters Roux! Please avoid posting private Second Life account details or personal information.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the workflow or limitation.
+      placeholder: I want to be able to...
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed feature
+      description: What should Waters Roux do differently?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or examples (optional)
+      description: You may include public screenshots or links. Please don't upload private data.
+    validations:
+      required: false

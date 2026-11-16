@@ -10,12 +10,13 @@ use crossbeam_channel::{Receiver, Sender};
 use serde_json::Value;
 use std::time::{Duration, Instant};
 
-const API: &str = "https://api.github.com/repos/Aurora-Viewer/Aurora-Viewer/issues";
-pub const ISSUES: &str = "https://github.com/Aurora-Viewer/Aurora-Viewer/issues";
+const API: &str = "https://api.github.com/repos/WynnieOS/Waters-Roux-Viewer/issues";
+pub const ISSUES: &str = crate::links::FEATURE_REQUESTS;
 pub const VERIFY: &str = "https://github.com/login/device";
 const TOKEN: &str = "https://github.com/login/oauth/access_token";
-// Public identifier of the project's GitHub App (Device Flow enabled).
-const CLIENT_ID: &str = "Iv23liT7PLWClMLztI1W";
+// The upstream GitHub App is not a Waters Roux app. Leave direct OAuth
+// unavailable until a separately authorized Waters Roux App is configured.
+const CLIENT_ID: &str = "";
 const SERVICE: &str = "Waters Roux Viewer Beta GitHub";
 const ACCOUNT: &str = "crash-reports";
 /// The credential store's entry of the authorization (service, account),
@@ -160,7 +161,7 @@ pub struct Session {
 impl Session {
     pub fn new(demo: bool) -> Self {
         Self {
-            authorization: if demo { None } else { load() },
+            authorization: if demo || CLIENT_ID.is_empty() { None } else { load() },
             rx: None,
             cancel: None,
             user_code: None,
@@ -179,7 +180,7 @@ impl Session {
     }
 
     pub fn connected(&self) -> bool {
-        self.authorization.as_ref().is_some_and(|a| a.usable(now()))
+        (self.demo || !CLIENT_ID.is_empty()) && self.authorization.as_ref().is_some_and(|a| a.usable(now()))
     }
 
     pub fn authorizing(&self) -> bool {
@@ -233,6 +234,10 @@ impl Session {
             return;
         }
         self.failure = None;
+        if !self.demo && CLIENT_ID.is_empty() {
+            self.failure = Some(Failure::Configuration);
+            return;
+        }
         let (tx, rx) = crossbeam_channel::bounded(2);
         let (cancel_tx, cancel_rx) = crossbeam_channel::bounded(1);
         self.cancel = Some(cancel_tx);
@@ -272,7 +277,7 @@ impl Session {
     /// Creates the issue. Never retried automatically: a lost reply can
     /// mean the issue exists.
     pub fn send(&mut self, title: String, body: String) {
-        if self.rx.is_some() || self.created.is_some() {
+        if (!self.demo && CLIENT_ID.is_empty()) || self.rx.is_some() || self.created.is_some() {
             return;
         }
         let Some(authorization) = self.authorization.clone().filter(|a| a.usable(now())) else {
