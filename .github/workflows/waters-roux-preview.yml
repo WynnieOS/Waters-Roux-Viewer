@@ -51,13 +51,18 @@ jobs:
         run: cargo build --release --locked -p aurora-viewer --features xr-static-loader
       - name: Assemble accurately labeled development preview
         shell: pwsh
+        # Keep branch names in environment variables rather than interpolating
+        # untrusted pull-request text into executable PowerShell.
+        env:
+          WR_SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
+          WR_BASE_BRANCH: ${{ github.base_ref }}
+          WR_SOURCE_SHA: ${{ github.sha }}
         run: |
           $ErrorActionPreference = 'Stop'
           # A PR is built from its source branch or the merge branch. Never guess
           # the product version from github.sha or the Actions run number.
-          $sourceBranch = '${{ github.head_ref }}'
-          if (-not $sourceBranch) { $sourceBranch = '${{ github.ref_name }}' }
-          $baseBranch = '${{ github.base_ref }}'
+          $sourceBranch = $env:WR_SOURCE_BRANCH
+          $baseBranch = $env:WR_BASE_BRANCH
           $isV3 = ($sourceBranch -match '(^|[-/])v3([-/]|$)') -or ($baseBranch -match '(^|[-/])v3([-/]|$)')
           if ($isV3) {
             $betaLabel = 'Beta 28 V3'
@@ -66,7 +71,7 @@ jobs:
             $betaLabel = 'Beta 27'
             $slug = 'Beta-27'
           }
-          $folder = "Waters-Roux-Viewer-$slug-${{ github.sha }}"
+          $folder = "Waters-Roux-Viewer-$slug-$env:WR_SOURCE_SHA"
           $zip = "Waters-Roux-Viewer-$slug-Windows.zip"
           $artifact = "Waters-Roux-Viewer-$slug-Windows"
           ./scripts/package-waters-roux-preview.ps1 -Exe target/release/aurora-viewer.exe -Out $folder -BetaLabel $betaLabel
@@ -90,7 +95,7 @@ jobs:
             'UNRELEASED WATERS ROUX DEVELOPMENT PREVIEW'
             "Requested code line: $betaLabel"
             "Source branch: $sourceBranch"
-            "GitHub Actions commit: ${{ github.sha }}"
+            "GitHub Actions commit: $env:WR_SOURCE_SHA"
             'Do not install over the current viewer, distribute to residents, or claim this is the approved Beta 28 V3.'
             'Automated compilation is not in-world QA. The 18-section acceptance gate remains open.'
           ) | Set-Content -LiteralPath (Join-Path $folder 'DEVELOPMENT-NOT-FOR-RELEASE.txt') -Encoding utf8
