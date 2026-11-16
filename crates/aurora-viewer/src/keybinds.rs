@@ -2166,9 +2166,7 @@ mod tests {
     #[test]
     fn quick_record_defaults_to_f9_and_migrates_existing_bindings() {
         let mut shortcuts = KeyBindings::default();
-        let first = shortcuts.get(Action::QuickRecord)[0]
-            .clone()
-            .expect("default F9 quick recorder");
+        let first = shortcuts.get(Action::QuickRecord)[0].clone().expect("default F9 quick recorder");
         assert_eq!(first.input, Input::key(KeyCode::F9));
         shortcuts.map.retain(|(action, _)| *action != Action::QuickRecord);
         let restored = shortcuts.sanitized();

@@ -13570,15 +13570,18 @@ impl App {
     /// Never restart while an MP4 is already saving.
     fn start_video_recording(&mut self) {
         if self.recorder.finalizing() {
-            self.world.system_message("An MP4 is still finalizing. Finish saving before recording again.".to_owned());
+            self.world
+                .system_message("An MP4 is still finalizing. Finish saving before recording again.".to_owned());
             return;
         }
         if self.recorder.active() {
-            self.world.system_message("Video recording is already active. Press F9 again to stop.".to_owned());
+            self.world
+                .system_message("Video recording is already active. Press F9 again to stop.".to_owned());
             return;
         }
         if !self.in_world() {
-            self.world.system_message("Enter Second Life before starting the video recorder.".to_owned());
+            self.world
+                .system_message("Enter Second Life before starting the video recorder.".to_owned());
             return;
         }
         match self.recorder.start(self.settings.recording, self.audio_engine.as_ref()) {
@@ -13602,9 +13605,9 @@ impl App {
             self.set_show_huds(previous);
         }
         match result {
-            Ok(true) => self.world.system_message(
-                "Finalizing H.264 MP4 in the background. Keep Waters Roux open until saved confirmation.".to_owned(),
-            ),
+            Ok(true) => self
+                .world
+                .system_message("Finalizing H.264 MP4 in the background. Keep Waters Roux open until saved confirmation.".to_owned()),
             Ok(false) => self.world.system_message("No recording is active.".to_owned()),
             Err(error) => self.world.system_message(format!("MP4 finalize failed: {error}")),
         }
