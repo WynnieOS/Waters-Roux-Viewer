@@ -1,9 +1,17 @@
-﻿<# Waters Roux Viewer Beta 27 portable development packaging; never a production release. #>
+﻿<# Waters Roux portable development packaging for Beta 27 or Beta 28 V3; never a production release. #>
 param(
     [Parameter(Mandatory)][string]$Exe,
-    [Parameter(Mandatory)][string]$Out
+    [Parameter(Mandatory)][string]$Out,
+    [ValidateSet('Beta 27', 'Beta 28 V3')][string]$BetaLabel = 'Beta 27'
 )
 $ErrorActionPreference = 'Stop'
+$previewFolderLabel = if ($BetaLabel -eq 'Beta 28 V3') { 'Beta-28-V3' } else { 'Beta-27' }
+$acceptanceSource = if ($BetaLabel -eq 'Beta 28 V3') {
+    'docs/WATERS_ROUX_BETA28_V3_ACCEPTANCE.md'
+} else {
+    'docs/WATERS_ROUX_BETA27.md'
+}
+$acceptanceLabel = if ($BetaLabel -eq 'Beta 28 V3') { 'BETA-28-V3-ACCEPTANCE.md' } else { 'BETA-27-ACCEPTANCE.md' }
 $source = Split-Path $PSScriptRoot -Parent
 $logo = Join-Path $source 'assets/branding/waters-roux-logo.png'
 $icon = Join-Path $source 'assets/branding/waters-roux.ico'
@@ -16,7 +24,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $Out 'assets/branding') | O
 Move-Item -LiteralPath (Join-Path $Out 'aurora-viewer.exe') -Destination (Join-Path $Out 'waters-roux-viewer.exe')
 if (Test-Path $icon) { Copy-Item -LiteralPath $icon -Destination (Join-Path $Out 'assets/branding/waters-roux.ico') }
 'Waters Roux portable development profile v1' | Set-Content -LiteralPath (Join-Path $Out 'waters-roux-portable.txt') -Encoding utf8
-@'
+$launchScript = @'
 @echo off
 cd /d "%~dp0"
 if not exist "profile" mkdir "profile"
@@ -28,8 +36,9 @@ if errorlevel 1 (
 )
 del "profile\write-test.tmp"
 start "Waters Roux Viewer - Beta 27" "waters-roux-viewer.exe" %*
-'@ | Set-Content -LiteralPath (Join-Path $Out 'Launch Waters Roux.cmd') -Encoding ascii
-@'
+'@
+$launchScript.Replace('Beta 27', $BetaLabel) | Set-Content -LiteralPath (Join-Path $Out 'Launch Waters Roux.cmd') -Encoding ascii
+$startHere = @'
 WATERS ROUX VIEWER — BETA 27 — PORTABLE DEVELOPMENT PREVIEW
 
 1. Extract the complete ZIP into a NEW writable folder, for example
@@ -74,11 +83,19 @@ See BETA-27-ACCEPTANCE.md for the current acceptance and human test checklist.
 Built on Aurora Viewer. LICENSE, NOTICE.md, dictionary and emoji licenses
 are included. Source: https://github.com/WynnieOS/Waters-Roux-Viewer
 The build commit and exact version are in BUILD-INFO.txt.
-'@ | Set-Content -LiteralPath (Join-Path $Out 'START-HERE.txt') -Encoding utf8
+'@
+$startHere.Replace('BETA 27', $BetaLabel.ToUpperInvariant()).Replace('Beta-27', $previewFolderLabel).Replace('BETA-27-ACCEPTANCE.md', $acceptanceLabel) |
+    Set-Content -LiteralPath (Join-Path $Out 'START-HERE.txt') -Encoding utf8
 $version = (& (Join-Path (Resolve-Path $Out).Path 'waters-roux-viewer.exe') --version | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or $version -notmatch '^Waters Roux Viewer ') { throw 'Packaged executable is not Waters Roux branded.' }
 $commit = (git -C $source rev-parse HEAD | Out-String).Trim()
-"Waters Roux Viewer — Beta 27`n$version`nSource commit: $commit`nDevelopment preview only." | Set-Content -LiteralPath (Join-Path $Out 'BUILD-INFO.txt') -Encoding utf8
+@(
+    "Waters Roux Viewer — $BetaLabel"
+    $version
+    "Source commit: $commit"
+    'Development preview only; this is NOT a public beta release.'
+    'Master V3 acceptance and in-world QA must pass before any distribution.'
+) | Set-Content -LiteralPath (Join-Path $Out 'BUILD-INFO.txt') -Encoding utf8
 $missingArtwork = [Collections.Generic.List[string]]::new()
 foreach ($name in @('waters-roux-logo.png', 'waters-roux-background.png', 'waters-roux-loading-background.png')) {
     $original = Join-Path $source "assets/branding/$name"
@@ -95,7 +112,7 @@ foreach ($name in @('waters-roux-logo.png', 'waters-roux-background.png', 'water
 if (-not (Test-Path -LiteralPath $icon -PathType Leaf)) { $missingArtwork.Add('waters-roux.ico (derived only from the approved original logo)') }
 if ($missingArtwork.Count -gt 0) {
     @(
-        'BETA 27: OFFICIAL ARTWORK IS INCOMPLETE; VISUAL DESIGN IS NOT APPROVED.'
+        ($BetaLabel.ToUpperInvariant() + ': OFFICIAL ARTWORK IS INCOMPLETE; VISUAL DESIGN IS NOT APPROVED.')
         'Missing source files:'
         $missingArtwork
         ''
@@ -103,4 +120,8 @@ if ($missingArtwork.Count -gt 0) {
         'Personal artwork can be chosen locally in Login Appearance / Branding without rebuilding.'
     ) | Set-Content -LiteralPath (Join-Path $Out 'MISSING-ARTWORK.txt') -Encoding utf8
 }
-Copy-Item -LiteralPath (Join-Path $source 'docs/WATERS_ROUX_BETA27.md') -Destination (Join-Path $Out 'BETA-27-ACCEPTANCE.md')
+$acceptancePath = Join-Path $source $acceptanceSource
+if (-not (Test-Path -LiteralPath $acceptancePath -PathType Leaf)) {
+    throw "Required acceptance checklist missing: $acceptanceSource"
+}
+Copy-Item -LiteralPath $acceptancePath -Destination (Join-Path $Out $acceptanceLabel)
