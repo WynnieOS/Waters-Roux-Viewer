@@ -4088,8 +4088,10 @@ mod tests {
 
     #[test]
     fn cinematic_follow_aims_at_an_animated_joint_and_returns_to_normal_view() {
-        let mut camera = Camera::default();
-        camera.initialized = true;
+        let mut camera = Camera {
+            initialized: true,
+            ..Camera::default()
+        };
         let mut settings = CameraSettings {
             cinematic_target: CinematicTarget::Head,
             cinematic_follow_half_life: 0.0,
@@ -4114,8 +4116,10 @@ mod tests {
     #[test]
     fn cinematic_smoothing_is_frame_rate_independent_and_ignores_invalid_joint_positions() {
         let run = |fps: u32| {
-            let mut camera = Camera::default();
-            camera.initialized = true;
+            let mut camera = Camera {
+                initialized: true,
+                ..Camera::default()
+            };
             let settings = CameraSettings {
                 cinematic_target: CinematicTarget::Torso,
                 cinematic_follow_half_life: 0.15,
