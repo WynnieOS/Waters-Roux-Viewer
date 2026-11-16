@@ -2,10 +2,17 @@
 //! it exposes live camera/lighting render settings and an opt-in native recorder.
 
 use super::widgets::{self, ActionKind, Floater};
-use crate::{settings::Settings, theme::Palette};
+use crate::{camera::CinematicTarget, settings::Settings, theme::Palette};
 use egui::{Context, Vec2};
 
 pub const WINDOW: &str = "waters_roux_machinima";
+
+/// Match Preferences and PhotoTools: the renderer's shadow switch and
+/// quality slider must always stay in sync.
+fn set_machinima_shadow_quality(settings: &mut Settings, quality: u8) {
+    settings.shadow_quality = quality.min(4);
+    settings.shadows = settings.shadow_quality > 0;
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Action {
@@ -109,6 +116,30 @@ pub fn show(
                     .add(egui::Slider::new(&mut settings.camera.smoothing, 0.0..=50.0).text("Camera movement smoothing"))
                     .changed();
                 changed |= widgets::switch_labeled(ui, p, &mut settings.camera.track_focus_object, "Keep focused object tracked").changed();
+                widgets::divider(ui, p);
+                ui.label("Cinematic skeleton follow (your own animated avatar)");
+                ui.horizontal_wrapped(|ui| {
+                    for (target, label) in [
+                        (CinematicTarget::Off, "Off"),
+                        (CinematicTarget::Head, "Head"),
+                        (CinematicTarget::Torso, "Torso"),
+                        (CinematicTarget::LeftArm, "Left arm"),
+                        (CinematicTarget::RightArm, "Right arm"),
+                    ] {
+                        changed |= ui
+                            .selectable_value(&mut settings.camera.cinematic_target, target, label)
+                            .changed();
+                    }
+                });
+                if settings.camera.cinematic_target != CinematicTarget::Off {
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut settings.camera.cinematic_follow_half_life, 0.0..=2.0)
+                                .text("Joint-follow smoothing (s)"),
+                        )
+                        .changed();
+                    ui.small("Third-person camera only. Follows the selected rendered joint; Flycam, POV and scripted cameras keep their own behavior.");
+                }
                 changed |= widgets::switch_labeled(
                     ui,
                     p,
@@ -142,9 +173,11 @@ pub fn show(
                             .changed();
                     }
                     changed |= widgets::switch_labeled(ui, p, &mut settings.ssr, "Screen-space reflections").changed();
-                    changed |= ui
-                        .add(egui::Slider::new(&mut settings.shadow_quality, 0..=4).text("Shadow quality"))
-                        .changed();
+                    let mut quality = settings.shadow_quality;
+                    if ui.add(egui::Slider::new(&mut quality, 0..=4).text("Shadow quality")).changed() {
+                        set_machinima_shadow_quality(settings, quality);
+                        changed = true;
+                    }
                     changed |= ui
                         .add(egui::Slider::new(&mut settings.draw_distance, 32.0..=1024.0).text("Draw distance (m)"))
                         .changed();
@@ -241,6 +274,17 @@ pub fn show(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn machinima_shadow_slider_updates_the_actual_renderer_switch() {
+        let mut settings = Settings::default();
+        set_machinima_shadow_quality(&mut settings, 0);
+        assert_eq!(settings.shadow_quality, 0);
+        assert!(!settings.shadows);
+        set_machinima_shadow_quality(&mut settings, 3);
+        assert_eq!(settings.shadow_quality, 3);
+        assert!(settings.shadows);
+    }
+
     #[test]
     fn machinima_actions_are_explicit() {
         assert_eq!(Action::default(), Action::None);
