@@ -485,7 +485,10 @@ mod tests {
         ] {
             assert!(parse(invalid).is_none(), "invalid SLURL accepted: {invalid}");
         }
-        assert_eq!(p("https://maps.secondlife.com/secondlife/Ahern"), ("Ahern".to_owned(), [128, 128, 0]));
+        assert_eq!(
+            p("https://maps.secondlife.com/secondlife/Ahern"),
+            ("Ahern".to_owned(), [128, 128, 0])
+        );
     }
 
     #[test]
