@@ -555,10 +555,7 @@ fn badge_icon(p: &Palette, badge: Badge) -> Option<(&'static str, Color32)> {
             Color32::from_rgba_premultiplied(color[0], color[1], color[2], color[3]),
         ),
         Badge::More(_) => return None,
-        Badge::Voice => (
-            "microphone-filled",
-            crate::ui::colors::get().voice_quiet.map(crate::ui::colors::c).unwrap_or(p.success),
-        ),
+        Badge::Voice => ("microphone-filled", crate::ui::voice_tag::idle_color(p, &crate::ui::colors::get())),
         Badge::Friend => ("heart-filled", p.success),
         Badge::TooComplex => ("alert-triangle-filled", p.amber),
         Badge::RenderNever => ("eye-off", p.amber),
