@@ -373,14 +373,14 @@ fn clamp_side(v: u32) -> u32 {
     v.clamp(MIN_SIDE, MAX_SIDE)
 }
 
-/// `<Pictures>/Aurora Viewer`, or the data folder when there is no
+/// `<Pictures>/Waters Roux`, or the data folder when there is no
 /// pictures folder (Firestorm asks the first time; a ready folder lets the
-/// first photo be one click).
+/// first photo be one click). Previously saved pictures are never moved.
 pub fn default_folder() -> PathBuf {
     directories::UserDirs::new()
         .and_then(|d| d.picture_dir().map(Path::to_path_buf))
         .unwrap_or_else(|| crate::settings::config_dir().join("photos"))
-        .join("Aurora Viewer")
+        .join("Waters Roux")
 }
 
 /// Size of a photo: the preset's long side with the proportions, the
