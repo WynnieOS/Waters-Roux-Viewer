@@ -31,7 +31,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-const LIMIT_SECONDS: u64 = 300;
+// Prevent unbounded recording size while allowing normal long-form filming.
+// The viewer automatically finalizes at this limit rather than freezing the last frame.
+const LIMIT_SECONDS: u64 = 1_800;
 const SAMPLE_RATE: u32 = 48_000;
 const AUDIO_CHANNELS: u16 = 2;
 #[cfg(test)]
@@ -201,12 +203,19 @@ impl Recorder {
         Ok(output)
     }
 
+    /// The app must stop and finalize at the time limit. Returning false from
+    /// `needs_frame` alone would leave the last frame frozen indefinitely.
+    pub fn reached_time_limit(&self, now: Instant) -> bool {
+        self.session.as_ref().is_some_and(|s| {
+            now.saturating_duration_since(s.started) >= Duration::from_secs(LIMIT_SECONDS)
+        })
+    }
+
     /// Only ask the renderer for a frame after all higher priority still
     /// captures have cleared. Keep the GPU readback from multiplying.
     pub fn needs_frame(&mut self, now: Instant) -> bool {
         let Some(s) = self.session.as_mut() else { return false };
-        if s.started.elapsed().as_secs() >= LIMIT_SECONDS {
-            self.message = Some("Video reached 5-minute safety limit. Stop to finalize the MP4.".into());
+        if now.saturating_duration_since(s.started) >= Duration::from_secs(LIMIT_SECONDS) {
             return false;
         }
         // Recover from an interrupted GPU frame rather than hanging forever.
@@ -673,7 +682,9 @@ mod tests {
         assert_eq!(expected_frames(Duration::from_secs(2), 30), 60);
         assert_eq!(expected_frames(Duration::from_millis(1500), 30), 45);
         assert_eq!(expected_frames(Duration::ZERO, 30), 0);
-        assert_eq!(expected_frames(Duration::from_secs(360), 30), 9000);
+        assert_eq!(expected_frames(Duration::from_secs(360), 30), 10_800);
+        assert_eq!(expected_frames(Duration::from_secs(1_800), 30), 54_000);
+        assert_eq!(expected_frames(Duration::from_secs(2_400), 30), 54_000);
     }
     #[test]
     fn slow_capture_keeps_the_original_recording_duration() {
