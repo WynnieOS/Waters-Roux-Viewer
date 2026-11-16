@@ -101,7 +101,7 @@ pub const COMMANDS: &[Command] = commands![
     "water_walk", "walk", "movement-water-walk", true;
     "resync_animations", "refresh", "toolbar-command-resync-animations", true;
     "regiontracker", "location-filled", "toolbar-command-region-tracker", true;
-    "group_titles", "tags-filled", "toolbar-command-group-titles", true;
+    "group_titles", "id-badge-2", "toolbar-command-group-titles", true;
     "wearable_favorites", "hanger-2-filled", "toolbar-command-wearable-favorites", true;
     "discord", "brand-discord-filled", "toolbar-command-discord", true;
     "360capture", "panorama-horizontal-filled", "toolbar-command-360-snapshot", true;
@@ -142,4 +142,26 @@ pub fn find(id: &str) -> Option<&'static Command> {
 /// Whether Aurora runs `id`: every command a skin brings is taken as one.
 pub fn ready(id: &str) -> bool {
     find(id).is_none_or(|c| c.ready)
+}
+
+#[cfg(test)]
+mod waters_roux_toolbar_identity_tests {
+    use super::*;
+
+    #[test]
+    fn all_primary_creator_windows_have_distinct_icons() {
+        let ids = ["group_titles", "nametagstudio", "machinima", "phototools", "view"];
+        let mut icons = std::collections::HashSet::new();
+        for id in ids {
+            let command = find(id).expect("primary creator toolbar command exists");
+            assert!(command.ready, "{id} must remain accessible from the toolbar");
+            assert!(icons.insert(command.icon), "{id} reuses another creator tool icon");
+        }
+    }
+
+    #[test]
+    fn obsolete_phototools_camera_is_not_in_toolbar_catalogue() {
+        assert!(find("phototools_view").is_none());
+        assert!(find("phototools").is_some());
+    }
 }
