@@ -394,25 +394,45 @@ mod tests {
         check_mp4(&final_mp4).expect("final AAC MP4 container");
         let result = ffmpeg_command(&ffprobe)
             .args([
-                "-v", "error", "-show_entries", "stream=codec_name,codec_type,channels,sample_rate",
-                "-show_entries", "format=duration", "-of", "json",
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_name,codec_type,channels,sample_rate",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
             ])
             .arg(&final_mp4)
             .stdin(Stdio::null())
             .output()
             .expect("probe AAC MP4");
-        assert!(result.status.success(), "ffprobe failed: {}", String::from_utf8_lossy(&result.stderr));
+        assert!(
+            result.status.success(),
+            "ffprobe failed: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
         let metadata: serde_json::Value = serde_json::from_slice(&result.stdout).expect("ffprobe JSON");
         let streams = metadata["streams"].as_array().expect("streams");
-        assert!(streams.iter().any(|s| s["codec_type"] == "video" && s["codec_name"] == "h264"), "H.264 stream required: {metadata}");
         assert!(
-            streams.iter().any(|s| {
-                s["codec_type"] == "audio" && s["codec_name"] == "aac" && s["channels"] == 2 && s["sample_rate"] == "48000"
-            }),
+            streams.iter().any(|s| s["codec_type"] == "video" && s["codec_name"] == "h264"),
+            "H.264 stream required: {metadata}"
+        );
+        assert!(
+            streams
+                .iter()
+                .any(|s| { s["codec_type"] == "audio" && s["codec_name"] == "aac" && s["channels"] == 2 && s["sample_rate"] == "48000" }),
             "48kHz stereo AAC must survive real muxing: {metadata}"
         );
-        let duration: f64 = metadata["format"]["duration"].as_str().expect("duration").parse().expect("numeric duration");
-        assert!((0.95..=1.10).contains(&duration), "1s recording must not play at 2x speed: {duration}");
+        let duration: f64 = metadata["format"]["duration"]
+            .as_str()
+            .expect("duration")
+            .parse()
+            .expect("numeric duration");
+        assert!(
+            (0.95..=1.10).contains(&duration),
+            "1s recording must not play at 2x speed: {duration}"
+        );
         let decode = ffmpeg_command(&ffmpeg)
             .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i"])
             .arg(&final_mp4)
@@ -420,7 +440,11 @@ mod tests {
             .stdin(Stdio::null())
             .output()
             .expect("decode audio+video together");
-        assert!(decode.status.success(), "MP4 stream decode failed: {}", String::from_utf8_lossy(&decode.stderr));
+        assert!(
+            decode.status.success(),
+            "MP4 stream decode failed: {}",
+            String::from_utf8_lossy(&decode.stderr)
+        );
         fs::remove_dir_all(&root).expect("cleanup fixture folder");
     }
 }
