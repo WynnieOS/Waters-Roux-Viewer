@@ -1,0 +1,84 @@
+name: Waters Roux V3 - branded source reconstruction preflight
+
+on:
+  pull_request:
+    branches:
+      - feat/waters-roux-beta27
+    paths:
+      - 'docs/WATERS_ROUX_BETA28_V3_*.md'
+      - 'scripts/reconstruct-waters-roux-v3-source.ps1'
+      - '.github/workflows/waters-roux-v3-source-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: waters-roux-v3-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconstruct-and-check:
+    name: Reconstruct branded source without publishing a viewer
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout isolated V3 staging branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/waters-roux-beta28-v3
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set non-personal CI merge author
+        shell: pwsh
+        run: |
+          git config user.name "Waters Roux V3 Source QA"
+          git config user.email "ci@users.noreply.github.com"
+
+      - name: Recreate pinned V2 source inputs in CI only
+        shell: pwsh
+        run: ./scripts/reconstruct-waters-roux-v3-source.ps1
+
+      - name: Inspect reconstruction identity and changes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $login = Get-Content 'crates/aurora-viewer/src/ui/login.rs' -Raw
+          if (-not $login.Contains('waters-roux-name')) { throw 'Waters Roux login missing' }
+          $app = Get-Content 'crates/aurora-viewer/src/app.rs' -Raw
+          if (-not $app.Contains('self.recorder.stop_async()')) { throw 'MP4 not wired to Waters Roux app' }
+          $recording = Get-Content 'crates/aurora-viewer/src/app/recording.rs' -Raw
+          if (-not $recording.Contains('mod mp4;')) { throw 'MP4 backend not included' }
+          git log -4 --oneline
+          git diff --stat
+          git status --short
+          'V3 source recovery preflight only: this is NOT a tested or distributed viewer.'
+
+      - name: Install Rust for source checks
+        shell: pwsh
+        run: rustup update stable --no-self-update
+
+      - name: Normalize ephemeral integrated source formatting
+        shell: pwsh
+        run: cargo fmt --all
+
+      - name: Verify Rust formatting
+        shell: pwsh
+        run: cargo fmt --all -- --check
+
+      - name: Validate integrated source with workspace lints
+        shell: pwsh
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+      - name: Run viewer unit tests
+        shell: pwsh
+        run: cargo test --locked -p aurora-viewer --bin aurora-viewer
+
+      - name: Report source recovery status
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "This workflow validates reconstruction in an ephemeral CI checkout."
+          Write-Host "No source was pushed; no viewer was built, signed, approved, or published."
+          Write-Host "Human in-world, security, recording and full 17-section acceptance tests remain mandatory."
