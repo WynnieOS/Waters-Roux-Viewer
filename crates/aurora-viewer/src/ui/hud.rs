@@ -661,16 +661,18 @@ pub fn draw(
             1.0
         };
         let mut y = sp.y;
-        // measure
+        // The separate ordinary-tag controls affect only classic tags, not
+        // chat bubbles, world floating text, or the custom Studio skin.
+        let tag_fade = if custom.enabled { fade } else { custom.regular_fade(fade) };
         let font_of = |s: f32| {
             let size = if custom.enabled {
                 if s == 13.0 { custom.name_size } else { custom.detail_size }
             } else {
-                s
+                custom.regular_font_size(s == 13.0)
             };
             FontId::new(
                 size,
-                if custom.enabled && custom.monospace {
+                if (custom.enabled && custom.monospace) || (!custom.enabled && custom.regular_monospace) {
                     egui::FontFamily::Monospace
                 } else {
                     egui::FontFamily::Proportional
@@ -690,7 +692,7 @@ pub fn draw(
                 } else {
                     *c
                 };
-                super::bidi::no_wrap(painter.ctx(), t.clone(), font_of(*s), foreground.gamma_multiply(fade))
+                super::bidi::no_wrap(painter.ctx(), t.clone(), font_of(*s), foreground.gamma_multiply(tag_fade))
             })
             .collect();
         let outlines = (custom.enabled && custom.outline).then(|| {
@@ -701,7 +703,7 @@ pub fn draw(
                         painter.ctx(),
                         t.clone(),
                         font_of(*s),
-                        color(custom.outline_color).gamma_multiply(fade),
+                        color(custom.outline_color).gamma_multiply(tag_fade),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -728,9 +730,9 @@ pub fn draw(
                     tag_radius
                 },
                 if custom.enabled {
-                    custom.color(fade)
+                    custom.color(tag_fade)
                 } else {
-                    Color32::from_rgba_unmultiplied(p.bar.r(), p.bar.g(), p.bar.b(), (190.0 * fade) as u8)
+                    Color32::from_rgba_unmultiplied(p.bar.r(), p.bar.g(), p.bar.b(), (190.0 * tag_fade) as u8)
                 },
             );
             if custom.enabled
@@ -748,7 +750,7 @@ pub fn draw(
                 painter.rect_stroke(
                     r,
                     egui::CornerRadius::same(custom.corner_radius.round() as u8),
-                    egui::Stroke::new(custom.border_width, color(custom.border_color).gamma_multiply(fade)),
+                    egui::Stroke::new(custom.border_width, color(custom.border_color).gamma_multiply(tag_fade)),
                     egui::StrokeKind::Inside,
                 );
             }
@@ -759,12 +761,12 @@ pub fn draw(
                     Pos2::new(r.left() + 4.0, r.bottom() - 3.0),
                     Pos2::new(r.right() - 4.0, r.bottom() - 1.0),
                 );
-                painter.rect_filled(track, super::widgets::TRACK_RADIUS, p.field.gamma_multiply(fade));
+                painter.rect_filled(track, super::widgets::TRACK_RADIUS, p.field.gamma_multiply(tag_fade));
                 let fill = egui::Rect::from_min_max(
                     track.min,
                     Pos2::new(track.left() + track.width() * f.clamp(0.02, 1.0), track.bottom()),
                 );
-                let (a, b) = (p.violet.gamma_multiply(fade), p.teal.gamma_multiply(fade));
+                let (a, b) = (p.violet.gamma_multiply(tag_fade), p.teal.gamma_multiply(tag_fade));
                 let mut mesh = egui::Mesh::default();
                 mesh.colored_vertex(fill.left_top(), a);
                 mesh.colored_vertex(fill.right_top(), b);
@@ -775,9 +777,9 @@ pub fn draw(
                 painter.add(mesh);
             }
             if let Some(id) = avatar.filter(|_| visualizer) {
-                voice_tags.paint(&painter, p, id, r, in_voice, now_s, fade);
+                voice_tags.paint(&painter, p, id, r, in_voice, now_s, tag_fade);
                 if audio.voice_visualizer_dot && in_voice.is_some() {
-                    painter.circle_filled(Pos2::new(r.left() + 12.0, r.center().y), 3.0, p.success.gamma_multiply(fade));
+                    painter.circle_filled(Pos2::new(r.left() + 12.0, r.center().y), 3.0, p.success.gamma_multiply(tag_fade));
                 }
             }
             if no_voice && let Some(icon) = icons.get("microphone-off") {
@@ -787,7 +789,7 @@ pub fn draw(
                     icon.id(),
                     icon_rect,
                     egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-                    p.danger.gamma_multiply(fade),
+                    p.danger.gamma_multiply(tag_fade),
                 );
             }
             if let Some(b) = &bubble {
@@ -811,7 +813,7 @@ pub fn draw(
             }
             // A subtle second pass thickens the glyphs; the authoritative
             // displayed text remains the one supplied by Second Life.
-            if custom.enabled && custom.bold {
+            if (custom.enabled && custom.bold) || (!custom.enabled && custom.regular_bold) {
                 painter.galley(rect.min + egui::vec2(0.55, 0.0), g.clone(), Color32::PLACEHOLDER);
             }
             painter.galley(rect.min, g, Color32::PLACEHOLDER);
