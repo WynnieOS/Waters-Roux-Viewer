@@ -56,7 +56,10 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
                 )
                 .changed();
             changed |= ui
-                .add(egui::Slider::new(&mut settings.draw_distance, PHOTO_DRAW_DISTANCE_MIN..=PHOTO_DRAW_DISTANCE_MAX).text("Draw distance (m)"))
+                .add(
+                    egui::Slider::new(&mut settings.draw_distance, PHOTO_DRAW_DISTANCE_MIN..=PHOTO_DRAW_DISTANCE_MAX)
+                        .text("Draw distance (m)"),
+                )
                 .changed();
             ui.horizontal_wrapped(|ui| {
                 if widgets::action_button(ui, p, "sun", "EEP / WindLight", ActionKind::Flat, Vec2::new(0.0, 29.0)).clicked() {
