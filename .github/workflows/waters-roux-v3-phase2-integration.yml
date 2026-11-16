@@ -36,12 +36,13 @@ jobs:
           $current = (git branch --show-current).Trim()
           if ($current -ne 'integrate/waters-roux-beta28-v3-phase2') { throw 'Wrong source branch' }
 
-          # Four exact reviewed branch heads; never silently substitute moving tips.
+          # Five exact reviewed branch heads; never silently substitute moving tips.
           $pins = @(
             @{ Ref='feat/waters-roux-v3-resizable-camera-controls'; Sha='588e69285054be2d23168177efb6031055828028' },
             @{ Ref='fix/waters-roux-v3-recorder-duration-finalization'; Sha='bf1b6229b0ced407a2b0ad56f75ae0da64a82f70' },
             @{ Ref='feat/waters-roux-v3-hold-to-repeat-build-spinners'; Sha='b4aaa119da143cca1c0cc3acccabae4fe4996be3' },
-            @{ Ref='fix/waters-roux-v3-distinct-toolbar-icons'; Sha='2917dbbf15c13f7d6e6d87b8f5686bcda52effc3' }
+            @{ Ref='fix/waters-roux-v3-distinct-toolbar-icons'; Sha='2917dbbf15c13f7d6e6d87b8f5686bcda52effc3' },
+            @{ Ref='fix/waters-roux-v3-nametag-image-import'; Sha='51d0d5d4dd387aba7a360a06252a2560d98a4006' }
           )
           foreach ($pin in $pins) {
             git fetch --no-tags origin "refs/heads/$($pin.Ref)"
@@ -71,6 +72,8 @@ jobs:
             @{ Path='crates/aurora-viewer/src/ui/controls.rs'; Token='.compact_when_minimized(COMPACT_WIDTH + 20.0)' },
             @{ Path='crates/aurora-viewer/src/ui/widgets.rs'; Token='SPINNER_HOLD_DELAY' },
             @{ Path='crates/aurora-viewer/src/ui/toolbar/catalogue.rs'; Token='"group_titles", "id-badge-2"' },
+            @{ Path='crates/aurora-viewer/src/ui/name_tag_studio.rs'; Token='fn local_image_path(path: &str)' },
+            @{ Path='crates/aurora-viewer/src/ui/name_tag_studio.rs'; Token='png_jpg_and_gif_actually_decode_as_name_tag_backgrounds' }
             @{ Path='crates/aurora-viewer/src/ui/bars.rs'; Token='icons.get("fleur-de-lis")' },
             @{ Path='crates/aurora-viewer/src/snapshot/mod.rs'; Token='.join("Waters Roux")' },
             @{ Path='crates/aurora-viewer/src/links.rs'; Token='WynnieOS/Waters-Roux-Viewer/issues/new/choose' }
