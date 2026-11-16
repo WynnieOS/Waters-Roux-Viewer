@@ -778,8 +778,16 @@ pub fn draw(
             }
             if let Some(id) = avatar.filter(|_| visualizer) {
                 voice_tags.paint(&painter, p, id, r, in_voice, now_s, tag_fade);
-                if audio.voice_visualizer_dot && in_voice.is_some() {
-                    painter.circle_filled(Pos2::new(r.left() + 12.0, r.center().y), 3.0, p.success.gamma_multiply(tag_fade));
+                if audio.voice_visualizer_dot
+                    && let Some((level, speaking)) = in_voice
+                {
+                    let colors = super::colors::get();
+                    let indicator = if speaking {
+                        super::voice_tag::level_color(p, level, &colors)
+                    } else {
+                        super::voice_tag::idle_color(p, &colors)
+                    };
+                    painter.circle_filled(Pos2::new(r.left() + 12.0, r.center().y), 3.0, indicator.gamma_multiply(tag_fade));
                 }
             }
             if no_voice && let Some(icon) = icons.get("microphone-off") {
@@ -789,7 +797,7 @@ pub fn draw(
                     icon.id(),
                     icon_rect,
                     egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-                    p.danger.gamma_multiply(tag_fade),
+                    super::voice_tag::unavailable_color(p, &super::colors::get()).gamma_multiply(tag_fade),
                 );
             }
             if let Some(b) = &bubble {
