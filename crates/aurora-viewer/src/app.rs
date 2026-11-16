@@ -11421,6 +11421,14 @@ impl App {
             gfx.renderer.capture_scene = true;
             self.scene_capture_pending = true;
         }
+        // Finalize long recordings automatically. Previously the encoder
+        // stopped asking for frames at five minutes but stayed active, so a
+        // user's MP4 could end in a frozen frame until they manually stopped.
+        if self.recorder.reached_time_limit(Instant::now()) {
+            self.world
+                .system_message("Recording reached the 30-minute limit; saving the MP4 automatically.".to_owned());
+            self.stop_video_recording();
+        }
         // Native machinima video reads the actual rendered world frames.
         // Never compete with snapshot, login-background, abuse-report or
         // inventory captures: they take priority over video frames.
