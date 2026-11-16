@@ -154,6 +154,18 @@ fn write_audio_packet(out: &mut File, stereo: &[f32; 960]) -> Result<(), String>
     out.write_all(&bytes).map_err(|e| format!("Cannot capture in-world audio: {e}"))
 }
 
+/// Opting into world audio must not silently produce a video-only MP4 when
+/// the output device has delivered no PCM blocks. One muted 10 ms frame is
+/// enough for FFmpeg's existing apad filter to fill the recording timeline.
+/// This never captures a microphone or unrelated desktop audio.
+fn seed_empty_world_audio(pcm: Option<&mut File>, audio_bytes: &mut u64) -> Result<(), String> {
+    if *audio_bytes == 0 && let Some(file) = pcm {
+        write_audio_packet(file, &[0.0; 960])?;
+        *audio_bytes += 1920;
+    }
+    Ok(())
+}
+
 fn check_mp4(path: &Path) -> Result<(), String> {
     let mut file = File::open(path).map_err(|e| format!("Cannot open finished MP4: {e}"))?;
     let mut header = [0u8; 12];
@@ -282,6 +294,9 @@ pub(super) fn encode(
         }
     }
 
+    // A quiet device must still produce the explicitly requested AAC track.
+    // Reuse the real recorder's PCM->AAC path; do not silently drop to video-only.
+    seed_empty_world_audio(pcm.as_mut(), &mut audio_bytes)?;
     // All PCM must be closed before FFmpeg attempts to mux it.
     if let Some(mut file) = pcm.take() {
         file.flush().map_err(|e| format!("Audio track flush: {e}"))?;
@@ -313,6 +328,22 @@ pub(super) fn encode(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn requested_audio_track_stays_present_without_world_audio_samples() {
+        let path = std::env::temp_dir().join(format!("waters-roux-empty-audio-{}.pcm", uuid::Uuid::new_v4()));
+        let mut file = File::create(&path).expect("create silence test file");
+        let mut audio_bytes = 0;
+        seed_empty_world_audio(Some(&mut file), &mut audio_bytes).expect("seed missing audio");
+        assert_eq!(audio_bytes, 1920, "one 10ms stereo frame");
+        seed_empty_world_audio(Some(&mut file), &mut audio_bytes).expect("idempotent");
+        file.flush().expect("flush");
+        drop(file);
+        let bytes = fs::read(&path).expect("read seeded PCM");
+        assert_eq!(bytes.len(), 1920);
+        assert!(bytes.iter().all(|b| *b == 0), "audio seed must be silence");
+        fs::remove_file(path).expect("remove seeded PCM");
+    }
 
     #[test]
     fn h264_mp4_has_valid_atoms_and_cfr_timeline() {
