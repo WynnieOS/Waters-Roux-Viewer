@@ -13531,3 +13531,11 @@ branding-error-name = The saved image reference is invalid. Restore a default or
 branding-error-config = The saved appearance file is invalid; a safe default is used.
 branding-error-write = The appearance could not be saved. Check that the profile folder is writable.
 branding-custom-unavailable = The selected custom image is unavailable; the safe fallback is shown.
+
+# Waters Roux workspace modes (Preferences > Layout)
+waters-roux-workspaces = Waters Roux workspaces
+waters-roux-workspace = Active workspace
+waters-roux-workspace-help = Switch to a saved arrangement. Each mode remembers its own window positions and relevant open panels.
+waters-roux-everyday = Everyday
+waters-roux-studio = Studio
+waters-roux-creator = Creator
