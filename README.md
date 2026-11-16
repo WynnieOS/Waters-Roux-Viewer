@@ -1309,11 +1309,11 @@ Questions and answers, and the details:
 
 ## Privacy
 
-The Aurora team runs no server: the viewer talks to Linden Lab, and to other
-services only for the features you use. The
-[privacy policy](https://aurora-viewer.org/privacy/) lists what is sent, to
-whom, and what stays on your computer; it is also linked from Preferences ›
-Privacy. Questions about it: [contact@aurora-viewer.org](mailto:contact@aurora-viewer.org).
+**Waters Roux privacy review is not complete.** See the
+[Waters Roux interim privacy-status notice](docs/WATERS_ROUX_PRIVACY_STATUS.md).
+Aurora's original privacy documentation describes its own upstream application
+and is **not** the privacy policy for Waters Roux. A reviewed Waters Roux policy
+is required before public v1.0.0 distribution.
 
 ## License
 
@@ -1324,10 +1324,12 @@ Aurora Viewer is free software under the
 from the Second Life viewer and Firestorm (originally LGPL 2.1); see
 [NOTICE.md](NOTICE.md) for details and third-party licenses.
 
-The name and the wolf logo identify the team's own builds: a modified version
-takes its own name and icon, see [TRADEMARKS.md](TRADEMARKS.md). The only
-official downloads are on [aurora-viewer.org](https://aurora-viewer.org) and in
-this repository's [releases](https://github.com/Aurora-Viewer/Aurora-Viewer/releases).
+The original Aurora name and wolf logo identify upstream builds; this
+derivative uses the Waters Roux name and branding. See
+[TRADEMARKS.md](TRADEMARKS.md) and [NOTICE.md](NOTICE.md) for upstream rights
+and attribution. **Only approved Waters Roux builds** will be published on
+the [Waters Roux Releases page](https://github.com/WynnieOS/Waters-Roux-Viewer/releases);
+an unverified development artifact is not an official public release.
 
 Aurora Viewer is not affiliated with Linden Lab or the Firestorm project.
 Second Life® is a trademark of Linden Research, Inc.
