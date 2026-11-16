@@ -68,7 +68,7 @@ jobs:
           $checks = @(
             @{ Path='crates/aurora-viewer/src/app.rs'; Token='self.recorder.reached_time_limit(Instant::now())' },
             @{ Path='crates/aurora-viewer/src/app.rs'; Token='Action::QuickRecord => self.quick_record()' },
-            @{ Path='crates/aurora-viewer/src/ui/controls.rs'; Token='keep the original control' },
+            @{ Path='crates/aurora-viewer/src/ui/controls.rs'; Token='.compact_when_minimized(COMPACT_WIDTH + 20.0)' },
             @{ Path='crates/aurora-viewer/src/ui/widgets.rs'; Token='SPINNER_HOLD_DELAY' },
             @{ Path='crates/aurora-viewer/src/ui/toolbar/catalogue.rs'; Token='"group_titles", "id-badge-2"' },
             @{ Path='crates/aurora-viewer/src/ui/bars.rs'; Token='icons.get("fleur-de-lis")' },
