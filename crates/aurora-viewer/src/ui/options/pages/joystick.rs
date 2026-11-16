@@ -552,6 +552,11 @@ pub fn page(cx: &mut Cx) {
         );
         cx.toggle(tr!("joystick-avatar-enabled"), "", &field!(joystick.avatar_enabled));
         cx.toggle(tr!("joystick-flycam-enabled"), "", &field!(joystick.flycam_enabled));
+        cx.toggle(
+            "Show Flycam status banner",
+            "Uncheck to hide the Flycam Mode Is On bar; Flycam and its keyboard shortcut remain active.",
+            &field!(joystick.show_flycam_banner),
+        );
         cx.row_with(tr!("joystick-flycam"), tr!("joystick-flycam-hint"), &Nothing, |ui, s, st, r| {
             let available = s.joystick.enabled && s.joystick.flycam_enabled && st.joystick.selected(&s.joystick).is_some();
             if ui
