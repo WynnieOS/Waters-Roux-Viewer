@@ -1,0 +1,103 @@
+name: Scan exact Waters Roux Beta 28 MP4 artifact
+
+on:
+  push:
+    branches:
+      - security/scan-beta28-exact-artifact
+    paths:
+      - .github/workflows/scan-beta28-exact-artifact.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/scan-beta28-exact-artifact.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  independent-clamav-scan:
+    name: Independent antivirus scan (exact blocked ZIP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Download exact browser-blocked GitHub artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Waters-Roux-Beta28-V2-H264-MP4-Windows-QA-ONLY
+          run-id: 43318363971
+          repository: WynnieOS/Waters-Roux-Viewer
+          github-token: ${{ github.token }}
+          path: scan-input
+
+      - name: Verify exact ZIP hash and safely extract without executing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import pathlib
+          import zipfile
+          root = pathlib.Path.cwd()
+          path = root / 'scan-input' / 'Waters-Roux-H264-MP4-UNVERIFIED-Windows.zip'
+          sidecar = path.with_name(path.name + '.sha256')
+          expected = 'ab6f569f9d602baca6a0499fb58eaddd059a874b9954cd07f9981793118ff6b2'
+          assert path.is_file() and sidecar.is_file(), 'Exact ZIP or checksum missing'
+          with path.open('rb') as stream:
+              observed = hashlib.file_digest(stream, 'sha256').hexdigest()
+          assert observed == expected, 'ZIP digest mismatch: ' + observed
+          assert expected in sidecar.read_text().lower(), 'Sidecar checksum mismatch'
+          dest = root / 'extracted'
+          dest.mkdir(exist_ok=True)
+          with zipfile.ZipFile(path) as archive:
+              assert archive.testzip() is None, 'Corrupt ZIP'
+              for member in archive.infolist():
+                  target = (dest / member.filename).resolve()
+                  assert target.is_relative_to(dest.resolve()), 'Unsafe ZIP path'
+                  assert ((member.external_attr >> 16) & 0o170000) != 0o120000, 'Symlink in ZIP'
+              archive.extractall(dest)
+          files = sorted(p.relative_to(dest).as_posix() for p in dest.rglob('*.exe'))
+          print('Verified SHA256:', observed)
+          print('Executable files:', files)
+          assert len(files) == 3, 'Unexpected executable count'
+          (root / 'scan-manifest.txt').write_text('ZIP SHA256: ' + observed + '\\nEXEs (not launched):\\n' + '\\n'.join(files) + '\\n')
+          PY
+
+      - name: Install ClamAV and refresh malware signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clamav clamav-freshclam
+          sudo systemctl stop clamav-freshclam || true
+          sudo freshclam --stdout
+          clamscan --version
+
+      - name: Scan ZIP and extracted contents with independent antivirus
+        shell: bash
+        run: |
+          set -euo pipefail
+          clamscan --recursive --infected --scan-archive=yes --max-filesize=256M --max-scansize=1024M --max-recursion=20 --log=clamav-scan.log scan-input extracted
+          grep -Fq 'Infected files: 0' clamav-scan.log
+          if grep -Eiq 'ERROR:| FOUND' clamav-scan.log; then
+            echo 'Scan log contains error or detection; see report' >&2
+            exit 1
+          fi
+          {
+            echo '### ClamAV independent scan'
+            echo 'Exact original nested ZIP verified by SHA256.'
+            echo 'No infected files reported; scanner exited successfully.'
+            echo 'The browser security warning remains a separate open issue.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload scan report, even if the scan fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Waters-Roux-Beta28-Independent-Scan-Report
+          path: |
+            scan-manifest.txt
+            clamav-scan.log
+          if-no-files-found: ignore
