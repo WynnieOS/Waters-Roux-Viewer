@@ -1305,6 +1305,12 @@ fn main_menus(ui: &mut egui::Ui, p: &Palette, panels: &mut Panels, st: &StatusIn
         if crate::updater::checks_enabled() && menu::item(ui, p, "download-filled", aurora_i18n::tr!("update-check")) {
             *action = BarAction::CheckUpdates;
         }
+        if menu::item(ui, p, "download-filled", "Waters Roux downloads / updates") {
+            request(ui.ctx(), CtxAction::OpenUrl(crate::links::RELEASES.into()));
+        }
+        if menu::item(ui, p, "bulb-filled", "Feature requests") {
+            request(ui.ctx(), CtxAction::OpenUrl(crate::links::FEATURE_REQUESTS.into()));
+        }
         if menu::item(ui, p, "bug-filled", aurora_i18n::tr!("bug-title")) {
             *action = BarAction::ReportBug;
         }

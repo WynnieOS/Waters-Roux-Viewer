@@ -1,42 +1,37 @@
-# Waters Roux Viewer — Windows development beta
+# Waters Roux Viewer — Beta 28 V3 development
 
-This is the Waters Roux derivative of Aurora Viewer. The upstream viewer,
-authors and licenses are acknowledged below and in NOTICE.md.
+Waters Roux is a custom Second Life viewer derived from Aurora's Rust/Vulkan source. The authors, upstream technical references and license obligations remain credited in [NOTICE.md](NOTICE.md). **The viewer is not provided or supported by Linden Lab.**
 
-For the new portable Windows beta, download the artifact from the beta branch's
-**Waters Roux — Windows preview** Actions run, extract its inner ZIP into a new
-writable folder, and open **Launch Waters Roux.cmd**. The executable is
-`waters-roux-viewer.exe`; this package stores its profile beside itself and
-does not migrate or overwrite the preceding preview's settings. See
-`START-HERE.txt` and `BUILD-INFO.txt` in the download for build-specific details.
-This is a development preview, not a production release.
+**Release status:** Beta 28 V3 is under development and has **not** passed the full acceptance, security, or resident testing checklist. There is no approved official public v1.0.0 download yet. Do not distribute the previously labeled **UNVERIFIED** Windows archive as a public release.
 
-Glass opacity: **Preferences → Appearance → Skin**, 10–100%, applied live and
-saved on exit. **Preferences → Accessibility → High Contrast** gives opaque
-panels. The Beta 27 login uses a neutral gradient until the approved standalone
-background is supplied. Open the login gear for independent Login and Loading
-background/logo selections, previews, Apply/Cancel and Glass controls. Missing original-logo PNG/ICO files are explicitly
-reported in `MISSING-ARTWORK.txt`; no substitute logo is used.
+Official project links:
+- **Website (temporary):** [Waters Roux GitHub](https://github.com/WynnieOS/Waters-Roux-Viewer)
+- **Report a Bug:** [GitHub issue form](https://github.com/WynnieOS/Waters-Roux-Viewer/issues/new/choose)
+- **Download / Updates:** [Waters Roux releases](https://github.com/WynnieOS/Waters-Roux-Viewer/releases)
+- **Feature Requests:** [Waters Roux Issues](https://github.com/WynnieOS/Waters-Roux-Viewer/issues)
+
+The final installer will preserve the approved Waters Roux glass login, logo/background customization, viewer branding, preferences and resident settings. See the [Beta V3 acceptance checklist](docs/WATERS_ROUX_BETA28_V3_ACCEPTANCE.md) on the development branch before treating any build as feature complete.
+
+**Technical documentation notice:** The upstream-derived reference material below contains historic Aurora component names, commands, example screenshots and attribution. Those references do **not** identify Waters Roux's official product website, bug tracker or release downloads, and do not certify the current V3 feature set.
 
 ---
 
 <div align="center">
 
-<img src="assets/branding/aurora-logo.svg" alt="Aurora Viewer" width="180">
+<img src="assets/branding/waters-roux-logo.png" alt="Waters Roux Viewer logo" width="180">
 
-# Aurora Viewer
+# Waters Roux Viewer
 
-**A modern Second Life viewer, written in Rust.**<br>
-A Vulkan renderer, a clean interface, and the Second Life you already know.
+**A customizable Second Life viewer built on Rust and Vulkan.**<br>
+Beta 28 V3 development — official v1.0.0 release pending acceptance.
 
-[![Download](docs/readme/button-download.svg)](https://github.com/Aurora-Viewer/Aurora-Viewer/releases/latest)&nbsp;
-[![Download for Linux](docs/readme/button-download-linux.svg)](docs/LINUX.md)&nbsp;
-[![Download for macOS (experimental)](docs/readme/button-download-macos.svg)](docs/MACOS.md)&nbsp;
-[![Discord](docs/readme/button-discord.svg)](https://discord.gg/TK4nbMGmKt)&nbsp;
-[![Website](docs/readme/button-website.svg)](https://aurora-viewer.org)
+[![Project website](docs/readme/button-website.svg)](https://github.com/WynnieOS/Waters-Roux-Viewer)&nbsp;
+[Report a Bug](https://github.com/WynnieOS/Waters-Roux-Viewer/issues/new/choose)&nbsp;
+[Releases](https://github.com/WynnieOS/Waters-Roux-Viewer/releases)&nbsp;
+[Feature Requests](https://github.com/WynnieOS/Waters-Roux-Viewer/issues)
 
-[![CI](https://github.com/Aurora-Viewer/Aurora-Viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/Aurora-Viewer/Aurora-Viewer/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Aurora-Viewer/Aurora-Viewer?include_prereleases&color=8B5CF6)](https://github.com/Aurora-Viewer/Aurora-Viewer/releases)
+[![CI](https://github.com/WynnieOS/Waters-Roux-Viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/WynnieOS/Waters-Roux-Viewer/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/WynnieOS/Waters-Roux-Viewer?include_prereleases&color=8B5CF6)](https://github.com/WynnieOS/Waters-Roux-Viewer/releases)
 [![License: GPLv3](https://img.shields.io/badge/license-GPLv3-4F46E5)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-stable-5EEAD4?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-070B1F)](#build)
@@ -1021,7 +1016,7 @@ destination folder then confirm with Move.
 
 The bug icon in the top bar, the Help menu, the login screen and the "Send a
 crash report" button after a crash open the project's
-[GitHub issue forms](https://github.com/Aurora-Viewer/Aurora-Viewer/issues/new/choose)
+[Waters Roux GitHub issue forms](https://github.com/WynnieOS/Waters-Roux-Viewer/issues/new/choose)
 in your browser; a GitHub account is needed. Choose the bug report template
 and describe what you were doing and what happened. After a crash, "Copy
 trace" and "Open report folder" in the same window give the technical
@@ -1029,7 +1024,7 @@ details: the full trace may contain personal paths, review it before sharing.
 The bar button can be hidden in Preferences › Interface.
 
 Ideas and feature requests go to the
-[feedback board](https://feedback.aurora-viewer.org), where everyone can vote
+[Waters Roux Issues](https://github.com/WynnieOS/Waters-Roux-Viewer/issues), where everyone can vote
 for them.
 
 ### Where your files are
@@ -1314,11 +1309,11 @@ Questions and answers, and the details:
 
 ## Privacy
 
-The Aurora team runs no server: the viewer talks to Linden Lab, and to other
-services only for the features you use. The
-[privacy policy](https://aurora-viewer.org/privacy/) lists what is sent, to
-whom, and what stays on your computer; it is also linked from Preferences ›
-Privacy. Questions about it: [contact@aurora-viewer.org](mailto:contact@aurora-viewer.org).
+**Waters Roux privacy review is not complete.** See the
+[Waters Roux interim privacy-status notice](docs/WATERS_ROUX_PRIVACY_STATUS.md).
+Aurora's original privacy documentation describes its own upstream application
+and is **not** the privacy policy for Waters Roux. A reviewed Waters Roux policy
+is required before public v1.0.0 distribution.
 
 ## License
 
@@ -1329,10 +1324,12 @@ Aurora Viewer is free software under the
 from the Second Life viewer and Firestorm (originally LGPL 2.1); see
 [NOTICE.md](NOTICE.md) for details and third-party licenses.
 
-The name and the wolf logo identify the team's own builds: a modified version
-takes its own name and icon, see [TRADEMARKS.md](TRADEMARKS.md). The only
-official downloads are on [aurora-viewer.org](https://aurora-viewer.org) and in
-this repository's [releases](https://github.com/Aurora-Viewer/Aurora-Viewer/releases).
+The original Aurora name and wolf logo identify upstream builds; this
+derivative uses the Waters Roux name and branding. See
+[TRADEMARKS.md](TRADEMARKS.md) and [NOTICE.md](NOTICE.md) for upstream rights
+and attribution. **Only approved Waters Roux builds** will be published on
+the [Waters Roux Releases page](https://github.com/WynnieOS/Waters-Roux-Viewer/releases);
+an unverified development artifact is not an official public release.
 
 Aurora Viewer is not affiliated with Linden Lab or the Firestorm project.
 Second Life® is a trademark of Linden Research, Inc.

@@ -16,8 +16,8 @@ const BUTTON: Vec2 = Vec2::new(0.0, 26.0);
 #[derive(Clone, Copy, Default, PartialEq)]
 enum Delivery {
     Local,
-    Browser,
     #[default]
+    Browser,
     Direct,
 }
 
