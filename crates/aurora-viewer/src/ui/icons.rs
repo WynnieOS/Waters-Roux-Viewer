@@ -473,8 +473,11 @@ const FILLED: &[(&str, &[u8])] = svg_list!(
     "zoom-scan",
 );
 
-/// Brand SVGs (white wolf silhouette of assets/branding/), drawn untinted or tinted.
-const BRAND_SVGS: &[(&str, &[u8])] = &[("wolf", include_bytes!("../../../../assets/branding/aurora-logo-white.svg"))];
+/// Branded SVG symbols are embedded separately from third-party Tabler icons.
+const BRAND_SVGS: &[(&str, &[u8])] = &[
+    ("wolf", include_bytes!("../../../../assets/branding/aurora-logo-white.svg")),
+    ("fleur-de-lis", include_bytes!("../../../../assets/branding/waters-roux-fleur-de-lis.svg")),
+];
 
 /// Raster images kept as PNG (brand logo).
 const PNGS: &[(&str, &[u8])] = &[("phoenix_18", include_bytes!("../../assets/icons/phoenix_18.png"))];
@@ -909,6 +912,13 @@ impl Icons {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn waters_roux_menu_fleur_de_lis_is_visible() {
+        let (_, bytes) = BRAND_SVGS.iter().find(|(name, _)| *name == "fleur-de-lis").expect("Waters Roux menu icon");
+        let image = rasterize_svg(bytes, BRAND_RASTER_PX).expect("fleur-de-lis SVG raster");
+        assert!(image.pixels.iter().any(|px| px.a() > 0), "fleur-de-lis is empty");
+    }
 
     #[test]
     fn every_embedded_svg_rasterizes() {
