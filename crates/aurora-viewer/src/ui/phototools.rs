@@ -11,6 +11,15 @@ use egui::{Context, Vec2};
 
 pub const WINDOW: &str = "waters_roux_phototools";
 
+// Match the V3 renderer and saved graphics limit. PhotoTools must never
+// truncate a resident's 512m+ draw distance when another control changes.
+const PHOTO_DRAW_DISTANCE_MIN: f32 = 32.0;
+const PHOTO_DRAW_DISTANCE_MAX: f32 = 1024.0;
+
+fn clamp_photo_draw_distance(distance: f32) -> f32 {
+    distance.clamp(PHOTO_DRAW_DISTANCE_MIN, PHOTO_DRAW_DISTANCE_MAX)
+}
+
 /// Returns whether settings changed and require persistence.
 /// The toolbar owns visibility and current tab, so no phantom window opens.
 pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Settings) -> bool {
@@ -47,7 +56,7 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
                 )
                 .changed();
             changed |= ui
-                .add(egui::Slider::new(&mut settings.draw_distance, 32.0..=512.0).text("Draw distance (m)"))
+                .add(egui::Slider::new(&mut settings.draw_distance, PHOTO_DRAW_DISTANCE_MIN..=PHOTO_DRAW_DISTANCE_MAX).text("Draw distance (m)"))
                 .changed();
             ui.horizontal_wrapped(|ui| {
                 if widgets::action_button(ui, p, "sun", "EEP / WindLight", ActionKind::Flat, Vec2::new(0.0, 29.0)).clicked() {
@@ -182,7 +191,7 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
     if changed {
         settings.dof.sanitize();
         settings.exposure = settings.exposure.clamp(0.25, 4.0);
-        settings.draw_distance = settings.draw_distance.clamp(32.0, 512.0);
+        settings.draw_distance = clamp_photo_draw_distance(settings.draw_distance);
     }
     changed
 }
@@ -190,6 +199,14 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn phototools_preserves_v3_long_range_draw_distance() {
+        assert_eq!(clamp_photo_draw_distance(768.0), 768.0);
+        assert_eq!(clamp_photo_draw_distance(1024.0), 1024.0);
+        assert_eq!(clamp_photo_draw_distance(2048.0), 1024.0);
+        assert_eq!(clamp_photo_draw_distance(16.0), 32.0);
+    }
 
     #[test]
     fn phototools_has_its_own_panel_state() {
