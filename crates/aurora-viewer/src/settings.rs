@@ -2894,7 +2894,8 @@ impl Settings {
         if !self.chat_island_width.is_finite() || self.chat_island_width < 0.0 {
             self.chat_island_width = 0.0;
         }
-        self.draw_distance = self.draw_distance.clamp(32.0, 512.0);
+        // V3: allow cinematic long-range draw distances without increasing the default.
+        self.draw_distance = self.draw_distance.clamp(32.0, 1024.0);
         self.draw_distance_stepping_interval = self.draw_distance_stepping_interval.clamp(5, 30);
         self.chat_commands.sanitize();
         if let Some(toolbar) = &mut self.toolbar {
@@ -3512,6 +3513,18 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn waters_roux_draw_distance_allows_1024_meters_without_changing_default() {
+        assert!(Settings::default().draw_distance < 1024.0);
+        let mut s = Settings {
+            draw_distance: 1024.0,
+            ..Default::default()
+        };
+        assert_eq!(s.sanitized().draw_distance, 1024.0);
+        s.draw_distance = 2048.0;
+        assert_eq!(s.sanitized().draw_distance, 1024.0);
     }
 
     #[test]
