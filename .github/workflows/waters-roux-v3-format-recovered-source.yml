@@ -1,0 +1,49 @@
+name: Waters Roux V3 - normalize recovered MP4 source formatting
+
+on:
+  push:
+    branches:
+      - recovery/waters-roux-beta28-v3-integrated-source
+    paths:
+      - '.github/workflows/waters-roux-v3-format-recovered-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  format-baseline:
+    name: Normalize only recovered MP4 app formatting
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout isolated recovered source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: recovery/waters-roux-beta28-v3-integrated-source
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Format without changing behavior
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name "Waters Roux V3 Source QA"
+          git config user.email "ci@users.noreply.github.com"
+          cargo fmt --all
+          if ($LASTEXITCODE -ne 0) { throw 'Rustfmt failed' }
+          $changed = @(git diff --name-only)
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect the formatting diff' }
+          if ($changed.Count -ne 1 -or $changed[0] -ne 'crates/aurora-viewer/src/app.rs') {
+            throw "Refusing unexpected formatting changes: $($changed -join ', ')"
+          }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Whitespace check failed' }
+          cargo fmt --all -- --check
+          if ($LASTEXITCODE -ne 0) { throw 'Rustfmt post-check failed' }
+          git add -- crates/aurora-viewer/src/app.rs
+          if ($LASTEXITCODE -ne 0) { throw 'Could not stage isolated Rustfmt change' }
+          git commit -m "style(v3): normalize recovered MP4 app Rustfmt only"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not commit formatting-only correction' }
+          git push origin HEAD:refs/heads/recovery/waters-roux-beta28-v3-integrated-source
+          if ($LASTEXITCODE -ne 0) { throw 'Could not update recovery branch; do not bypass permissions' }
+          Write-Host 'Formatting-only correction committed. No viewer was packaged or released.'
