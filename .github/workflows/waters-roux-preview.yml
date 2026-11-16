@@ -49,16 +49,64 @@ jobs:
       - name: Build portable Windows application
         shell: pwsh
         run: cargo build --release --locked -p aurora-viewer --features xr-static-loader
-      - name: Assemble development preview
+      - name: Assemble accurately labeled development preview
         shell: pwsh
         run: |
-          $folder = "Waters-Roux-Viewer-Beta-27-${{ github.sha }}"
-          ./scripts/package-waters-roux-preview.ps1 -Exe target/release/aurora-viewer.exe -Out $folder
-          Compress-Archive -LiteralPath $folder -DestinationPath Waters-Roux-Viewer-Beta-27-Windows.zip
-      - name: Upload portable preview
+          $ErrorActionPreference = 'Stop'
+          # A PR is built from its source branch or the merge branch. Never guess
+          # the product version from github.sha or the Actions run number.
+          $sourceBranch = '${{ github.head_ref }}'
+          if (-not $sourceBranch) { $sourceBranch = '${{ github.ref_name }}' }
+          $baseBranch = '${{ github.base_ref }}'
+          $isV3 = ($sourceBranch -match '(^|[-/])v3([-/]|$)') -or ($baseBranch -match '(^|[-/])v3([-/]|$)')
+          if ($isV3) {
+            $betaLabel = 'Beta 28 V3'
+            $slug = 'Beta-28-V3-DEVELOPMENT'
+          } else {
+            $betaLabel = 'Beta 27'
+            $slug = 'Beta-27'
+          }
+          $folder = "Waters-Roux-Viewer-$slug-${{ github.sha }}"
+          $zip = "Waters-Roux-Viewer-$slug-Windows.zip"
+          $artifact = "Waters-Roux-Viewer-$slug-Windows"
+          ./scripts/package-waters-roux-preview.ps1 -Exe target/release/aurora-viewer.exe -Out $folder -BetaLabel $betaLabel
+          if ($LASTEXITCODE -ne 0) { throw "Portable preview packaging failed" }
+          foreach ($required in @('waters-roux-viewer.exe', 'Launch Waters Roux.cmd', 'BUILD-INFO.txt', 'START-HERE.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $folder $required) -PathType Leaf)) {
+              throw "Missing packaged file: $required"
+            }
+          }
+          $buildInfo = Get-Content -LiteralPath (Join-Path $folder 'BUILD-INFO.txt') -Raw
+          if (-not $buildInfo.Contains($betaLabel)) { throw "Incorrect packaged beta identity: $betaLabel" }
+          if ($isV3) {
+            if (-not (Test-Path -LiteralPath (Join-Path $folder 'BETA-28-V3-ACCEPTANCE.md') -PathType Leaf)) {
+              throw 'V3 package is missing the master acceptance checklist.'
+            }
+            if (Test-Path -LiteralPath (Join-Path $folder 'MISSING-ARTWORK.txt')) {
+              throw 'V3 artwork/branding is incomplete. Do not upload this preview.'
+            }
+          }
+          @(
+            'UNRELEASED WATERS ROUX DEVELOPMENT PREVIEW'
+            "Requested code line: $betaLabel"
+            "Source branch: $sourceBranch"
+            "GitHub Actions commit: ${{ github.sha }}"
+            'Do not install over the current viewer, distribute to residents, or claim this is the approved Beta 28 V3.'
+            'Automated compilation is not in-world QA. The 18-section acceptance gate remains open.'
+          ) | Set-Content -LiteralPath (Join-Path $folder 'DEVELOPMENT-NOT-FOR-RELEASE.txt') -Encoding utf8
+          Compress-Archive -LiteralPath $folder -DestinationPath $zip
+          $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $zip" | Set-Content -LiteralPath "$zip.sha256" -Encoding utf8
+          "WR_PREVIEW_ARTIFACT=$artifact" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "WR_PREVIEW_ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Built unreleased $betaLabel preview ($hash)."
+
+      - name: Upload portable preview (not an approved beta)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Waters-Roux-Viewer-Beta-27-Windows
-          path: Waters-Roux-Viewer-Beta-27-Windows.zip
+          name: ${{ env.WR_PREVIEW_ARTIFACT }}
+          path: |
+            ${{ env.WR_PREVIEW_ZIP }}
+            ${{ env.WR_PREVIEW_ZIP }}.sha256
           retention-days: 14
           compression-level: 6
