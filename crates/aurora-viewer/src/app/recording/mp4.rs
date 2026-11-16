@@ -159,7 +159,9 @@ fn write_audio_packet(out: &mut File, stereo: &[f32; 960]) -> Result<(), String>
 /// enough for FFmpeg's existing apad filter to fill the recording timeline.
 /// This never captures a microphone or unrelated desktop audio.
 fn seed_empty_world_audio(pcm: Option<&mut File>, audio_bytes: &mut u64) -> Result<(), String> {
-    if *audio_bytes == 0 && let Some(file) = pcm {
+    if *audio_bytes == 0
+        && let Some(file) = pcm
+    {
         write_audio_packet(file, &[0.0; 960])?;
         *audio_bytes += 1920;
     }
