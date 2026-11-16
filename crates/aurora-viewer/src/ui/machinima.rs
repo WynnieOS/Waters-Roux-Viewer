@@ -146,7 +146,7 @@ pub fn show(
                         .add(egui::Slider::new(&mut settings.shadow_quality, 0..=4).text("Shadow quality"))
                         .changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut settings.draw_distance, 32.0..=512.0).text("Draw distance (m)"))
+                        .add(egui::Slider::new(&mut settings.draw_distance, 32.0..=1024.0).text("Draw distance (m)"))
                         .changed();
                     changed |= ui
                         .add(egui::Slider::new(&mut settings.render_scale_percent, 50..=100).text("Render resolution (%)"))
