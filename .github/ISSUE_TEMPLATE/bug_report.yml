@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug in Aurora
+description: Report a bug in Waters Roux Viewer
 type: Bug
 body:
   - type: textarea
@@ -34,13 +34,13 @@ body:
     validations:
       required: true
 
-  - type: upload
+  - type: textarea
     id: attachments
     attributes:
-      label: Attachments (Logs, Screenshots, or Files)
+      label: Optional screenshot or sanitized log links
       description: |
         **WARNING:** All uploaded files are **PUBLIC** and visible to everyone on the internet. 
         Do **NOT** upload sensitive information, private logs, passwords, or personal data. 
-        Attach only public screenshots or sanitized logs.
+        Attach only public screenshots or sanitized logs. Add a link here or attach files in the GitHub issue editor.
     validations:
       required: false
