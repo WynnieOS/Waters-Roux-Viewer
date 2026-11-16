@@ -110,7 +110,7 @@ pub fn show(
     info: &LoginInfo,
     progress: Option<(&str, f32)>,
 ) -> LoginAction {
-    super::draw_background(ui, p);
+    super::draw_login_background(ui, p, form);
     let ctx = ui.ctx().clone();
     let grids_open = crate::ui::grids::is_open(&ctx);
     let screen = ctx.content_rect();
@@ -212,7 +212,7 @@ pub fn show(
                                     .fit_to_exact_size(Vec2::splat((if screen.height() < 800.0 { 32.0 } else { 64.0 }) * layout.scale)),
                             );
                         }
-                        ui.label(RichText::new("Aurora Viewer").size(28.0 * layout.text_scale).strong().color(p.ink));
+                        ui.label(RichText::new("Waters Roux").size(28.0 * layout.text_scale).strong().color(p.ink));
                         ui.label(
                             RichText::new(crate::ui::login::client_tagline())
                                 .size(13.0 * layout.text_scale)

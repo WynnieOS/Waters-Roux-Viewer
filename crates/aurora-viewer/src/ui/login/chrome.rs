@@ -28,7 +28,7 @@ pub fn sidebar(ctx: &Context, p: &Palette, icons: &Icons, info: &LoginInfo, card
 }
 
 fn version(ui: &mut egui::Ui, p: &Palette) {
-    let label = aurora_i18n::tr!("ui-login-aurora-viewer-v", value0 = aurora_version::version().to_string());
+    let label = format!("Waters Roux Viewer v{}", aurora_version::version());
     ui.label(RichText::new(label).size(11.5).color(p.muted_dim));
 }
 

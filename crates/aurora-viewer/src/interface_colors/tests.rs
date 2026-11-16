@@ -77,6 +77,7 @@ fn the_skin_bases_give_back_the_skin() {
         accent: some(s.violet),
         surface: some(s.panel),
         text: some(s.ink),
+        ..Default::default()
     };
     let (p, adjusted) = derive(s, &all);
     assert_same(&p, &s);
@@ -154,6 +155,7 @@ fn a_tinted_theme_tints_its_surfaces_and_texts() {
             accent: rgba("#EC4899"),
             surface: rgba("#3A2433"),
             text: rgba("#FCE7F3"),
+            ..Default::default()
         },
     );
     assert_eq!(adjusted, Adjusted::default());
@@ -325,4 +327,21 @@ fn chat_colours_move_onto_a_light_background() {
         assert!(contrast(moved, ground) >= TEXT, "{c} → {moved:?}");
     }
     assert_eq!(readable(hex("#5EEAD4"), skin().panel, TEXT), hex("#5EEAD4"));
+}
+
+#[test]
+fn waters_roux_glass_opacity_is_a_saved_palette_choice() {
+    let skin = Theme::waters_roux().skin_palette();
+    assert_eq!(apply(skin, &InterfaceColors::default()).panel_alpha, 172);
+    let transparent = InterfaceColors {
+        glass_alpha: Some(76),
+        ..Default::default()
+    };
+    assert_eq!(apply(skin, &transparent).panel_alpha, 76);
+    let opaque = InterfaceColors {
+        glass_alpha: Some(255),
+        ..Default::default()
+    };
+    assert_eq!(apply(skin, &opaque).panel_alpha, 255);
+    assert!(!transparent.is_default());
 }
