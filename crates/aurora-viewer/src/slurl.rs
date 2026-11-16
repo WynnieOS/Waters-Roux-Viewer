@@ -128,6 +128,19 @@ pub fn parse(input: &str) -> Option<Location> {
     if lower.starts_with("hop://") || lower.starts_with("x-grid-location-info://") {
         return parse_hypergrid(s);
     }
+    // A three-slash secondlife app link must be one of the explicit place forms.
+    // Never mistake other app commands for a region named "app".
+    if lower.starts_with("secondlife:///")
+        && ![
+            "secondlife:///app/teleport/",
+            "secondlife:///app/region/",
+            "secondlife:///secondlife/",
+        ]
+        .iter()
+        .any(|prefix| lower.starts_with(prefix))
+    {
+        return None;
+    }
     // strip the known URL prefixes down to "Region/x/y/z"
     let mut rest: Option<&str> = None;
     for prefix in [
@@ -467,6 +480,8 @@ mod tests {
             "Ahern/1/2/3/4",
             "https://www.fake-slurl.com/secondlife/Ahern/128/128/0",
             "secondlife:///app/teleport/",
+            "secondlife:///app",
+            "secondlife:///app/chat/hello",
         ] {
             assert!(parse(invalid).is_none(), "invalid SLURL accepted: {invalid}");
         }
