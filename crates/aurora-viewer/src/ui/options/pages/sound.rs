@@ -547,6 +547,18 @@ fn voice(cx: &mut Cx) {
             &field!(colors.voice_loud),
             |ui, s| voice_color_swatch(ui, &p, "loud", &mut s.colors.voice_loud, p.danger),
         );
+        cx.row(
+            "Idle microphone color",
+            "Resident connected to voice but not speaking. Theme uses the skin's microphone green.",
+            &field!(colors.voice_idle),
+            |ui, s| voice_color_swatch(ui, &p, "idle", &mut s.colors.voice_idle, p.success),
+        );
+        cx.row(
+            "Unavailable microphone color",
+            "Microphone-off badge for residents not connected to voice. This does not prove they muted their microphone.",
+            &field!(colors.voice_unavailable),
+            |ui, s| voice_color_swatch(ui, &p, "unavailable", &mut s.colors.voice_unavailable, p.danger),
+        );
         cx.toggle(tr!("voice-show-visualizers"), "", &field!(audio.voice_visualizer));
         cx.toggle(tr!("voice-show-self"), "", &field!(audio.voice_visualizer_self));
         cx.toggle(tr!("voice-show-dot"), "", &field!(audio.voice_visualizer_dot));

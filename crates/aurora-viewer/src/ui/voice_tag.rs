@@ -62,8 +62,20 @@ pub struct VoiceTags {
     envelopes: HashMap<Uuid, Envelope>,
 }
 
+/// Idle microphone, not the speaking outline; preserve the skin palette when
+/// no resident-specific color is selected.
+pub(super) fn idle_color(p: &Palette, options: &crate::settings::ColorSettings) -> Color32 {
+    options.voice_idle.map(crate::ui::colors::c).unwrap_or(p.success)
+}
+
+/// No voice connection/unavailable. This is not an indication that an
+/// otherwise connected resident deliberately muted their microphone.
+pub(super) fn unavailable_color(p: &Palette, options: &crate::settings::ColorSettings) -> Color32 {
+    options.voice_unavailable.map(crate::ui::colors::c).unwrap_or(p.danger)
+}
+
 /// Green → amber → red, calibrated for WebRTC's actual participant range.
-fn level_color(p: &Palette, level: f32, options: &crate::settings::ColorSettings) -> Color32 {
+pub(super) fn level_color(p: &Palette, level: f32, options: &crate::settings::ColorSettings) -> Color32 {
     let color = |value: Option<crate::settings::Rgba>, fallback: Color32| value.map(crate::ui::colors::c).unwrap_or(fallback);
     let quiet = color(options.voice_quiet, p.success);
     let medium = color(options.voice_medium, p.amber);
@@ -153,6 +165,24 @@ mod tests {
         assert_eq!(level_color(&p, LEVEL_MIN, &selected), crate::ui::colors::c([255, 0, 128, 255]));
         assert_eq!(level_color(&p, LEVEL_AMBER, &selected), crate::ui::colors::c([0, 255, 255, 255]));
         assert_eq!(level_color(&p, LEVEL_MAX, &selected), crate::ui::colors::c([128, 0, 255, 255]));
+    }
+
+    #[test]
+    fn voice_idle_and_unavailable_colors_roundtrip_without_reclassifying_muted_users() {
+        let p = crate::theme::Theme::default().palette();
+        let old: crate::settings::ColorSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!(idle_color(&p, &old), p.success);
+        assert_eq!(unavailable_color(&p, &old), p.danger);
+        assert_eq!(level_color(&p, LEVEL_MIN, &old), p.success);
+
+        let mut selected = old;
+        selected.voice_idle = Some([18, 102, 170, 255]);
+        selected.voice_unavailable = Some([180, 40, 90, 255]);
+        let restored: crate::settings::ColorSettings = serde_json::from_str(&serde_json::to_string(&selected).unwrap()).unwrap();
+        assert_eq!(idle_color(&p, &restored), crate::ui::colors::c([18, 102, 170, 255]));
+        assert_eq!(unavailable_color(&p, &restored), crate::ui::colors::c([180, 40, 90, 255]));
+        // Speech volume remains independently configurable.
+        assert_eq!(level_color(&p, LEVEL_AMBER, &restored), p.amber);
     }
 
     #[test]
