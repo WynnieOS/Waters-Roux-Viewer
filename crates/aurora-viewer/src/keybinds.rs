@@ -350,6 +350,8 @@ pub enum Action {
     ZoomSelection,
     /// LLViewerJoystick::toggleFlycam (menu_viewer.xml, Alt+Shift+F).
     Flycam,
+    /// One-key start/stop MP4 capture, including while Flycam is engaged.
+    QuickRecord,
     /// The Controls window, on its Camera tab (Firestorm's View › Camera
     /// Controls).
     CameraControls,
@@ -542,6 +544,7 @@ pub fn sections() -> &'static Vec<(&'static str, Vec<(Action, &'static str)>)> {
                     (Action::FocusSelection, aurora_i18n::tr!("keybinds-focus-selection")),
                     (Action::ZoomSelection, aurora_i18n::tr!("keybinds-zoom-selection")),
                     (Action::Flycam, aurora_i18n::tr!("joystick-flycam")),
+                    (Action::QuickRecord, "Start / stop MP4 recording"),
                     (Action::CameraControls, aurora_i18n::tr!("controls-camera-title")),
                     (Action::LensZoomIn, aurora_i18n::tr!("keybinds-lens-zoom-in")),
                     (Action::LensZoomOut, aurora_i18n::tr!("keybinds-lens-zoom-out")),
@@ -766,6 +769,7 @@ impl KeyBindings {
             (Action::FocusSelection, [k(K::KeyH), None]),
             (Action::ZoomSelection, [kmod(K::KeyH, false, true), None]),
             (Action::Flycam, [kalt(K::KeyF, false, true), None]),
+            (Action::QuickRecord, [k(K::F9), None]),
             (Action::CameraControls, [kmod(K::KeyC, true, true), None]),
             (Action::LensZoomIn, [kmod(K::Digit0, true, false), kmod(K::Numpad0, true, false)]),
             (Action::LensZoomOut, [kmod(K::Digit8, true, false), kmod(K::Numpad8, true, false)]),
@@ -2157,6 +2161,20 @@ mod tests {
         assert_eq!(Action::Fly.time_of_day(), None);
         kb.set(Action::EnvMidnight, 0, None);
         assert_eq!(kb.sanitized().get(Action::EnvMidnight)[0], None);
+    }
+
+    #[test]
+    fn quick_record_defaults_to_f9_and_migrates_existing_bindings() {
+        let mut shortcuts = KeyBindings::default();
+        let first = shortcuts.get(Action::QuickRecord)[0].clone().expect("default F9 quick recorder");
+        assert_eq!(first.input, Input::key(KeyCode::F9));
+        shortcuts.map.retain(|(action, _)| *action != Action::QuickRecord);
+        let restored = shortcuts.sanitized();
+        let binding = restored.get(Action::QuickRecord)[0]
+            .clone()
+            .expect("old profile migrated to F9 recorder");
+        assert_eq!(binding.input, Input::key(KeyCode::F9));
+        assert_ne!(restored.get(Action::QuickRecord), restored.get(Action::Flycam));
     }
 
     #[test]

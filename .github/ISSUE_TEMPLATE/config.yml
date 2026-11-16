@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Feature request
-    url: https://feedback.aurora-viewer.org
-    about: Suggest a feature or an improvement, and vote for the ideas of others, on our feedback board.
+    url: https://github.com/WynnieOS/Waters-Roux-Viewer/issues
+    about: Discuss features and improvements for Waters Roux, or open a new feature request.

@@ -1305,6 +1305,12 @@ fn main_menus(ui: &mut egui::Ui, p: &Palette, panels: &mut Panels, st: &StatusIn
         if crate::updater::checks_enabled() && menu::item(ui, p, "download-filled", aurora_i18n::tr!("update-check")) {
             *action = BarAction::CheckUpdates;
         }
+        if menu::item(ui, p, "download-filled", "Waters Roux downloads / updates") {
+            request(ui.ctx(), CtxAction::OpenUrl(crate::links::RELEASES.into()));
+        }
+        if menu::item(ui, p, "bulb-filled", "Feature requests") {
+            request(ui.ctx(), CtxAction::OpenUrl(crate::links::FEATURE_REQUESTS.into()));
+        }
         if menu::item(ui, p, "bug-filled", aurora_i18n::tr!("bug-title")) {
             *action = BarAction::ReportBug;
         }
@@ -1878,8 +1884,8 @@ pub fn top_bars(
                 ui.set_min_width(ui.available_width());
                 ui.spacing_mut().item_spacing.x = 4.0;
                 ui.style_mut().visuals.button_frame = false;
-                // Aurora menu (white wolf): Me, Communicate, World, Build, Contents, Advanced, Help
-                if let Some(t) = icons.get("crown") {
+                // Waters Roux menu: original fleur-de-lis symbol, with all existing commands retained.
+                if let Some(t) = icons.get("fleur-de-lis") {
                     let img = egui::Image::new(t).fit_to_exact_size(Vec2::new(18.0, 18.0)).tint(p.ink);
                     menu::button(ui, p, egui::Button::image(img), |ui| {
                         menu::searchable(ui, p, |ui| main_menus(ui, p, panels, st, &mut action, true));

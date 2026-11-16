@@ -146,7 +146,7 @@ pub fn show(
                         .add(egui::Slider::new(&mut settings.shadow_quality, 0..=4).text("Shadow quality"))
                         .changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut settings.draw_distance, 32.0..=512.0).text("Draw distance (m)"))
+                        .add(egui::Slider::new(&mut settings.draw_distance, 32.0..=1024.0).text("Draw distance (m)"))
                         .changed();
                     changed |= ui
                         .add(egui::Slider::new(&mut settings.render_scale_percent, 50..=100).text("Render resolution (%)"))
@@ -204,6 +204,7 @@ pub fn show(
                 ui.label("Your microphone narration and unrelated desktop audio are not captured yet.");
                 ui.label("Records H.264 video to a real MP4 file; optional in-world audio is encoded as AAC. Recording requires the bundled FFmpeg encoder.");
                 ui.label("MP4 finishing happens in the background after Stop. Wait for the Saved MP4 message before exiting.");
+                ui.label("Quick Record: press F9 to start or stop anywhere in-world, including Flycam. Change the key in Preferences > Shortcuts.");
                 ui.label("Voice chat and in-world audio may require consent. Microphone narration is not captured.");
                 ui.horizontal(|ui| {
                     if finalizing {

@@ -1,0 +1,75 @@
+name: Waters Roux V3 - F9 Quick Record source QA
+
+on:
+  push:
+    branches:
+      - feat/waters-roux-v3-quick-record-f9
+    paths:
+      - '.github/workflows/waters-roux-v3-quick-record-qa.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  quick-record:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout isolated F9 recording feature
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/waters-roux-v3-quick-record-f9
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Format only F9 recording-related Rust files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name 'Waters Roux V3 Source QA'
+          git config user.email 'ci@users.noreply.github.com'
+          cargo fmt --all
+          if ($LASTEXITCODE -ne 0) { throw 'Rustfmt failed' }
+          $allowed = @(
+            'crates/aurora-viewer/src/app.rs',
+            'crates/aurora-viewer/src/keybinds.rs',
+            'crates/aurora-viewer/src/ui/machinima.rs'
+          )
+          $modified = @(git diff --name-only)
+          foreach ($file in $modified) {
+            if ($file -notin $allowed) { throw "Unexpected Rustfmt change outside F9 feature: $file" }
+          }
+          if ($modified.Count -gt 0) {
+            git diff --check
+            if ($LASTEXITCODE -ne 0) { throw 'Whitespace error' }
+            git add -- $modified
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to stage formatting' }
+            git commit -m "style(v3): rustfmt F9 quick record source"
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to commit formatting-only changes' }
+            git push origin HEAD:refs/heads/feat/waters-roux-v3-quick-record-f9
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to preserve formatted feature branch' }
+          }
+          cargo fmt --all -- --check
+          if ($LASTEXITCODE -ne 0) { throw 'Format check failed' }
+      - name: Confirm F9 shortcut uses same MP4 record pipeline
+        shell: pwsh
+        run: |
+          $k = Get-Content crates/aurora-viewer/src/keybinds.rs -Raw
+          $a = Get-Content crates/aurora-viewer/src/app.rs -Raw
+          if (!$k.Contains('Action::QuickRecord, [k(K::F9), None]')) { throw 'F9 binding absent' }
+          if (!$a.Contains('Action::QuickRecord => self.quick_record()')) { throw 'Quick record input path absent' }
+          if (!$a.Contains('BarAction::StartRecording => self.start_video_recording()')) { throw 'Existing Machinima start not shared' }
+          if (!$a.Contains('BarAction::StopRecording => self.stop_video_recording()')) { throw 'Existing Machinima stop not shared' }
+          if (!$a.Contains('self.recorder.stop_async()')) { throw 'Async finalize absent' }
+          Write-Host 'Source assertions passed; actual Flycam, video and audio acceptance remains mandatory.'
+      - name: Run focused Rust and viewer tests
+        shell: pwsh
+        run: |
+          cargo test --locked -p aurora-viewer --bin aurora-viewer
+          if ($LASTEXITCODE -ne 0) { throw 'Viewer tests failed; do not distribute as V3' }
+      - name: Report QA limitations
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host 'F9 Quick Record source QA only; nothing published.'
+          Write-Host 'Test F9 in and out of Flycam in a real Second Life session, including voice permissions and MP4 playback.'

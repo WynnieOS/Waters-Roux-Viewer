@@ -4586,6 +4586,7 @@ impl App {
             Action::Fly => self.toggle_fly(),
             Action::FlyOverride => self.toggle_fly_override(),
             Action::Flycam => self.toggle_joystick_flycam(),
+            Action::QuickRecord => self.quick_record(),
             Action::AlwaysRun => self.set_always_run(!self.always_run),
             Action::MoveLock => self.toggle_move_lock(),
             Action::MovementEnhancer => self.open_movement(),
@@ -13565,6 +13566,63 @@ impl App {
         self.egui_ctx.copy_text(aurora_version::version().to_owned());
     }
 
+    /// The Machinima Bar and keyboard shortcut share one recording pipeline.
+    /// Never restart while an MP4 is already saving.
+    fn start_video_recording(&mut self) {
+        if self.recorder.finalizing() {
+            self.world
+                .system_message("An MP4 is still finalizing. Finish saving before recording again.".to_owned());
+            return;
+        }
+        if self.recorder.active() {
+            self.world
+                .system_message("Video recording is already active. Press F9 again to stop.".to_owned());
+            return;
+        }
+        if !self.in_world() {
+            self.world
+                .system_message("Enter Second Life before starting the video recorder.".to_owned());
+            return;
+        }
+        match self.recorder.start(self.settings.recording, self.audio_engine.as_ref()) {
+            Ok(path) => {
+                let before = self.settings.show_huds;
+                if before != self.settings.recording.capture_huds {
+                    self.set_show_huds(self.settings.recording.capture_huds);
+                    if self.settings.show_huds != before {
+                        self.recording_huds_restore = Some(before);
+                    }
+                }
+                self.world.system_message(format!("Recording video to {}", path.display()));
+            }
+            Err(error) => self.world.system_message(format!("Recorder error: {error}")),
+        }
+    }
+
+    fn stop_video_recording(&mut self) {
+        let result = self.recorder.stop_async();
+        if let Some(previous) = self.recording_huds_restore.take() {
+            self.set_show_huds(previous);
+        }
+        match result {
+            Ok(true) => self
+                .world
+                .system_message("Finalizing H.264 MP4 in the background. Keep Waters Roux open until saved confirmation.".to_owned()),
+            Ok(false) => self.world.system_message("No recording is active.".to_owned()),
+            Err(error) => self.world.system_message(format!("MP4 finalize failed: {error}")),
+        }
+    }
+
+    /// Rebindable F9 default. Because this is a normal keybinding, it works
+    /// whether the user is flying the camera or operating outside Flycam.
+    fn quick_record(&mut self) {
+        if self.recorder.active() {
+            self.stop_video_recording();
+        } else {
+            self.start_video_recording();
+        }
+    }
+
     fn handle_actions(&mut self, a: UiActions, event_loop: &ActiveEventLoop) {
         if let Some(action) = a.exit {
             self.confirm_exit(action);
@@ -13907,39 +13965,8 @@ impl App {
             BarAction::CreateLandmark => self.open_create_landmark(None),
             BarAction::PhotoToDisk => self.photo_to_disk(),
             BarAction::CapturePanorama => self.photo_panorama_to_disk(),
-            BarAction::StartRecording => {
-                if self.in_world() {
-                    match self.recorder.start(self.settings.recording, self.audio_engine.as_ref()) {
-                        Ok(path) => {
-                            let before = self.settings.show_huds;
-                            if before != self.settings.recording.capture_huds {
-                                self.set_show_huds(self.settings.recording.capture_huds);
-                                if self.settings.show_huds != before {
-                                    self.recording_huds_restore = Some(before);
-                                }
-                            }
-                            self.world.system_message(format!("Recording video to {}", path.display()));
-                        }
-                        Err(error) => self.world.system_message(format!("Recorder error: {error}")),
-                    }
-                } else {
-                    self.world
-                        .system_message("Enter Second Life before starting the video recorder.".to_owned());
-                }
-            }
-            BarAction::StopRecording => {
-                let result = self.recorder.stop_async();
-                if let Some(previous) = self.recording_huds_restore.take() {
-                    self.set_show_huds(previous);
-                }
-                match result {
-                    Ok(true) => self.world.system_message(
-                        "Finalizing H.264 MP4 in the background. Keep Waters Roux open until saved confirmation.".to_owned(),
-                    ),
-                    Ok(false) => self.world.system_message("No recording is active.".to_owned()),
-                    Err(error) => self.world.system_message(format!("MP4 finalize failed: {error}")),
-                }
-            }
+            BarAction::StartRecording => self.start_video_recording(),
+            BarAction::StopRecording => self.stop_video_recording(),
             BarAction::PhotoRoll => self.photo_reel_show_newest(),
             // The Destination Guide and Help pages run inside the viewer's
             // existing browser, rather than creating dead toolbar windows.

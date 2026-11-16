@@ -1,0 +1,81 @@
+name: Waters Roux V3 - integrate camera and graphics fixes
+
+on:
+  push:
+    branches:
+      - integrate/waters-roux-beta28-v3
+    paths:
+      - '.github/workflows/waters-roux-v3-integrate-camera-graphics.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: waters-roux-v3-integrate-camera-graphics
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout stable integrated Waters Roux source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: integrate/waters-roux-beta28-v3
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Merge pinned camera and graphics source without shipping a viewer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name 'Waters Roux V3 Integration'
+          git config user.email 'ci@users.noreply.github.com'
+          $branch = (git branch --show-current).Trim()
+          if ($branch -ne 'integrate/waters-roux-beta28-v3') { throw 'Wrong integration branch' }
+          $pins = @(
+            @{ Ref='feat/waters-roux-v3-1024m-draw-distance'; Sha='d4525627a7a17a57bd98f182441aef91a127276c' },
+            @{ Ref='feat/waters-roux-v3-quick-record-f9'; Sha='f773f5adae72df9cbb0f5a8877a738e442ac31b0' },
+            @{ Ref='feat/waters-roux-v3-hide-flycam-overlay'; Sha='ff7f586fa251a6daff7a04a5c9553a53075fa7ef' }
+          )
+          foreach ($pin in $pins) {
+            git fetch --no-tags origin "refs/heads/$($pin.Ref)"
+            if ($LASTEXITCODE -ne 0) { throw "Cannot fetch $($pin.Ref)" }
+            $actual = (git rev-parse "refs/remotes/origin/$($pin.Ref)").Trim()
+            if ($LASTEXITCODE -ne 0 -or $actual -ne $pin.Sha) { throw "Pin mismatch $($pin.Ref): expected $($pin.Sha), actual $actual" }
+            git merge --no-ff --no-edit $pin.Sha
+            if ($LASTEXITCODE -ne 0) { throw "Conflict in $($pin.Ref). Stop and review; never substitute unbranded source" }
+          }
+          $keybinds = Get-Content 'crates/aurora-viewer/src/keybinds.rs' -Raw
+          $app = Get-Content 'crates/aurora-viewer/src/app.rs' -Raw
+          $joystick = Get-Content 'crates/aurora-viewer/src/app/joystick.rs' -Raw
+          $settings = Get-Content 'crates/aurora-viewer/src/settings.rs' -Raw
+          $links = Get-Content 'crates/aurora-viewer/src/links.rs' -Raw
+          if (!$keybinds.Contains('Action::QuickRecord, [k(K::F9), None]')) { throw 'Quick Record binding lost' }
+          if (!$app.Contains('Action::QuickRecord => self.quick_record()')) { throw 'Quick Record handler lost' }
+          if (!$joystick.Contains('!self.settings.joystick.show_flycam_banner')) { throw 'Flycam banner toggle lost' }
+          if (!$settings.Contains('self.draw_distance.clamp(32.0, 1024.0)')) { throw 'Draw distance improvement lost' }
+          if (!$links.Contains('WynnieOS/Waters-Roux-Viewer/issues/new/choose')) { throw 'Waters Roux support links lost' }
+          if (!(Test-Path 'assets/branding/waters-roux-logo.png')) { throw 'Branded logo missing' }
+          if (!(Test-Path 'crates/aurora-viewer/src/app/recording/mp4.rs')) { throw 'MP4 recorder source missing' }
+          cargo fmt --all
+          if ($LASTEXITCODE -ne 0) { throw 'Rustfmt failed' }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Unexpected whitespace change' }
+          $changed = @(git status --porcelain)
+          if ($changed.Count -gt 0) {
+            git add --all
+            if ($LASTEXITCODE -ne 0) { throw 'Could not stage formatting' }
+            git commit -m 'style(v3): format integrated camera and graphics fixes'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not commit formatting changes' }
+          }
+          cargo fmt --all -- --check
+          if ($LASTEXITCODE -ne 0) { throw 'Integration formatting check failed' }
+          git push origin HEAD:refs/heads/integrate/waters-roux-beta28-v3
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot persist V3 integration' }
+          Write-Host 'Camera/draw-distance/Flycam source integrated; viewer not distributed.'
+      - name: No release without acceptance
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host 'This is only code integration. The full V3 checklist, Windows compilation, audio/video and in-world testing remain required.'
