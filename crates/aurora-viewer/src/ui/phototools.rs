@@ -56,7 +56,7 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
     let mut open_lighting = false;
     let mut open_camera = false;
     let mut open_machinima = false;
-    let preset_name_id = egui::Id::new("waters-roux-photo-preset-name");
+    let preset_name_id = egui::Id::unique("waters-roux-photo-preset-name");
     let mut preset_name = ctx.data(|d| d.get_temp::<String>(preset_name_id)).unwrap_or_default();
     let screen = ctx.content_rect();
 
@@ -356,8 +356,10 @@ mod tests {
 
     #[test]
     fn photo_presets_persist_and_restore_lighting_without_overwriting() {
-        let mut settings = Settings::default();
-        settings.draw_distance = 768.0;
+        let mut settings = Settings {
+            draw_distance: 768.0,
+            ..Settings::default()
+        };
         set_photo_shadow_quality(&mut settings, 3);
         settings.bloom = true;
         settings.dof.enabled = true;
