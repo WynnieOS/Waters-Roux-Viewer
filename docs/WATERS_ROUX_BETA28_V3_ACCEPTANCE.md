@@ -105,6 +105,18 @@
 - [ ] Owner + Devin complete in-world Beta V3 acceptance and document results.
 - [ ] Fix failed Beta V3 tests, rerun regression/security gates, prepare official v1.0.0 installer, release notes, user guide, support/update instructions and optional separately validated macOS build.
 
+## 18. Official website, bugs, updates, feature requests and project metadata
+- [ ] "Website" opens https://github.com/WynnieOS/Waters-Roux-Viewer until an actual Waters Roux site is published (no Aurora redirect).
+- [ ] "Report a Bug" opens https://github.com/WynnieOS/Waters-Roux-Viewer/issues/new/choose; bug-report and crash-report browser flows go to the same Waters Roux repository.
+- [ ] "Download / Updates" opens https://github.com/WynnieOS/Waters-Roux-Viewer/releases; preserve existing Waters Roux update feed and release-channel behavior.
+- [ ] "Feature Requests" opens https://github.com/WynnieOS/Waters-Roux-Viewer/issues; provide a usable issue template and discoverable Help menu action.
+- [ ] Help/Wiki, support and README links must not send Waters Roux residents to Aurora's wiki, download, feedback board or issue tracker.
+- [ ] Fix GitHub repository Website metadata (currently Aurora on audit), product description, issue form descriptions and any active support/contact links.
+- [ ] Remove Aurora GitHub API destinations and **never reuse Aurora's GitHub App client ID**; direct OAuth/reporting may only be enabled once a dedicated Waters Roux App is approved and tested. Browser reporting must remain available.
+- [ ] Preserve source license notices, historical attribution and compatibility file paths; do not indiscriminately rename upstream source internals.
+- [ ] Publish a reviewed Waters Roux privacy policy before official v1.0.0; an interim status notice must not masquerade as an approved privacy policy.
+- [ ] Validate every final browser destination in actual Windows Beta V3; investigate broken or inaccessible GitHub Pages, Issues, release pages and privacy links.
+
 ## Current implementation notes
 
 - Installed Beta V2 artifact identified conclusively by SHA256 at Actions run **43404203369**. See `WATERS_ROUX_BETA28_V3_SOURCE_RECOVERY.md`.
