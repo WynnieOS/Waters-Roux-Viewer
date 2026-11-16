@@ -56,8 +56,13 @@ impl Editor {
         } else if self.drag.is_none() && !self.gizmo.dragging() {
             self.sync_pose_bone(self.selected.unwrap_or(rig.pelvis), &frame);
         }
-        // Process tabs first: hidden groups must lose their handles this frame.
-        self.poser_ui(ctx, p, world, &frame);
+        // Pose Stand is a genuinely separate self-only working floater;
+        // Poser retains the full consent-based multi-avatar editor.
+        if self.poser.stand_mode {
+            self.pose_stand_ui(ctx, p, world, &frame);
+        } else {
+            self.poser_ui(ctx, p, world, &frame);
+        }
         if self.poser.active && self.poser.markers {
             self.pose_overlay(ctx, p, world, proj, &frame);
         } else {
