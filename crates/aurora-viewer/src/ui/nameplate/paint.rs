@@ -487,11 +487,15 @@ pub(super) struct LoudRing {
 /// olive.
 pub(super) fn loud_ring(p: &Palette, level: f32, heat: f32) -> LoudRing {
     let (l, h) = (level.clamp(0.0, 1.0), heat.clamp(0.0, 1.0));
-    let green = p.success.lerp_to_gamma(p.ink, 0.3 * l);
+    let options = crate::ui::colors::get();
+    let quiet = options.voice_quiet.map(crate::ui::colors::c).unwrap_or(p.success);
+    let medium = options.voice_medium.map(crate::ui::colors::c).unwrap_or(p.amber);
+    let loud = options.voice_loud.map(crate::ui::colors::c).unwrap_or(p.danger);
+    let quiet_bright = quiet.lerp_to_gamma(p.ink, 0.3 * l);
     let color = if h < 0.5 {
-        green.lerp_to_gamma(p.amber, 2.0 * h)
+        quiet_bright.lerp_to_gamma(medium, 2.0 * h)
     } else {
-        p.amber.lerp_to_gamma(p.danger, 2.0 * h - 1.0)
+        medium.lerp_to_gamma(loud, 2.0 * h - 1.0)
     };
     LoudRing {
         gap: 1.0 + 7.0 * l,
@@ -551,7 +555,13 @@ fn badge_icon(p: &Palette, badge: Badge) -> Option<(&'static str, Color32)> {
             Color32::from_rgba_premultiplied(color[0], color[1], color[2], color[3]),
         ),
         Badge::More(_) => return None,
-        Badge::Voice => ("microphone-filled", p.success),
+        Badge::Voice => (
+            "microphone-filled",
+            crate::ui::colors::get()
+                .voice_quiet
+                .map(crate::ui::colors::c)
+                .unwrap_or(p.success),
+        ),
         Badge::Friend => ("heart-filled", p.success),
         Badge::TooComplex => ("alert-triangle-filled", p.amber),
         Badge::RenderNever => ("eye-off", p.amber),

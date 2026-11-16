@@ -1566,6 +1566,11 @@ pub struct ColorSettings {
     pub tag_match: Rgba,
     /// Custom display name (NameTagMismatch).
     pub tag_mismatch: Rgba,
+    // Optional voice indicator colors. None retains the active skin's palette,
+    // including a resident's saved theme and accessibility choices.
+    pub voice_quiet: Option<Rgba>,
+    pub voice_medium: Option<Rgba>,
+    pub voice_loud: Option<Rgba>,
     // minimap
     pub map_me: Rgba,
     pub map_other: Rgba,
@@ -1616,6 +1621,9 @@ impl Default for ColorSettings {
             tag_linden: hex(0xF472B6),
             tag_match: hex(0xE8EDFB),
             tag_mismatch: hex(0xE8EDFB),
+            voice_quiet: None,
+            voice_medium: None,
+            voice_loud: None,
             map_me: hex(0x8B5CF6),
             map_other: hex(0x4ADE80),
             map_friend: hex(0x818CF8),

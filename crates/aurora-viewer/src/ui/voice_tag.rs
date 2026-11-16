@@ -63,16 +63,22 @@ pub struct VoiceTags {
 }
 
 /// Green → amber → red, calibrated for WebRTC's actual participant range.
-fn level_color(p: &Palette, level: f32) -> Color32 {
+fn level_color(p: &Palette, level: f32, options: &crate::settings::ColorSettings) -> Color32 {
+    let color = |value: Option<crate::settings::Rgba>, fallback: Color32| {
+        value.map(crate::ui::colors::c).unwrap_or(fallback)
+    };
+    let quiet = color(options.voice_quiet, p.success);
+    let medium = color(options.voice_medium, p.amber);
+    let loud = color(options.voice_loud, p.danger);
     let lerp = |a: Color32, b: Color32, t: f32| {
         let t = t.clamp(0.0, 1.0);
         let mix = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
         Color32::from_rgb(mix(a.r(), b.r()), mix(a.g(), b.g()), mix(a.b(), b.b()))
     };
     if level < LEVEL_AMBER {
-        lerp(p.success, p.amber, (level - LEVEL_MIN) / (LEVEL_AMBER - LEVEL_MIN))
+        lerp(quiet, medium, (level - LEVEL_MIN) / (LEVEL_AMBER - LEVEL_MIN))
     } else {
-        lerp(p.amber, p.danger, (level - LEVEL_AMBER) / (LEVEL_MAX - LEVEL_AMBER))
+        lerp(medium, loud, (level - LEVEL_AMBER) / (LEVEL_MAX - LEVEL_AMBER))
     }
 }
 
@@ -93,7 +99,7 @@ impl VoiceTags {
             // Keep speech readable at a distance and against bright scene backgrounds.
             let opacity = e.opacity * fade.sqrt();
             let width = 3.0 + volume * 1.5;
-            let color = level_color(p, e.level).gamma_multiply(opacity);
+            let color = level_color(p, e.level, &crate::ui::colors::get()).gamma_multiply(opacity);
             painter.rect_stroke(
                 rect,
                 3.0,
@@ -122,9 +128,43 @@ mod tests {
         let level = 0.18 + 0.1 * (0.35_f32 * 32_768.0).log10();
         let mut e = Envelope::new(0.0);
         e.update(level, true, 0.3);
-        assert_eq!(level_color(&p, e.level), p.danger);
-        assert_eq!(level_color(&p, 0.30), p.success);
-        assert_ne!(level_color(&p, 0.48), p.danger);
+        let defaults = crate::settings::ColorSettings::default();
+        assert_eq!(level_color(&p, e.level, &defaults), p.danger);
+        assert_eq!(level_color(&p, 0.30, &defaults), p.success);
+        assert_ne!(level_color(&p, 0.48, &defaults), p.danger);
+    }
+
+    #[test]
+    fn configurable_voice_colors_preserve_theme_defaults() {
+        let p = crate::theme::Theme::default().palette();
+        let defaults = crate::settings::ColorSettings::default();
+        assert_eq!(level_color(&p, LEVEL_MIN, &defaults), p.success);
+        assert_eq!(level_color(&p, LEVEL_AMBER, &defaults), p.amber);
+        assert_eq!(level_color(&p, LEVEL_MAX, &defaults), p.danger);
+
+        // Older saved files omit the new keys, and continue to use the theme.
+        let from_old: crate::settings::ColorSettings =
+            serde_json::from_str("{}").expect("older color preferences");
+        assert_eq!(from_old.voice_quiet, None);
+        assert_eq!(from_old.voice_medium, None);
+        assert_eq!(from_old.voice_loud, None);
+
+        let mut selected = defaults;
+        selected.voice_quiet = Some([255, 0, 128, 255]);
+        selected.voice_medium = Some([0, 255, 255, 255]);
+        selected.voice_loud = Some([128, 0, 255, 255]);
+        assert_eq!(
+            level_color(&p, LEVEL_MIN, &selected),
+            crate::ui::colors::c([255, 0, 128, 255])
+        );
+        assert_eq!(
+            level_color(&p, LEVEL_AMBER, &selected),
+            crate::ui::colors::c([0, 255, 255, 255])
+        );
+        assert_eq!(
+            level_color(&p, LEVEL_MAX, &selected),
+            crate::ui::colors::c([128, 0, 255, 255])
+        );
     }
 
     #[test]
