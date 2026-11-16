@@ -1,6 +1,5 @@
 name: Bug Report
 description: Report a bug in Waters Roux Viewer
-type: Bug
 body:
   - type: textarea
     id: steps-to-reproduce
