@@ -155,11 +155,7 @@ impl Style {
     }
 
     pub fn regular_font_size(&self, name: bool) -> f32 {
-        if name {
-            self.regular_name_size
-        } else {
-            self.regular_detail_size
-        }
+        if name { self.regular_name_size } else { self.regular_detail_size }
     }
 
     pub fn color(&self, fade: f32) -> Color32 {
@@ -388,7 +384,9 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
                         .changed();
                     changed |= widgets::switch_labeled(ui, p, &mut style.regular_monospace, "Monospace classic font").changed();
                     changed |= widgets::switch_labeled(ui, p, &mut style.regular_bold, "Bold classic name").changed();
-                    ui.small("Default: original Second Life font size and full opacity. Text stays local and server names are never changed.");
+                    ui.small(
+                        "Default: original Second Life font size and full opacity. Text stays local and server names are never changed.",
+                    );
                 });
                 widgets::divider(ui, p);
                 ui.strong("Custom Name Tag Studio typography");
@@ -611,8 +609,7 @@ mod tests {
             regular_bold: true,
             ..from_old
         };
-        let restored: Style =
-            serde_json::from_str(&serde_json::to_string(&edited).unwrap()).unwrap();
+        let restored: Style = serde_json::from_str(&serde_json::to_string(&edited).unwrap()).unwrap();
         assert_eq!(restored, edited);
         assert_eq!(restored.regular_fade(0.5), 0.325);
     }
