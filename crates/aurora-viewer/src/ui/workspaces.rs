@@ -151,7 +151,11 @@ pub fn restore_open_panels(mode: Mode, panels: &mut Panels) -> Result<(), String
     let focus = match std::fs::read(windows(mode)) {
         Ok(bytes) => Some(serde_json::from_slice::<FocusPanels>(&bytes).map_err(|e| e.to_string())?),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            if mode == Mode::Everyday { None } else { Some(FocusPanels::defaults(mode)) }
+            if mode == Mode::Everyday {
+                None
+            } else {
+                Some(FocusPanels::defaults(mode))
+            }
         }
         Err(error) => return Err(error.to_string()),
     };
