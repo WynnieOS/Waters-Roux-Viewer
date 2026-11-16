@@ -1494,7 +1494,12 @@ impl App {
             Err(e) => log::warn!("logo decode failed: {e}"),
         });
 
-        let panels = Panels::from_settings(&settings);
+        let mut panels = Panels::from_settings(&settings);
+        // The global egui layout is loaded above; restore this mode's own
+        // open creator panels without resetting the user's saved settings.
+        if let Err(error) = ui::workspaces::restore_open_panels(settings.workspace_mode, &mut panels) {
+            log::warn!("Waters Roux workspace panel state could not be restored: {error}");
+        }
         let chat_ui = ChatUi::from_settings(&settings);
         let mut scene = Scene::new(cache, lib.clone());
         scene.jobs.execute(|| {
@@ -6095,6 +6100,9 @@ impl App {
             }
         }
         if self.capture.is_none() {
+            if let Err(error) = ui::workspaces::capture(&self.egui_ctx, self.settings.workspace_mode, &self.panels) {
+                log::warn!("Could not save the active Waters Roux workspace: {error}");
+            }
             ui::layout::save(&self.egui_ctx);
         }
         // LLFavoritesOrderStorage::destroyClass: the favourites as they are
@@ -15091,7 +15099,14 @@ impl App {
         self.options_ui.joystick = self.joystick.snapshot.clone();
         self.options_ui.flycam_active = self.joystick.active;
         let before_camera = self.settings.camera.clone();
+        let before_workspace = self.settings.workspace_mode;
         let mut res = ui::options::show(ctx, p, &self.skin.icons, &mut self.settings, &mut self.options_ui, &mut open);
+        if before_workspace != self.settings.workspace_mode
+            && let Err(error) = ui::workspaces::switch(ctx, before_workspace, self.settings.workspace_mode, &mut self.panels)
+        {
+            log::warn!("Waters Roux workspace switch cancelled: {error}");
+            self.settings.workspace_mode = before_workspace;
+        }
         self.sync_appearance_camera();
         self.world.rlva.preserve_camera_settings(&mut self.settings.camera, &before_camera);
         if res.toggle_flycam {

@@ -13504,3 +13504,11 @@ branding-error-name = 保存された画像の参照が無効です。既定値�
 branding-error-config = 保存された外観ファイルが無効なため、安全な既定値を使用します。
 branding-error-write = 外観を保存できません。プロファイルフォルダーが書き込み可能か確認してください。
 branding-custom-unavailable = 選択したカスタム画像を使用できないため、安全な代替表示を使用します。
+
+# Waters Roux ワークスペース（環境設定 > レイアウト）
+waters-roux-workspaces = Waters Roux ワークスペース
+waters-roux-workspace = 現在のワークスペース
+waters-roux-workspace-help = 保存されたレイアウトに切り替えます。モードごとにウィンドウの配置と開いているパネルを記憶します。
+waters-roux-everyday = 日常
+waters-roux-studio = スタジオ
+waters-roux-creator = 制作
