@@ -154,6 +154,20 @@ fn write_audio_packet(out: &mut File, stereo: &[f32; 960]) -> Result<(), String>
     out.write_all(&bytes).map_err(|e| format!("Cannot capture in-world audio: {e}"))
 }
 
+/// Opting into world audio must not silently produce a video-only MP4 when
+/// the output device has delivered no PCM blocks. One muted 10 ms frame is
+/// enough for FFmpeg's existing apad filter to fill the recording timeline.
+/// This never captures a microphone or unrelated desktop audio.
+fn seed_empty_world_audio(pcm: Option<&mut File>, audio_bytes: &mut u64) -> Result<(), String> {
+    if *audio_bytes == 0
+        && let Some(file) = pcm
+    {
+        write_audio_packet(file, &[0.0; 960])?;
+        *audio_bytes += 1920;
+    }
+    Ok(())
+}
+
 fn check_mp4(path: &Path) -> Result<(), String> {
     let mut file = File::open(path).map_err(|e| format!("Cannot open finished MP4: {e}"))?;
     let mut header = [0u8; 12];
@@ -165,6 +179,34 @@ fn check_mp4(path: &Path) -> Result<(), String> {
         return Err("Encoder returned an unexpectedly small MP4".into());
     }
     Ok(())
+}
+
+/// Use precisely the same AAC muxing path for live captures and the real
+/// bundled-encoder regression fixture. Keep the original silent MP4 intact
+/// until FFmpeg confirms that both output tracks were finalized.
+fn mux_world_audio(ffmpeg: &Path, video_work: &Path, audio_work: &Path, mux_work: &Path) -> Result<(), String> {
+    let result = ffmpeg_command(ffmpeg)
+        .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"])
+        .arg("-i")
+        .arg(video_work)
+        .args(["-f", "s16le", "-ar", &SAMPLE_RATE.to_string(), "-ac", &AUDIO_CHANNELS.to_string()])
+        .arg("-i")
+        .arg(audio_work)
+        .args(["-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy"])
+        .args(["-c:a", "aac", "-b:a", "192k", "-af", "aresample=async=1:first_pts=0,apad"])
+        .args(["-shortest", "-movflags", "+faststart", "-f", "mp4"])
+        .arg(mux_work)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| format!("Cannot mux MP4 audio track: {e}"))?;
+    if !result.status.success() {
+        return Err(format!(
+            "MP4 audio mux failed; video retained at {}: {}",
+            video_work.display(),
+            String::from_utf8_lossy(&result.stderr).chars().take(800).collect::<String>()
+        ));
+    }
+    check_mp4(mux_work)
 }
 
 pub(super) fn encode(
@@ -254,6 +296,9 @@ pub(super) fn encode(
         }
     }
 
+    // A quiet device must still produce the explicitly requested AAC track.
+    // Reuse the real recorder's PCM->AAC path; do not silently drop to video-only.
+    seed_empty_world_audio(pcm.as_mut(), &mut audio_bytes)?;
     // All PCM must be closed before FFmpeg attempts to mux it.
     if let Some(mut file) = pcm.take() {
         file.flush().map_err(|e| format!("Audio track flush: {e}"))?;
@@ -268,28 +313,7 @@ pub(super) fn encode(
     check_mp4(&video_work)?;
 
     if audio_bytes > 0 {
-        let result = ffmpeg_command(&ffmpeg)
-            .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"])
-            .arg("-i")
-            .arg(&video_work)
-            .args(["-f", "s16le", "-ar", &SAMPLE_RATE.to_string(), "-ac", &AUDIO_CHANNELS.to_string()])
-            .arg("-i")
-            .arg(&audio_work)
-            .args(["-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy"])
-            .args(["-c:a", "aac", "-b:a", "192k", "-af", "aresample=async=1:first_pts=0,apad"])
-            .args(["-shortest", "-movflags", "+faststart", "-f", "mp4"])
-            .arg(&mux_work)
-            .stdin(Stdio::null())
-            .output()
-            .map_err(|e| format!("Cannot mux MP4 audio track: {e}"))?;
-        if !result.status.success() {
-            return Err(format!(
-                "MP4 audio mux failed; video retained at {}: {}",
-                video_work.display(),
-                String::from_utf8_lossy(&result.stderr).chars().take(800).collect::<String>()
-            ));
-        }
-        check_mp4(&mux_work)?;
+        mux_world_audio(&ffmpeg, &video_work, &audio_work, &mux_work)?;
         fs::rename(&mux_work, &path).map_err(|e| format!("Cannot save completed MP4: {e}"))?;
         let _ = fs::remove_file(&video_work);
         let _ = fs::remove_file(&audio_work);
@@ -306,6 +330,22 @@ pub(super) fn encode(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn requested_audio_track_stays_present_without_world_audio_samples() {
+        let path = std::env::temp_dir().join(format!("waters-roux-empty-audio-{}.pcm", uuid::Uuid::new_v4()));
+        let mut file = File::create(&path).expect("create silence test file");
+        let mut audio_bytes = 0;
+        seed_empty_world_audio(Some(&mut file), &mut audio_bytes).expect("seed missing audio");
+        assert_eq!(audio_bytes, 1920, "one 10ms stereo frame");
+        seed_empty_world_audio(Some(&mut file), &mut audio_bytes).expect("idempotent");
+        file.flush().expect("flush");
+        drop(file);
+        let bytes = fs::read(&path).expect("read seeded PCM");
+        assert_eq!(bytes.len(), 1920);
+        assert!(bytes.iter().all(|b| *b == 0), "audio seed must be silence");
+        fs::remove_file(path).expect("remove seeded PCM");
+    }
 
     #[test]
     fn h264_mp4_has_valid_atoms_and_cfr_timeline() {
@@ -344,5 +384,100 @@ mod tests {
         if fixture_path.is_none() {
             fs::remove_file(&output).expect("cleanup fixture");
         }
+    }
+
+    #[test]
+    fn h264_mp4_muxes_aac_world_audio_with_correct_duration() {
+        // The Windows packaging gate explicitly opts in with pinned FFmpeg
+        // and FFprobe. No microphone or in-world audio is recorded here.
+        if std::env::var_os("WATERS_ROUX_TEST_MP4").is_none() {
+            return;
+        }
+        let ffmpeg = locate_encoder().expect("trusted bundled encoder");
+        let ffprobe = ffmpeg.with_file_name(if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" });
+        assert!(ffprobe.is_file(), "AAC regression must probe with bundled ffprobe");
+        let root = std::env::temp_dir().join(format!("waters-roux-aac-fixture-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).expect("fixture folder");
+        let silent = root.join("silent-video.mp4");
+        let world_audio = root.join("world-output.pcm");
+        let final_mp4 = root.join("world-audio.mp4");
+
+        let mut encoder = VideoEncoder::start(&ffmpeg, &silent, 64, 64, Options::default()).expect("H.264 fixture encoder");
+        let frame = vec![127; 64 * 64 * 4];
+        for _ in 0..30 {
+            encoder.write(&frame).expect("encode fixture frame");
+        }
+        assert_eq!(encoder.finish().expect("finalize fixture video"), 30);
+        let mut pcm = File::create(&world_audio).expect("create 48 kHz stereo test track");
+        for chunk in 0..100usize {
+            let mut samples = [0.0_f32; 960];
+            for frame in 0..480usize {
+                let sample_at = (chunk * 480 + frame) as f32 / 48_000.0;
+                let sample = (sample_at * 440.0 * std::f32::consts::TAU).sin() * 0.12;
+                samples[frame * 2] = sample;
+                samples[frame * 2 + 1] = sample;
+            }
+            write_audio_packet(&mut pcm, &samples).expect("record PCM block");
+        }
+        pcm.flush().expect("flush PCM");
+        drop(pcm);
+        assert_eq!(fs::metadata(&world_audio).expect("PCM metadata").len(), 192_000);
+
+        mux_world_audio(&ffmpeg, &silent, &world_audio, &final_mp4).expect("AAC audio mux");
+        check_mp4(&final_mp4).expect("final AAC MP4 container");
+        let result = ffmpeg_command(&ffprobe)
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_name,codec_type,channels,sample_rate",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+            ])
+            .arg(&final_mp4)
+            .stdin(Stdio::null())
+            .output()
+            .expect("probe AAC MP4");
+        assert!(
+            result.status.success(),
+            "ffprobe failed: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let metadata: serde_json::Value = serde_json::from_slice(&result.stdout).expect("ffprobe JSON");
+        let streams = metadata["streams"].as_array().expect("streams");
+        assert!(
+            streams.iter().any(|s| s["codec_type"] == "video" && s["codec_name"] == "h264"),
+            "H.264 stream required: {metadata}"
+        );
+        assert!(
+            streams
+                .iter()
+                .any(|s| { s["codec_type"] == "audio" && s["codec_name"] == "aac" && s["channels"] == 2 && s["sample_rate"] == "48000" }),
+            "48kHz stereo AAC must survive real muxing: {metadata}"
+        );
+        let duration: f64 = metadata["format"]["duration"]
+            .as_str()
+            .expect("duration")
+            .parse()
+            .expect("numeric duration");
+        assert!(
+            (0.95..=1.10).contains(&duration),
+            "1s recording must not play at 2x speed: {duration}"
+        );
+        let decode = ffmpeg_command(&ffmpeg)
+            .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i"])
+            .arg(&final_mp4)
+            .args(["-map", "0:v:0", "-map", "0:a:0", "-f", "null", "-"])
+            .stdin(Stdio::null())
+            .output()
+            .expect("decode audio+video together");
+        assert!(
+            decode.status.success(),
+            "MP4 stream decode failed: {}",
+            String::from_utf8_lossy(&decode.stderr)
+        );
+        fs::remove_dir_all(&root).expect("cleanup fixture folder");
     }
 }

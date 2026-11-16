@@ -14,6 +14,16 @@ fn set_machinima_shadow_quality(settings: &mut Settings, quality: u8) {
     settings.shadows = settings.shadow_quality > 0;
 }
 
+/// FSR owns world render resolution; match PhotoTools and Graphics Preferences.
+fn manual_render_scale_enabled(settings: &Settings) -> bool {
+    settings.antialiasing != 7
+}
+
+/// The existing renderer disables CAS when HDR is off or FSR supplies RCAS.
+fn cas_sharpen_enabled(settings: &Settings) -> bool {
+    settings.hdr_emissive && settings.antialiasing != 7
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Action {
     #[default]
@@ -154,7 +164,10 @@ pub fn show(
                 egui::ScrollArea::vertical().max_height(245.0).show(ui, |ui| {
                     changed |= widgets::switch_labeled(ui, p, &mut settings.hdr_emissive, "HDR / emissive lighting").changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut settings.exposure, 0.25..=4.0).text("Exposure"))
+                        .add_enabled(
+                            settings.hdr_emissive,
+                            egui::Slider::new(&mut settings.exposure, 0.25..=4.0).text("Exposure"),
+                        )
                         .changed();
                     changed |= widgets::switch_labeled(ui, p, &mut settings.dof.enabled, "Depth of field").changed();
                     ui.add_enabled_ui(settings.dof.enabled, |ui| {
@@ -181,11 +194,72 @@ pub fn show(
                     changed |= ui
                         .add(egui::Slider::new(&mut settings.draw_distance, 32.0..=1024.0).text("Draw distance (m)"))
                         .changed();
+                    ui.collapsing("Anti-aliasing and image quality", |ui| {
+                        egui::ComboBox::from_id_salt("waters-roux-machinima-antialiasing")
+                            .selected_text(match settings.antialiasing {
+                                0 => "Off",
+                                1 => "FXAA",
+                                2 => "MSAA 2×",
+                                3 => "MSAA 4×",
+                                4 => "MSAA 8×",
+                                5 => "TAA",
+                                6 => "SMAA",
+                                7 => "FSR 3.1",
+                                _ => "Unknown",
+                            })
+                            .show_ui(ui, |ui| {
+                                for (mode, label) in [
+                                    (0, "Off"),
+                                    (1, "FXAA"),
+                                    (2, "MSAA 2×"),
+                                    (3, "MSAA 4×"),
+                                    (4, "MSAA 8×"),
+                                    (5, "TAA"),
+                                    (6, "SMAA"),
+                                    (7, "FSR 3.1"),
+                                ] {
+                                    changed |= ui.selectable_value(&mut settings.antialiasing, mode, label).changed();
+                                }
+                            });
+                        changed |= widgets::switch_labeled(ui, p, &mut settings.specular_aa, "Specular anti-aliasing").changed();
+                        if settings.antialiasing == 7 {
+                            ui.label("FSR controls rendering resolution and provides its own sharpening.");
+                            ui.horizontal_wrapped(|ui| {
+                                for (quality, label) in [
+                                    (0, "Native"),
+                                    (1, "Quality"),
+                                    (2, "Balanced"),
+                                    (3, "Performance"),
+                                    (4, "Ultra"),
+                                ] {
+                                    changed |= ui.selectable_value(&mut settings.fsr_quality, quality, label).changed();
+                                }
+                            });
+                            changed |= ui
+                                .add(egui::Slider::new(&mut settings.fsr_sharpness, 0..=100).text("FSR sharpness (%)"))
+                                .changed();
+                        }
+                        changed |= ui
+                            .add_enabled(
+                                cas_sharpen_enabled(settings),
+                                egui::Slider::new(&mut settings.sharpen, 0.0..=1.0).text("CAS sharpening"),
+                            )
+                            .changed();
+                        if !settings.hdr_emissive {
+                            ui.small("Enable HDR / Emissive to adjust tonemapping and CAS sharpening.");
+                        }
+                    });
                     changed |= ui
-                        .add(egui::Slider::new(&mut settings.render_scale_percent, 50..=100).text("Render resolution (%)"))
+                        .add_enabled(
+                            manual_render_scale_enabled(settings),
+                            egui::Slider::new(&mut settings.render_scale_percent, 50..=100).text("Render resolution (%)"),
+                        )
                         .changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut settings.tonemap_mix, 0.0..=1.0).text("Tonemapping strength"))
+                        .add_enabled(
+                            settings.hdr_emissive,
+                            egui::Slider::new(&mut settings.tonemap_mix, 0.0..=1.0).text("Tonemapping strength"),
+                        )
                         .changed();
                 });
             }
@@ -283,6 +357,43 @@ mod tests {
         set_machinima_shadow_quality(&mut settings, 3);
         assert_eq!(settings.shadow_quality, 3);
         assert!(settings.shadows);
+    }
+
+    #[test]
+    fn machinima_fsr_prevents_conflicting_scale_and_cas_controls() {
+        let mut settings = Settings {
+            antialiasing: 7,
+            hdr_emissive: true,
+            render_scale_percent: 82,
+            sharpen: 0.6,
+            ..Settings::default()
+        };
+        assert!(!manual_render_scale_enabled(&settings));
+        assert!(!cas_sharpen_enabled(&settings));
+        assert_eq!(settings.render_scale_percent, 82);
+        assert_eq!(settings.sharpen, 0.6);
+        settings.antialiasing = 6;
+        assert!(manual_render_scale_enabled(&settings));
+        assert!(cas_sharpen_enabled(&settings));
+        settings.hdr_emissive = false;
+        assert!(!cas_sharpen_enabled(&settings));
+        assert!(manual_render_scale_enabled(&settings));
+    }
+
+    #[test]
+    fn machinima_image_quality_settings_survive_restart() {
+        let settings = Settings {
+            antialiasing: 7,
+            fsr_quality: 2,
+            fsr_sharpness: 63,
+            specular_aa: true,
+            ..Settings::default()
+        };
+        let loaded: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(loaded.antialiasing, 7);
+        assert_eq!(loaded.fsr_quality, 2);
+        assert_eq!(loaded.fsr_sharpness, 63);
+        assert!(loaded.specular_aa);
     }
 
     #[test]
