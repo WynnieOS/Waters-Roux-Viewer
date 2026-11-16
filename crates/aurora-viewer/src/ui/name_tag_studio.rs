@@ -22,6 +22,13 @@ const MAX_FRAMES: usize = 48;
 #[serde(default)]
 pub struct Style {
     pub enabled: bool,
+    /// Ordinary Second Life classic name tags, independent of the custom skin.
+    /// Defaults retain the original 13pt/11pt typography and full opacity.
+    pub regular_name_size: f32,
+    pub regular_detail_size: f32,
+    pub regular_opacity: f32,
+    pub regular_monospace: bool,
+    pub regular_bold: bool,
     pub name_size: f32,
     pub bold: bool,
     pub outline: bool,
@@ -51,6 +58,11 @@ impl Default for Style {
     fn default() -> Self {
         Self {
             enabled: false,
+            regular_name_size: 13.0,
+            regular_detail_size: 11.0,
+            regular_opacity: 1.0,
+            regular_monospace: false,
+            regular_bold: false,
             name_size: 16.0,
             bold: true,
             outline: true,
@@ -78,6 +90,21 @@ impl Default for Style {
 
 impl Style {
     pub fn sanitize(&mut self) {
+        self.regular_name_size = if self.regular_name_size.is_finite() {
+            self.regular_name_size.clamp(10.0, 28.0)
+        } else {
+            13.0
+        };
+        self.regular_detail_size = if self.regular_detail_size.is_finite() {
+            self.regular_detail_size.clamp(9.0, 24.0)
+        } else {
+            11.0
+        };
+        self.regular_opacity = if self.regular_opacity.is_finite() {
+            self.regular_opacity.clamp(0.2, 1.0)
+        } else {
+            1.0
+        };
         self.name_size = if self.name_size.is_finite() {
             self.name_size.clamp(10.0, 28.0)
         } else {
@@ -119,6 +146,16 @@ impl Style {
         if self.image_path.len() > 2048 {
             self.image_path.clear();
         }
+    }
+
+    /// Never dim chat bubbles or residents' actual identities; only the
+    /// classic name-tag card, glyphs and voice decorations use this factor.
+    pub fn regular_fade(&self, distance_fade: f32) -> f32 {
+        (distance_fade * self.regular_opacity).clamp(0.0, 1.0)
+    }
+
+    pub fn regular_font_size(&self, name: bool) -> f32 {
+        if name { self.regular_name_size } else { self.regular_detail_size }
     }
 
     pub fn color(&self, fade: f32) -> Color32 {
@@ -334,7 +371,25 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
         widgets::divider(ui, p);
         egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| match tab {
             0 => {
-                ui.strong("Name typography");
+                ui.collapsing("Regular Second Life name tags (without custom skin)", |ui| {
+                    ui.label("These settings apply to classic name tags even when custom name tags are disabled.");
+                    changed |= ui
+                        .add(egui::Slider::new(&mut style.regular_name_size, 10.0..=28.0).text("Display-name font size"))
+                        .changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut style.regular_detail_size, 9.0..=24.0).text("Group titles, usernames and details"))
+                        .changed();
+                    changed |= ui
+                        .add(egui::Slider::new(&mut style.regular_opacity, 0.2..=1.0).text("Name tag opacity"))
+                        .changed();
+                    changed |= widgets::switch_labeled(ui, p, &mut style.regular_monospace, "Monospace classic font").changed();
+                    changed |= widgets::switch_labeled(ui, p, &mut style.regular_bold, "Bold classic name").changed();
+                    ui.small(
+                        "Default: original Second Life font size and full opacity. Text stays local and server names are never changed.",
+                    );
+                });
+                widgets::divider(ui, p);
+                ui.strong("Custom Name Tag Studio typography");
                 changed |= ui
                     .add(egui::Slider::new(&mut style.name_size, 10.0..=28.0).text("Display-name size"))
                     .changed();
@@ -534,6 +589,45 @@ mod tests {
             assert!(art.frames[0].size()[0] > 0 && art.frames[0].size()[1] > 0);
         }
         std::fs::remove_dir_all(root).expect("remove isolated import fixture");
+    }
+
+    #[test]
+    fn classic_name_tag_style_keeps_legacy_defaults_and_roundtrips() {
+        let from_old: Style = serde_json::from_str("{}").expect("older name-tag settings");
+        assert!(!from_old.enabled);
+        assert_eq!(from_old.regular_name_size, 13.0);
+        assert_eq!(from_old.regular_detail_size, 11.0);
+        assert_eq!(from_old.regular_opacity, 1.0);
+        assert_eq!(from_old.regular_font_size(true), 13.0);
+        assert_eq!(from_old.regular_font_size(false), 11.0);
+
+        let edited = Style {
+            regular_name_size: 23.0,
+            regular_detail_size: 14.0,
+            regular_opacity: 0.65,
+            regular_monospace: true,
+            regular_bold: true,
+            ..from_old
+        };
+        let restored: Style = serde_json::from_str(&serde_json::to_string(&edited).unwrap()).unwrap();
+        assert_eq!(restored, edited);
+        assert_eq!(restored.regular_fade(0.5), 0.325);
+    }
+
+    #[test]
+    fn classic_tags_clamp_invalid_values_without_changing_the_custom_skin() {
+        let mut style = Style {
+            regular_name_size: f32::NAN,
+            regular_detail_size: 400.0,
+            regular_opacity: -3.0,
+            name_size: 19.0,
+            ..Style::default()
+        };
+        style.sanitize();
+        assert_eq!(style.regular_name_size, 13.0);
+        assert_eq!(style.regular_detail_size, 24.0);
+        assert_eq!(style.regular_opacity, 0.2);
+        assert_eq!(style.name_size, 19.0);
     }
 
     #[test]
