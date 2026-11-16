@@ -12,6 +12,7 @@ on:
       - 'assets/branding/**'
       - 'scripts/package*.ps1'
       - 'scripts/prepare-waters-roux-icon.ps1'
+      - 'scripts/bundle-waters-roux-ffmpeg.ps1'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -90,6 +91,52 @@ jobs:
             if (Test-Path -LiteralPath (Join-Path $folder 'MISSING-ARTWORK.txt')) {
               throw 'V3 artwork/branding is incomplete. Do not upload this preview.'
             }
+            # The recorder calls tools/ffmpeg.exe at runtime. A build without
+            # this executable compiles but cannot record MP4 on a clean PC.
+            # Stage the already pinned, SHA256-verified GPL encoder from the
+            # existing source-controlled vendor script. No runtime downloads.
+            ./scripts/bundle-waters-roux-ffmpeg.ps1 -Out $folder
+            if ($LASTEXITCODE -ne 0) { throw 'V3 pinned H.264/AAC encoder staging failed.' }
+            $ffmpeg = Join-Path $folder 'tools/ffmpeg.exe'
+            $ffprobe = Join-Path $folder 'tools/ffprobe.exe'
+            $licenseDir = Join-Path $folder 'third-party/ffmpeg'
+            foreach ($required in @('tools/ffmpeg.exe', 'tools/ffprobe.exe', 'THIRD-PARTY-FFMPEG.txt')) {
+              if (-not (Test-Path -LiteralPath (Join-Path $folder $required) -PathType Leaf)) {
+                throw "Cannot upload MP4-broken V3 package: missing $required"
+              }
+            }
+            $licenses = @(Get-ChildItem -LiteralPath $licenseDir -File -ErrorAction Stop | Where-Object { $_.Name -match '^LICENSE' })
+            if ($licenses.Count -lt 1) { throw 'FFmpeg third-party GPL license missing from V3 package.' }
+            # Exercise the real Waters Roux MP4 worker with the packaged binary;
+            # then independently inspect both codec and wall-clock duration.
+            $fixture = Join-Path $env:RUNNER_TEMP 'waters-roux-v3-actual-recorder.mp4'
+            $env:WATERS_ROUX_FFMPEG = (Resolve-Path -LiteralPath $ffmpeg).Path
+            $env:WATERS_ROUX_TEST_MP4 = '1'
+            $env:WATERS_ROUX_TEST_MP4_OUTPUT = $fixture
+            cargo test --locked -p aurora-viewer --bin aurora-viewer h264_mp4_has_valid_atoms_and_cfr_timeline -- --nocapture
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $fixture -PathType Leaf)) {
+              throw 'Actual Waters Roux H.264 recording worker fixture failed.'
+            }
+            $probeJson = & $ffprobe -v error -show_entries 'stream=codec_name,codec_type,width,height,r_frame_rate,nb_frames' -show_entries 'format=duration' -of json $fixture | Out-String
+            if ($LASTEXITCODE -ne 0) { throw 'Packaged ffprobe cannot inspect the actual recorder MP4.' }
+            $metadata = $probeJson | ConvertFrom-Json
+            $video = @($metadata.streams | Where-Object { $_.codec_type -eq 'video' })[0]
+            if ($null -eq $video -or $video.codec_name -ne 'h264' -or $video.width -ne 64 -or $video.height -ne 64 -or $video.r_frame_rate -ne '30/1') {
+              throw "V3 recorder generated wrong codec/dimensions/FPS: $probeJson"
+            }
+            if ($video.nb_frames -and [int]$video.nb_frames -ne 30) {
+              throw "V3 recorder expected 30 frames, received $($video.nb_frames)"
+            }
+            $duration = [double]$metadata.format.duration
+            if ($duration -lt 0.95 -or $duration -gt 1.1) {
+              throw "V3 MP4 duration drift: $duration instead of ~1.0 second"
+            }
+            & $ffmpeg -hide_banner -loglevel error -i $fixture -f null -
+            if ($LASTEXITCODE -ne 0) { throw 'Packaged FFmpeg cannot independently decode the actual recorder MP4.' }
+            $codecHash = (Get-FileHash -LiteralPath $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
+            "Verified bundled libx264/AAC encoder SHA256: $codecHash" | Add-Content -LiteralPath (Join-Path $folder 'BUILD-INFO.txt') -Encoding utf8
+            "Actual Rust recorder fixture: H.264 64x64, 30fps, 30 frames, $duration s; decoded successfully." | Add-Content -LiteralPath (Join-Path $folder 'BUILD-INFO.txt') -Encoding utf8
+            Remove-Item -LiteralPath $fixture -Force
           }
           @(
             'UNRELEASED WATERS ROUX DEVELOPMENT PREVIEW'
