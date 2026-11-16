@@ -206,9 +206,9 @@ impl Recorder {
     /// The app must stop and finalize at the time limit. Returning false from
     /// `needs_frame` alone would leave the last frame frozen indefinitely.
     pub fn reached_time_limit(&self, now: Instant) -> bool {
-        self.session.as_ref().is_some_and(|s| {
-            now.saturating_duration_since(s.started) >= Duration::from_secs(LIMIT_SECONDS)
-        })
+        self.session
+            .as_ref()
+            .is_some_and(|s| now.saturating_duration_since(s.started) >= Duration::from_secs(LIMIT_SECONDS))
     }
 
     /// Only ask the renderer for a frame after all higher priority still
