@@ -57,9 +57,7 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
     let mut open_camera = false;
     let mut open_machinima = false;
     let preset_name_id = egui::Id::new("waters-roux-photo-preset-name");
-    let mut preset_name = ctx
-        .data(|d| d.get_temp::<String>(preset_name_id))
-        .unwrap_or_default();
+    let mut preset_name = ctx.data(|d| d.get_temp::<String>(preset_name_id)).unwrap_or_default();
     let screen = ctx.content_rect();
 
     Floater::new(
@@ -373,10 +371,7 @@ mod tests {
         settings.dof.enabled = false;
         let json = serde_json::to_string(&settings).expect("save photo profiles");
         let mut restored: Settings = serde_json::from_str(&json).expect("load photo profiles");
-        assert!(crate::graphics_presets::saved::select(
-            &mut restored,
-            "Bayou Portrait",
-        ));
+        assert!(crate::graphics_presets::saved::select(&mut restored, "Bayou Portrait",));
         assert_eq!(restored.draw_distance, 768.0);
         assert_eq!(restored.shadow_quality, 3);
         assert!(restored.shadows);
