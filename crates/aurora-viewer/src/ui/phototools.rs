@@ -27,6 +27,17 @@ fn set_photo_shadow_quality(settings: &mut Settings, quality: u8) {
     settings.shadows = settings.shadow_quality > 0;
 }
 
+/// FSR's own upscaler controls render resolution and uses its own RCAS
+/// sharpening. Never show independently editable controls that conflict
+/// with the actual active image-quality pipeline.
+fn photo_manual_render_scale_enabled(settings: &Settings) -> bool {
+    settings.antialiasing != 7
+}
+
+fn photo_cas_sharpen_enabled(settings: &Settings) -> bool {
+    settings.hdr_emissive && settings.antialiasing != 7
+}
+
 /// Save to the existing persisted graphics/photo library, without silently
 /// replacing a resident's named profile or storing account/device settings.
 fn create_photo_preset(settings: &mut Settings, name: &str) -> bool {
@@ -142,22 +153,80 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
                     "Screen-space reflections",
                 )
                 .changed();
-                ui.horizontal_wrapped(|ui| {
-                    ui.label("PBR tonemapping:");
+                ui.add_enabled_ui(settings.hdr_emissive, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label("PBR tonemapping:");
+                        changed |= ui
+                            .selectable_value(&mut settings.tonemapper, 0, "Neutral")
+                            .changed();
+                        changed |= ui
+                            .selectable_value(&mut settings.tonemapper, 1, "ACES")
+                            .changed();
+                    });
                     changed |= ui
-                        .selectable_value(&mut settings.tonemapper, 0, "Neutral")
-                        .changed();
-                    changed |= ui
-                        .selectable_value(&mut settings.tonemapper, 1, "ACES")
+                        .add(egui::Slider::new(&mut settings.tonemap_mix, 0.0..=1.0).text("Tonemapping blend"))
                         .changed();
                 });
+                ui.collapsing("Cinematic image quality / anti-aliasing", |ui| {
+                    ui.label("Choose the live renderer's native anti-aliasing pipeline.");
+                    egui::ComboBox::from_id_salt("waters-roux-photo-antialiasing")
+                        .selected_text(match settings.antialiasing {
+                            0 => "Off",
+                            1 => "FXAA",
+                            2 => "MSAA 2×",
+                            3 => "MSAA 4×",
+                            4 => "MSAA 8×",
+                            5 => "TAA",
+                            6 => "SMAA",
+                            7 => "FSR 3.1",
+                            _ => "Unknown",
+                        })
+                        .show_ui(ui, |ui| {
+                            for (mode, name) in [
+                                (0, "Off"),
+                                (1, "FXAA"),
+                                (2, "MSAA 2×"),
+                                (3, "MSAA 4×"),
+                                (4, "MSAA 8×"),
+                                (5, "TAA"),
+                                (6, "SMAA"),
+                                (7, "FSR 3.1"),
+                            ] {
+                                changed |= ui.selectable_value(&mut settings.antialiasing, mode, name).changed();
+                            }
+                        });
+                    changed |= widgets::switch_labeled(ui, p, &mut settings.specular_aa, "Specular anti-aliasing").changed();
+                    if settings.antialiasing == 7 {
+                        ui.label("FSR controls the world render resolution and its own sharpening.");
+                        ui.horizontal_wrapped(|ui| {
+                            for (mode, label) in [
+                                (0, "Native"),
+                                (1, "Quality"),
+                                (2, "Balanced"),
+                                (3, "Performance"),
+                                (4, "Ultra"),
+                            ] {
+                                changed |= ui.selectable_value(&mut settings.fsr_quality, mode, label).changed();
+                            }
+                        });
+                        changed |= ui
+                            .add(egui::Slider::new(&mut settings.fsr_sharpness, 0..=100).text("FSR sharpness (%)"))
+                            .changed();
+                    }
+                    changed |= ui
+                        .add_enabled(
+                            photo_cas_sharpen_enabled(settings),
+                            egui::Slider::new(&mut settings.sharpen, 0.0..=1.0).text("CAS sharpening"),
+                        )
+                        .changed();
+                    if !settings.hdr_emissive {
+                        ui.small("Enable HDR / Emissive to adjust tonemapping and CAS sharpening.");
+                    }
+                });
                 changed |= ui
-                    .add(egui::Slider::new(&mut settings.tonemap_mix, 0.0..=1.0).text("Tonemapping blend"))
-                    .changed();
-                changed |= ui
-                    .add(
-                        egui::Slider::new(&mut settings.render_scale_percent, 50..=100)
-                            .text("Render resolution (%)"),
+                    .add_enabled(
+                        photo_manual_render_scale_enabled(settings),
+                        egui::Slider::new(&mut settings.render_scale_percent, 50..=100).text("Render resolution (%)"),
                     )
                     .changed();
             });
@@ -379,6 +448,47 @@ mod tests {
         assert!(restored.shadows);
         assert!(restored.bloom);
         assert!(restored.dof.enabled);
+    }
+
+    #[test]
+    fn phototools_fsr_disables_conflicting_render_scale_and_cas_sharpening() {
+        let mut settings = Settings {
+            antialiasing: 7,
+            hdr_emissive: true,
+            render_scale_percent: 77,
+            sharpen: 0.6,
+            ..Settings::default()
+        };
+        assert!(!photo_manual_render_scale_enabled(&settings));
+        assert!(!photo_cas_sharpen_enabled(&settings));
+        assert_eq!(settings.render_scale_percent, 77);
+        assert_eq!(settings.sharpen, 0.6);
+
+        settings.antialiasing = 5;
+        assert!(photo_manual_render_scale_enabled(&settings));
+        assert!(photo_cas_sharpen_enabled(&settings));
+        settings.hdr_emissive = false;
+        assert!(!photo_cas_sharpen_enabled(&settings));
+        assert!(photo_manual_render_scale_enabled(&settings));
+    }
+
+    #[test]
+    fn phototools_quality_modes_persist_without_resetting_existing_profiles() {
+        let mut settings = Settings {
+            antialiasing: 7,
+            fsr_quality: 2,
+            fsr_sharpness: 63,
+            specular_aa: true,
+            ..Settings::default()
+        };
+        assert!(create_photo_preset(&mut settings, "Creator Film"));
+        settings.antialiasing = 1;
+        settings.fsr_quality = 0;
+        settings.fsr_sharpness = 0;
+        let stored: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert!(stored.graphics_saved.contains_key("Creator Film"));
+        assert_eq!(stored.antialiasing, 1);
+        assert_eq!(stored.fsr_sharpness, 0);
     }
 
     #[test]
