@@ -344,17 +344,17 @@ impl Manip {
                 self.plane_scale[i] = 1.0;
             }
         }
-        for i in 0..5 {
+        for (i, scale) in self.ring_scale.iter_mut().enumerate() {
             let part = match i {
                 0..=2 => Part::Ring(i),
                 3 => Part::Roll,
                 _ => Part::Free,
             };
             let t = if active == Some(part) { 1.05 } else { 1.0 };
-            if self.ring_scale[i] == 0.0 {
-                self.ring_scale[i] = 1.0;
+            if *scale == 0.0 {
+                *scale = 1.0;
             }
-            self.ring_scale[i] += (t - self.ring_scale[i]) * k;
+            *scale += (t - *scale) * k;
         }
     }
 
