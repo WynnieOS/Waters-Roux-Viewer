@@ -1,0 +1,96 @@
+name: Waters Roux V3 - official links source QA
+
+on:
+  push:
+    branches:
+      - fix/waters-roux-v3-official-support-links
+    paths:
+      - '.github/workflows/waters-roux-v3-official-links-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  official-links-source:
+    name: Format and verify Waters Roux support link changes
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout V3 support-link development
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: fix/waters-roux-v3-official-support-links
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Normalize only this PR's Rust source formatting
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name "Waters Roux V3 Source QA"
+          git config user.email "ci@users.noreply.github.com"
+          cargo fmt --all
+          if ($LASTEXITCODE -ne 0) { throw 'Rustfmt failed' }
+          $allowed = @(
+            'crates/aurora-viewer/src/links.rs',
+            'crates/aurora-viewer/src/bug_report/github.rs',
+            'crates/aurora-viewer/src/crash/github.rs',
+            'crates/aurora-viewer/src/ui/bug_report.rs',
+            'crates/aurora-viewer/src/ui/bug_report/tests.rs',
+            'crates/aurora-viewer/src/ui/bars.rs'
+          )
+          $changed = @(git diff --name-only)
+          foreach ($p in $changed) {
+            if ($p -notin $allowed) { throw "Unexpected Rustfmt change: $p" }
+          }
+          if ($changed.Count -gt 0) {
+            git diff --check
+            if ($LASTEXITCODE -ne 0) { throw 'Whitespace error' }
+            git add -- $changed
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to stage formatted source' }
+            git commit -m "style(v3): format official support-link changes only"
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to commit formatted source' }
+            git push origin HEAD:refs/heads/fix/waters-roux-v3-official-support-links
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to update V3 support-link branch' }
+          }
+          cargo fmt --all -- --check
+          if ($LASTEXITCODE -ne 0) { throw 'Post-format check failed' }
+
+      - name: Ensure no Aurora destination in official link modules
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            'crates/aurora-viewer/src/links.rs',
+            'crates/aurora-viewer/src/bug_report/github.rs',
+            'crates/aurora-viewer/src/crash/github.rs'
+          )
+          foreach ($f in $files) {
+            $s = Get-Content -LiteralPath $f -Raw
+            if ($s -match 'https://(?:www\.)?aurora-viewer\.org' -or
+                $s -match 'github\.com/Aurora-Viewer/Aurora-Viewer/(?:issues|releases|wiki)' -or
+                $s -match 'api\.github\.com/repos/Aurora-Viewer/Aurora-Viewer/issues' -or
+                $s -match 'Iv23liT7PLWClMLztI1W') {
+              throw "Upstream support or GitHub authorization destination remains in $f"
+            }
+          }
+          $links = Get-Content -LiteralPath 'crates/aurora-viewer/src/links.rs' -Raw
+          foreach ($target in @('issues/new/choose', 'issues', 'releases', 'WynnieOS/Waters-Roux-Viewer')) {
+            if (-not $links.Contains($target)) { throw "Missing official route: $target" }
+          }
+          'Official Waters Roux link source checks passed. This is NOT an in-viewer acceptance test.'
+
+      - name: Run viewer unit tests
+        shell: pwsh
+        run: |
+          cargo test --locked -p aurora-viewer --bin aurora-viewer
+          if ($LASTEXITCODE -ne 0) { throw 'Viewer unit tests failed. Beta V3 approval is blocked.' }
+
+      - name: Report QA limits
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host 'Source checks are not proof that links open correctly in a real viewer.'
+          Write-Host 'GitHub metadata Website, privacy policy and resident acceptance remain separate mandatory release gates.'
+          Write-Host 'No viewer executable, ZIP or public release is produced by this workflow.'
