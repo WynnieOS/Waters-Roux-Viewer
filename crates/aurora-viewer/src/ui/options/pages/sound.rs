@@ -563,14 +563,7 @@ fn voice_color_swatch(
     theme: egui::Color32,
 ) -> bool {
     let mut value = (*selected).unwrap_or(theme.to_array());
-    let mut changed = crate::ui::widgets::color_button(
-        ui,
-        p,
-        ui.scope_id().with(key),
-        &mut value,
-        false,
-    )
-    .changed();
+    let mut changed = crate::ui::widgets::color_button(ui, p, ui.scope_id().with(key), &mut value, false).changed();
     if changed {
         *selected = Some(value);
     }

@@ -64,9 +64,7 @@ pub struct VoiceTags {
 
 /// Green → amber → red, calibrated for WebRTC's actual participant range.
 fn level_color(p: &Palette, level: f32, options: &crate::settings::ColorSettings) -> Color32 {
-    let color = |value: Option<crate::settings::Rgba>, fallback: Color32| {
-        value.map(crate::ui::colors::c).unwrap_or(fallback)
-    };
+    let color = |value: Option<crate::settings::Rgba>, fallback: Color32| value.map(crate::ui::colors::c).unwrap_or(fallback);
     let quiet = color(options.voice_quiet, p.success);
     let medium = color(options.voice_medium, p.amber);
     let loud = color(options.voice_loud, p.danger);
@@ -143,8 +141,7 @@ mod tests {
         assert_eq!(level_color(&p, LEVEL_MAX, &defaults), p.danger);
 
         // Older saved files omit the new keys, and continue to use the theme.
-        let from_old: crate::settings::ColorSettings =
-            serde_json::from_str("{}").expect("older color preferences");
+        let from_old: crate::settings::ColorSettings = serde_json::from_str("{}").expect("older color preferences");
         assert_eq!(from_old.voice_quiet, None);
         assert_eq!(from_old.voice_medium, None);
         assert_eq!(from_old.voice_loud, None);
@@ -153,18 +150,9 @@ mod tests {
         selected.voice_quiet = Some([255, 0, 128, 255]);
         selected.voice_medium = Some([0, 255, 255, 255]);
         selected.voice_loud = Some([128, 0, 255, 255]);
-        assert_eq!(
-            level_color(&p, LEVEL_MIN, &selected),
-            crate::ui::colors::c([255, 0, 128, 255])
-        );
-        assert_eq!(
-            level_color(&p, LEVEL_AMBER, &selected),
-            crate::ui::colors::c([0, 255, 255, 255])
-        );
-        assert_eq!(
-            level_color(&p, LEVEL_MAX, &selected),
-            crate::ui::colors::c([128, 0, 255, 255])
-        );
+        assert_eq!(level_color(&p, LEVEL_MIN, &selected), crate::ui::colors::c([255, 0, 128, 255]));
+        assert_eq!(level_color(&p, LEVEL_AMBER, &selected), crate::ui::colors::c([0, 255, 255, 255]));
+        assert_eq!(level_color(&p, LEVEL_MAX, &selected), crate::ui::colors::c([128, 0, 255, 255]));
     }
 
     #[test]
