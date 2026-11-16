@@ -1,0 +1,95 @@
+name: Waters Roux V3 - integrate reviewed source fixes (no package)
+
+on:
+  push:
+    branches:
+      - integrate/waters-roux-beta28-v3
+    paths:
+      - '.github/workflows/waters-roux-v3-integrate-fixes.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: waters-roux-v3-integrate-reviewed-source
+  cancel-in-progress: false
+
+jobs:
+  merge-source:
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout isolated V3 integration source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: integrate/waters-roux-beta28-v3
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Merge pinned branding, snapshot and support changes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name 'Waters Roux V3 Integration'
+          git config user.email 'ci@users.noreply.github.com'
+          $branch = (git branch --show-current).Trim()
+          if ($branch -ne 'integrate/waters-roux-beta28-v3') { throw "Refusing unexpected branch $branch" }
+          $pins = @(
+            @{ Ref='feat/waters-roux-v3-fleur-menu'; Sha='ce04a8b5ee4699956fee4fb41387c4580987d1a3' },
+            @{ Ref='fix/waters-roux-v3-snapshot-folder'; Sha='96a136c35a52b3fc1e0d44fba6f4f7ed5de952f9' },
+            @{ Ref='fix/waters-roux-v3-official-support-links'; Sha='a20ea5e1845686b0d87ba6676ec017c9df081290' }
+          )
+          foreach ($pin in $pins) {
+            git fetch --no-tags origin "refs/heads/$($pin.Ref)"
+            if ($LASTEXITCODE -ne 0) { throw "Cannot fetch $($pin.Ref)" }
+            $remote = (git rev-parse "refs/remotes/origin/$($pin.Ref)").Trim()
+            if ($LASTEXITCODE -ne 0 -or $remote -ne $pin.Sha) {
+              throw "Pin mismatch on $($pin.Ref): expected $($pin.Sha), got $remote"
+            }
+            git merge --no-ff --no-edit $pin.Sha
+            if ($LASTEXITCODE -ne 0) { throw "Merge failed for $($pin.Ref); STOP instead of silently resolving conflicts" }
+          }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Whitespace issues in merged V3 source' }
+
+          # The V2 branded login, custom graphics and MP4 source must survive.
+          $required = @(
+            'assets/branding/waters-roux-logo.png',
+            'assets/branding/waters-roux-background.png',
+            'assets/branding/waters-roux-fleur-de-lis.svg',
+            'crates/aurora-viewer/src/app/recording/mp4.rs',
+            'docs/WATERS_ROUX_PRIVACY_STATUS.md'
+          )
+          foreach ($p in $required) { if (!(Test-Path -LiteralPath $p)) { throw "Missing resident-approved integration input: $p" } }
+          $bars = Get-Content 'crates/aurora-viewer/src/ui/bars.rs' -Raw
+          if (!$bars.Contains('icons.get("fleur-de-lis")')) { throw 'V3 fleur-de-lis menu is not wired' }
+          $snaps = Get-Content 'crates/aurora-viewer/src/snapshot/mod.rs' -Raw
+          if (!$snaps.Contains('.join("Waters Roux")')) { throw 'V3 photo folder path is missing' }
+          $links = Get-Content 'crates/aurora-viewer/src/links.rs' -Raw
+          if (!$links.Contains('WynnieOS/Waters-Roux-Viewer/issues/new/choose')) { throw 'Support fix missing' }
+          $app = Get-Content 'crates/aurora-viewer/src/app.rs' -Raw
+          if (!$app.Contains('self.recorder.poll_finalization()')) { throw 'MP4 recorder integration is missing' }
+
+          cargo fmt --all
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to format integrated Rust sources' }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Rust formatting introduced whitespace issues' }
+          $changes = @(git status --porcelain)
+          if ($changes.Count -gt 0) {
+            git add --all
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to stage formatting-only integration changes' }
+            git commit -m 'style(v3): rustfmt integrated Waters Roux source'
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to commit formatted integration source' }
+          }
+          cargo fmt --all -- --check
+          if ($LASTEXITCODE -ne 0) { throw 'Integrated source formatting check failed' }
+          git log -6 --oneline
+          git push origin HEAD:refs/heads/integrate/waters-roux-beta28-v3
+          if ($LASTEXITCODE -ne 0) { throw 'Could not preserve V3 integration branch' }
+          Write-Host 'Saved integrated V3 SOURCE only; no viewer archive published.'
+
+      - name: Explicit delivery safety notice
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host 'Source integration is NOT all 18 feature sections, release or in-world QA.'
+          Write-Host 'Do not package or distribute Beta V3 until full acceptance and security clearance.'
