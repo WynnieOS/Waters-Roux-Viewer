@@ -31,7 +31,7 @@ pub const COMMANDS: &[Command] = commands![
     "conversations", "Command_Chat_Icon", "common-conversations", true;
     "speak", "Command_Speak_Icon", "ui-skin-speak", true;
     "move", "Command_Move_Icon", "controls-movement-title", true;
-    "view", "video-filled", "controls-camera-title", true;
+    "view", "camera", "controls-camera-title", true;
     "vr_view", "device-vision-pro-filled", "vr-view", cfg!(any(target_os = "linux", target_os = "windows", target_os = "macos"));
     "mouselook", "Command_View_Icon", "common-mouselook-m", true;
     "people", "Command_People_Icon", "common-people", true;
@@ -74,13 +74,13 @@ pub const COMMANDS: &[Command] = commands![
     // Aurora's own: the photo reel's quick view, the session's photos
     "photo_roll", "carousel-horizontal-filled", "toolbar-command-photo-roll", true;
     // Firestorm's, not in Aurora yet
-    "avatar", "user-circle", "toolbar-command-avatar", false;
-    "destinations", "map-2", "toolbar-command-destinations", false;
-    "howto", "Command_HowTo_Icon", "toolbar-command-howto", false;
+    "avatar", "user-circle", "toolbar-command-avatar", true;
+    "destinations", "map-2", "toolbar-command-destinations", true;
+    "howto", "Command_HowTo_Icon", "toolbar-command-howto", true;
     "picks", "heart-filled", "toolbar-command-picks", true;
     "poser", "wand", "toolbar-command-poser", true;
-    "flickr", "brand-flickr", "toolbar-command-flickr", false;
-    "primfeed", "rss", "toolbar-command-primfeed", false;
+    "flickr", "brand-flickr", "toolbar-command-flickr", true;
+    "primfeed", "rss", "toolbar-command-primfeed", true;
     "RFO", "user-check", "toolbar-command-friends-only", true;
     "gridstatus", "building-broadcast-tower-filled", "toolbar-command-grid-status", true;
     "voice", "Command_Voice_Icon", "toolbar-command-voice", true;
@@ -92,30 +92,43 @@ pub const COMMANDS: &[Command] = commands![
     "statistics", "statistics", "toolbar-command-statistics", true;
     "soundexplorer", "music", "toolbar-command-sound-explorer", true;
     "assetblacklist", "shield-off", "toolbar-command-asset-blacklist", true;
-    "phototools", "camera-cog", "toolbar-command-phototools", false;
-    "phototools_view", "video-filled", "toolbar-command-phototools-camera", false;
-    "pose_stand", "man-filled", "toolbar-command-pose-stand", false;
-    "conversation_log", "file-text-filled", "toolbar-command-conversation-log", false;
+    "phototools", "camera-cog", "toolbar-command-phototools", true;
+    "machinima", "movie", "toolbar-command-machinima", true;
+    "nametagstudio", "tags-filled", "toolbar-command-nametag-studio", true;
+    "pose_stand", "man-filled", "toolbar-command-pose-stand", true;
+    "conversation_log", "file-text-filled", "toolbar-command-conversation-log", true;
     "movelock", "lock-filled", "movelock-title", true;
     "water_walk", "walk", "movement-water-walk", true;
     "resync_animations", "refresh", "toolbar-command-resync-animations", true;
-    "regiontracker", "location-filled", "toolbar-command-region-tracker", false;
+    "regiontracker", "location-filled", "toolbar-command-region-tracker", true;
     "group_titles", "tags-filled", "toolbar-command-group-titles", true;
-    "wearable_favorites", "hanger-2-filled", "toolbar-command-wearable-favorites", false;
-    "discord", "brand-discord-filled", "toolbar-command-discord", false;
-    "360capture", "panorama-horizontal-filled", "toolbar-command-360-snapshot", false;
-    "omnifilter", "filter-filled", "toolbar-command-omnifilter", false;
-    "avatar_align", "user-scan", "toolbar-command-avatar-align", false;
-    "face_nearest_avatar", "user-search", "toolbar-command-face-nearest", false;
+    "wearable_favorites", "hanger-2-filled", "toolbar-command-wearable-favorites", true;
+    "discord", "brand-discord-filled", "toolbar-command-discord", true;
+    "360capture", "panorama-horizontal-filled", "toolbar-command-360-snapshot", true;
+    "omnifilter", "filter-filled", "toolbar-command-omnifilter", true;
+    "avatar_align", "user-scan", "toolbar-command-avatar-align", true;
+    "face_nearest_avatar", "user-search", "toolbar-command-face-nearest", true;
 ];
 
 impl Command {
     pub fn label(&self) -> &'static str {
-        aurora_i18n::text(self.key)
+        if self.id == "machinima" {
+            "Machinima Bar"
+        } else if self.id == "nametagstudio" {
+            "Name Tag Studio"
+        } else {
+            aurora_i18n::text(self.key)
+        }
     }
 
     pub fn label_in(&self, language: &str) -> &'static str {
-        aurora_i18n::text_in(language, self.key)
+        if self.id == "machinima" {
+            "Machinima Bar"
+        } else if self.id == "nametagstudio" {
+            "Name Tag Studio"
+        } else {
+            aurora_i18n::text_in(language, self.key)
+        }
     }
 }
 

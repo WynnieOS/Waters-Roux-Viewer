@@ -7,6 +7,7 @@ pub mod appearance;
 pub mod area_search;
 pub mod audio;
 pub mod aurora_bg;
+pub mod avatar_align;
 pub mod avatar_picker;
 pub mod avatar_render_settings;
 pub mod backdrop;
@@ -68,8 +69,10 @@ pub mod layout;
 pub mod link_health;
 pub mod loading;
 pub mod login;
+pub mod login_grid;
 pub mod lookat_targets;
 pub mod looks_editor;
+pub mod machinima;
 pub mod map_tiles;
 pub mod marketplace;
 pub mod marketplace_listings;
@@ -82,6 +85,7 @@ pub mod money_tracker;
 pub mod monitor;
 pub mod movelock;
 pub mod movement;
+pub mod name_tag_studio;
 pub mod nameplate;
 pub mod news;
 pub mod notification_center;
@@ -95,6 +99,7 @@ pub mod pay;
 pub mod people;
 pub mod perf;
 pub mod photo_reel;
+pub mod phototools;
 pub mod physics;
 pub mod place_card;
 pub mod place_details;
@@ -106,6 +111,7 @@ pub mod quick_prefs;
 pub mod region;
 pub mod region_message_prompt;
 pub mod region_restart;
+pub mod region_tracker;
 pub mod remote_object;
 pub mod report_abuse;
 pub(crate) mod resource_drop;
@@ -158,6 +164,13 @@ pub struct Panels {
     pub group_titles: bool,
     /// The photo window (Firestorm's snapshot floater).
     pub snapshot: bool,
+    /// Independent photo production controls (not the Snapshot window).
+    pub photo_tools: bool,
+    pub name_tag_studio: bool,
+    /// Independent dockable camera controls for machinima production.
+    pub machinima: bool,
+    /// True when the separate Photo Camera toolbar command selected its tab.
+    pub photo_tools_camera_tab: bool,
     pub people: bool,
     pub minimap: bool,
     /// World map (Ctrl+M).
@@ -220,6 +233,10 @@ pub struct Panels {
     /// with Preferences › Aurora), and on its Movement tab (the movement
     /// window).
     pub camera_controls: bool,
+    /// Compass for turning the local avatar to cardinal/diagonal bearings.
+    pub avatar_align: bool,
+    /// Session region tracker: current and recently visited locations.
+    pub region_tracker: bool,
     pub movement_controls: bool,
     /// Navigation bar location being edited (text) and "just opened" (select all).
     pub nav_edit: Option<String>,
@@ -240,6 +257,10 @@ impl Panels {
             sim_console: false,
             group_titles: false,
             snapshot: false,
+            photo_tools: false,
+            name_tag_studio: false,
+            machinima: false,
+            photo_tools_camera_tab: false,
             people: settings.show_people,
             minimap: settings.show_minimap,
             world_map: false,
@@ -277,6 +298,8 @@ impl Panels {
             stream_title: settings.audio.stream_title_window,
             stream_title_history: false,
             camera_controls: settings.show_camera_controls,
+            avatar_align: false,
+            region_tracker: false,
             movement_controls: settings.show_movement_controls,
             nav_edit: None,
             nav_edit_new: false,
