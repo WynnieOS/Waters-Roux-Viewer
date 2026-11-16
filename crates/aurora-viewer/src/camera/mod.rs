@@ -21,7 +21,9 @@ mod settings;
 
 pub use focus::FocusObject;
 pub use free::FreeCamera;
-pub use settings::{CameraPreset, CameraSettings, CameraShot, DEFAULT_FOV, FOV_RANGE, SMOOTHING_RANGE, SavedViews, VrView, zoom_lens};
+pub use settings::{
+    CameraPreset, CameraSettings, CameraShot, CinematicTarget, DEFAULT_FOV, FOV_RANGE, SMOOTHING_RANGE, SavedViews, VrView, zoom_lens,
+};
 
 /// Reference for a rolled view, shared with flycam handoff and AgentUpdate.
 /// At a vertical pole the world Z axis cannot define an up direction.
@@ -323,6 +325,10 @@ pub struct Camera {
     smoothing_stop: bool,
     /// Last filtered first-person eye position for steadier machinima.
     stabilized_mouselook_eye: Option<Vec3>,
+    /// Current posed joint in render-world space (computed only for the local avatar).
+    cinematic_joint_world: Option<Vec3>,
+    /// Smooth positional shift applied to both camera and focus to preserve framing.
+    cinematic_offset: Vec3,
     tool: Option<Tool>,
     avatar: AvatarFrame,
     head: Vec3,
@@ -393,6 +399,8 @@ impl Default for Camera {
             smoothing_goal_agent: DVec3::ZERO,
             smoothing_stop: false,
             stabilized_mouselook_eye: None,
+            cinematic_joint_world: None,
+            cinematic_offset: Vec3::ZERO,
             tool: None,
             avatar: AvatarFrame {
                 root: start,
@@ -437,6 +445,35 @@ impl Camera {
 
     pub fn forward(&self) -> Vec3 {
         (self.target - self.position).normalize_or(Vec3::X)
+    }
+
+    /// Accept the evaluated local-avatar joint from Scene after poses update.
+    /// The app calls this only on the late camera pass, after animations.
+    pub fn set_cinematic_focus(&mut self, world_joint: Option<Vec3>) {
+        self.cinematic_joint_world = world_joint.filter(|p| p.is_finite());
+    }
+
+    /// Keep the camera's original orientation/framing while its focus follows
+    /// an animated head, chest or elbow. Smooth in avatar-relative space so
+    /// normal world motion doesn't create a trailing or jittering camera.
+    fn cinematic_follow_offset(&mut self, settings: &CameraSettings, dt: f32, default_focus: Vec3) -> Vec3 {
+        if !self.third_person() || !self.focus_on_avatar || self.follow_available {
+            self.cinematic_offset = Vec3::ZERO;
+            return Vec3::ZERO;
+        }
+        let desired = if settings.cinematic_target == CinematicTarget::Off {
+            Vec3::ZERO
+        } else {
+            self.cinematic_joint_world.map(|joint| joint - default_focus).unwrap_or(Vec3::ZERO)
+        };
+        let immediate = !self.initialized || !self.cinematic_offset.is_finite() || self.cinematic_offset.distance_squared(desired) > 64.0;
+        let alpha = if immediate {
+            1.0
+        } else {
+            interpolant(settings.cinematic_follow_half_life.clamp(0.0, 2.0), dt)
+        };
+        self.cinematic_offset = self.cinematic_offset.lerp_monotonic(desired, alpha);
+        self.cinematic_offset
     }
 
     /// The point the camera is locked on (alt-camera), if not the avatar.
@@ -1561,6 +1598,7 @@ impl Camera {
         self.avatar = avatar_frame(world, s, f.now);
         self.sync_seat(&mut world.agent, s);
         if let Some(flycam) = self.flycam {
+            self.cinematic_offset = Vec3::ZERO;
             self.position = flycam.position;
             self.target = flycam.position + flycam.forward();
             self.fov_y = flycam.fov;
@@ -1569,6 +1607,7 @@ impl Camera {
             return;
         }
         if let Some(free) = self.free {
+            self.cinematic_offset = Vec3::ZERO;
             // the free camera's own view; the avatar's waits for its return
             self.position = free.position;
             self.target = free.target();
@@ -1612,7 +1651,11 @@ impl Camera {
 
         let mut camera_target = self.calc_camera_target(world, s, f);
         self.virtual_position = camera_target;
-        let focus_target = self.calc_focus_target(world, s, f.now, camera_target);
+        let mut focus_target = self.calc_focus_target(world, s, f.now, camera_target);
+        let cinematic_offset = self.cinematic_follow_offset(s, dt, focus_target);
+        camera_target += cinematic_offset;
+        focus_target += cinematic_offset;
+        self.virtual_position = camera_target;
         // field of view correction: the camera backs off, the view narrows
         // An edited object's growing extents must not move a frozen camera.
         if f.edit_tracking != Some(false) || offset_changed {
@@ -4041,5 +4084,56 @@ mod tests {
             }
             assert!(camera.position.abs_diff_eq(stopped, 1e-4));
         }
+    }
+
+    #[test]
+    fn cinematic_follow_aims_at_an_animated_joint_and_returns_to_normal_view() {
+        let mut camera = Camera {
+            initialized: true,
+            ..Camera::default()
+        };
+        let mut settings = CameraSettings {
+            cinematic_target: CinematicTarget::Head,
+            cinematic_follow_half_life: 0.0,
+            ..CameraSettings::default()
+        };
+        let default_focus = Vec3::new(128.0, 128.0, 25.0);
+        let animated = default_focus + Vec3::new(0.15, -0.2, 0.35);
+        camera.set_cinematic_focus(Some(animated));
+        let delta = camera.cinematic_follow_offset(&settings, 1.0 / 60.0, default_focus);
+        assert!(delta.abs_diff_eq(animated - default_focus, 1e-6));
+
+        // Switching off eases back to the same original shot, not a new camera.
+        settings.cinematic_target = CinematicTarget::Off;
+        let delta = camera.cinematic_follow_offset(&settings, 1.0 / 60.0, default_focus);
+        assert_eq!(delta, Vec3::ZERO);
+        camera.focus_on_avatar = false;
+        camera.set_cinematic_focus(Some(animated));
+        settings.cinematic_target = CinematicTarget::Head;
+        assert_eq!(camera.cinematic_follow_offset(&settings, 1.0 / 60.0, default_focus), Vec3::ZERO);
+    }
+
+    #[test]
+    fn cinematic_smoothing_is_frame_rate_independent_and_ignores_invalid_joint_positions() {
+        let run = |fps: u32| {
+            let mut camera = Camera {
+                initialized: true,
+                ..Camera::default()
+            };
+            let settings = CameraSettings {
+                cinematic_target: CinematicTarget::Torso,
+                cinematic_follow_half_life: 0.15,
+                ..CameraSettings::default()
+            };
+            camera.set_cinematic_focus(Some(Vec3::new(0.0, 0.0, 1.0)));
+            for _ in 0..fps {
+                camera.cinematic_follow_offset(&settings, 1.0 / fps as f32, Vec3::ZERO);
+            }
+            camera.cinematic_offset
+        };
+        assert!(run(30).abs_diff_eq(run(144), 1e-4));
+        let mut camera = Camera::default();
+        camera.set_cinematic_focus(Some(Vec3::splat(f32::NAN)));
+        assert!(camera.cinematic_joint_world.is_none());
     }
 }
