@@ -178,8 +178,7 @@ mod tests {
         let mut selected = old;
         selected.voice_idle = Some([18, 102, 170, 255]);
         selected.voice_unavailable = Some([180, 40, 90, 255]);
-        let restored: crate::settings::ColorSettings =
-            serde_json::from_str(&serde_json::to_string(&selected).unwrap()).unwrap();
+        let restored: crate::settings::ColorSettings = serde_json::from_str(&serde_json::to_string(&selected).unwrap()).unwrap();
         assert_eq!(idle_color(&p, &restored), crate::ui::colors::c([18, 102, 170, 255]));
         assert_eq!(unavailable_color(&p, &restored), crate::ui::colors::c([180, 40, 90, 255]));
         // Speech volume remains independently configurable.
