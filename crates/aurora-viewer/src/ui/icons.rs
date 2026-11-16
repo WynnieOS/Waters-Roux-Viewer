@@ -476,7 +476,10 @@ const FILLED: &[(&str, &[u8])] = svg_list!(
 /// Branded SVG symbols are embedded separately from third-party Tabler icons.
 const BRAND_SVGS: &[(&str, &[u8])] = &[
     ("wolf", include_bytes!("../../../../assets/branding/aurora-logo-white.svg")),
-    ("fleur-de-lis", include_bytes!("../../../../assets/branding/waters-roux-fleur-de-lis.svg")),
+    (
+        "fleur-de-lis",
+        include_bytes!("../../../../assets/branding/waters-roux-fleur-de-lis.svg"),
+    ),
 ];
 
 /// Raster images kept as PNG (brand logo).
@@ -915,7 +918,10 @@ mod tests {
 
     #[test]
     fn waters_roux_menu_fleur_de_lis_is_visible() {
-        let (_, bytes) = BRAND_SVGS.iter().find(|(name, _)| *name == "fleur-de-lis").expect("Waters Roux menu icon");
+        let (_, bytes) = BRAND_SVGS
+            .iter()
+            .find(|(name, _)| *name == "fleur-de-lis")
+            .expect("Waters Roux menu icon");
         let image = rasterize_svg(bytes, BRAND_RASTER_PX).expect("fleur-de-lis SVG raster");
         assert!(image.pixels.iter().any(|px| px.a() > 0), "fleur-de-lis is empty");
     }
