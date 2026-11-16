@@ -321,6 +321,8 @@ pub struct Camera {
     smoothing_goal_global: DVec3,
     smoothing_goal_agent: DVec3,
     smoothing_stop: bool,
+    /// Last filtered first-person eye position for steadier machinima.
+    stabilized_mouselook_eye: Option<Vec3>,
     tool: Option<Tool>,
     avatar: AvatarFrame,
     head: Vec3,
@@ -390,6 +392,7 @@ impl Default for Camera {
             smoothing_goal_global: DVec3::ZERO,
             smoothing_goal_agent: DVec3::ZERO,
             smoothing_stop: false,
+            stabilized_mouselook_eye: None,
             tool: None,
             avatar: AvatarFrame {
                 root: start,
@@ -1635,7 +1638,7 @@ impl Camera {
         }
 
         // transition between modes / focus points
-        let (mut camera, focus) = match self.anim {
+        let (mut camera, mut focus) = match self.anim {
             Some(mut a) => {
                 a.elapsed += dt;
                 let fraction = if a.duration > 0.0 { a.elapsed / a.duration } else { 1.0 };
@@ -1664,6 +1667,24 @@ impl Camera {
                 (camera_target, focus_target)
             }
         };
+
+        // Optional avatar-POV stabilization removes high-frequency positional
+        // bob without smoothing mouse aim. The focus moves by the same amount,
+        // so camera rotation stays unchanged. Reset on teleport-sized jumps
+        // and when leaving mouselook (or transitioning into it).
+        if self.mouselook() && self.first_person_view() && s.mouselook_stabilize {
+            let previous = self.stabilized_mouselook_eye.unwrap_or(camera);
+            let steady = if !previous.is_finite() || previous.distance_squared(camera) > 4.0 {
+                camera
+            } else {
+                previous.lerp_monotonic(camera, interpolant(0.045, dt))
+            };
+            self.stabilized_mouselook_eye = Some(steady);
+            focus += steady - camera;
+            camera = steady;
+        } else {
+            self.stabilized_mouselook_eye = None;
+        }
 
         // smoothing: relative to the avatar when following it (the avatar
         // moves too jerkily in world space to smooth there). `lerp_monotonic`

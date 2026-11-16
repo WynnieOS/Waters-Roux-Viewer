@@ -485,7 +485,7 @@ pub fn draw(
             }
             let mut lines = Vec::new();
             // status line first, as LLVOAvatar::idleUpdateNameTagText: "(Away, Blocked)"
-            {
+            if !settings.name_tag_style.enabled || settings.name_tag_style.show_status {
                 use crate::world::status::{ANIM_AWAY, ANIM_DO_NOT_DISTURB};
                 let anims = world.animations_of(&o.full_id);
                 let playing = |id: uuid::Uuid| anims.iter().any(|a| a.id == id);
@@ -507,7 +507,9 @@ pub fn draw(
                     lines.push((format!("({})", status.join(", ")), p.muted, 11.0));
                 }
             }
-            if let Some(t) = o.group_title().filter(|_| world.group_titles.shows(o.full_id == world.agent_id)) {
+            if (!settings.name_tag_style.enabled || settings.name_tag_style.show_group_title)
+                && let Some(t) = o.group_title().filter(|_| world.group_titles.shows(o.full_id == world.agent_id))
+            {
                 lines.push((t, p.muted, 11.0));
             }
             // LLVOAvatar::idleUpdateNameTagText: the display name, then the
@@ -527,7 +529,9 @@ pub fn draw(
             };
             let col = super::colors::tag_color(world, &o.full_id, &legacy, custom);
             lines.push((name, col, 13.0));
-            if let Some(u) = username {
+            if (!settings.name_tag_style.enabled || settings.name_tag_style.show_username)
+                && let Some(u) = username
+            {
                 let dim = |v: u8| (v as f32 * 0.83) as u8;
                 lines.push((
                     u,
@@ -632,7 +636,16 @@ pub fn draw(
     // far first so near tags draw on top
     tags.sort_by(|a, b| b.0.total_cmp(&a.0));
     let opacity = bubbles.as_ref().map_or(0.0, |b| b.opacity);
+    let custom = &settings.name_tag_style;
+    // Single cached asset for the frame; animated GIFs advance in the
+    // reader's own viewer without ever changing simulator identity.
+    let image = super::name_tag_studio::texture(ctx, custom, now_s);
     for (d, sp, lines, in_voice, progress, avatar, at, alpha, bubble) in tags {
+        let sp = if custom.enabled {
+            sp - egui::vec2(0.0, custom.text_height)
+        } else {
+            sp
+        };
         // the scene hides what it has in front of this point
         aurora_render::world_label_at(ctx, Some(at));
         let is_avatar = d < 1000.0;
@@ -649,10 +662,50 @@ pub fn draw(
         };
         let mut y = sp.y;
         // measure
+        let font_of = |s: f32| {
+            let size = if custom.enabled {
+                if s == 13.0 { custom.name_size } else { custom.detail_size }
+            } else {
+                s
+            };
+            FontId::new(
+                size,
+                if custom.enabled && custom.monospace {
+                    egui::FontFamily::Monospace
+                } else {
+                    egui::FontFamily::Proportional
+                },
+            )
+        };
+        let color = |rgb: [u8; 4]| Color32::from_rgba_unmultiplied(rgb[0], rgb[1], rgb[2], rgb[3]);
         let galleys: Vec<_> = lines
             .iter()
-            .map(|(t, c, s)| super::bidi::no_wrap(painter.ctx(), t.clone(), FontId::proportional(*s), c.gamma_multiply(fade)))
+            .map(|(t, c, s)| {
+                let foreground = if custom.enabled && custom.custom_text_colors {
+                    if *s == 13.0 {
+                        color(custom.name_color)
+                    } else {
+                        color(custom.detail_color)
+                    }
+                } else {
+                    *c
+                };
+                super::bidi::no_wrap(painter.ctx(), t.clone(), font_of(*s), foreground.gamma_multiply(fade))
+            })
             .collect();
+        let outlines = (custom.enabled && custom.outline).then(|| {
+            lines
+                .iter()
+                .map(|(t, _, s)| {
+                    super::bidi::no_wrap(
+                        painter.ctx(),
+                        t.clone(),
+                        font_of(*s),
+                        color(custom.outline_color).gamma_multiply(fade),
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
         let total_h: f32 = galleys.iter().map(|g| g.size().y).sum();
         let max_w = galleys.iter().map(|g| g.size().x).fold(0.0, f32::max);
         y -= total_h;
@@ -661,16 +714,44 @@ pub fn draw(
         let voice_w = if no_voice { super::voice_tag::ICON_WIDTH } else { 0.0 };
         let text_x = sp.x + voice_w * 0.5;
         if is_avatar {
-            let w = max_w + 12.0 + super::voice_tag::TAG_EXTRA_WIDTH;
-            let r = egui::Rect::from_min_size(Pos2::new(sp.x - w * 0.5, y - 3.0), egui::vec2(w, total_h + 6.0));
+            let padding = if custom.enabled { custom.padding } else { 3.0 };
+            let w = max_w + if custom.enabled { 2.0 * padding } else { 12.0 } + super::voice_tag::TAG_EXTRA_WIDTH;
+            let r = egui::Rect::from_min_size(Pos2::new(sp.x - w * 0.5, y - padding), egui::vec2(w, total_h + padding * 2.0));
             if let Some(id) = avatar {
                 name_tags.push(NameTag::new(id, r, at, proj));
             }
             painter.rect_filled(
                 r,
-                tag_radius,
-                Color32::from_rgba_unmultiplied(p.bar.r(), p.bar.g(), p.bar.b(), (190.0 * fade) as u8),
+                if custom.enabled {
+                    egui::CornerRadius::same(custom.corner_radius.round() as u8)
+                } else {
+                    tag_radius
+                },
+                if custom.enabled {
+                    custom.color(fade)
+                } else {
+                    Color32::from_rgba_unmultiplied(p.bar.r(), p.bar.g(), p.bar.b(), (190.0 * fade) as u8)
+                },
             );
+            if custom.enabled
+                && let Some(tex) = &image
+            {
+                let (dest, uv) = super::name_tag_studio::image_rect(tex, r, &custom.image_fit);
+                painter.image(
+                    tex.id(),
+                    dest,
+                    uv,
+                    super::widgets::PICTURE_TINT.gamma_multiply(custom.image_opacity * fade),
+                );
+            }
+            if custom.enabled && custom.border_width > 0.0 {
+                painter.rect_stroke(
+                    r,
+                    egui::CornerRadius::same(custom.corner_radius.round() as u8),
+                    egui::Stroke::new(custom.border_width, color(custom.border_color).gamma_multiply(fade)),
+                    egui::StrokeKind::Inside,
+                );
+            }
             // still loading: thin progress bar along the bottom of the tag
             // (violet -> turquoise, like the loading screens)
             if let Some(f) = progress {
@@ -714,11 +795,25 @@ pub fn draw(
                 super::chat_bubbles::paint(&painter, p, b, top, fade, opacity, false, now_s);
             }
         }
-        for g in galleys {
+        for (i, g) in galleys.into_iter().enumerate() {
             let h = g.size().y;
             let pos = Pos2::new(text_x, y);
             let rect = Align2::CENTER_TOP.anchor_size(pos, g.size());
-            // every line was laid out with its own color: nothing to fall back on
+            if let Some(outline) = outlines.as_ref().and_then(|outlines| outlines.get(i)) {
+                for delta in [
+                    egui::vec2(-0.9, 0.0),
+                    egui::vec2(0.9, 0.0),
+                    egui::vec2(0.0, -0.9),
+                    egui::vec2(0.0, 0.9),
+                ] {
+                    painter.galley(rect.min + delta, outline.clone(), Color32::PLACEHOLDER);
+                }
+            }
+            // A subtle second pass thickens the glyphs; the authoritative
+            // displayed text remains the one supplied by Second Life.
+            if custom.enabled && custom.bold {
+                painter.galley(rect.min + egui::vec2(0.55, 0.0), g.clone(), Color32::PLACEHOLDER);
+            }
             painter.galley(rect.min, g, Color32::PLACEHOLDER);
             y += h;
         }

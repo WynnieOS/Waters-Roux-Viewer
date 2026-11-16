@@ -242,6 +242,8 @@ pub enum VersionState {
 
 pub struct LoginInfo {
     pub news: Vec<NewsItem>,
+    /// Live official Second Life grid health and online resident count.
+    pub grid: super::login_grid::LiveGrid,
     pub version: VersionState,
     pub can_check_updates: bool,
     /// UI language of `news`: they follow a change made in the preferences.
@@ -279,6 +281,7 @@ impl LoginInfo {
         let language = aurora_i18n::language();
         Self {
             news: builtin(language),
+            grid: super::login_grid::LiveGrid::default(),
             version: VersionState::Available {
                 version: version.into(),
                 url: String::new(),
@@ -290,7 +293,9 @@ impl LoginInfo {
     }
 
     pub fn start(rt: &tokio::runtime::Handle) -> Self {
-        Self::with_source(rt, Source::from_environment(), aurora_i18n::language())
+        let mut info = Self::with_source(rt, Source::from_environment(), aurora_i18n::language());
+        info.grid = super::login_grid::LiveGrid::start(rt);
+        info
     }
 
     fn with_source(rt: &tokio::runtime::Handle, source: Option<Source>, language: &'static str) -> Self {
@@ -305,6 +310,7 @@ impl LoginInfo {
         });
         let mut info = Self {
             news: Vec::new(),
+            grid: super::login_grid::LiveGrid::default(),
             version: VersionState::NotConfigured,
             can_check_updates: false,
             language,
@@ -329,6 +335,7 @@ impl LoginInfo {
     }
 
     pub fn poll(&mut self) {
+        self.grid.poll();
         self.poll_in(aurora_i18n::language());
     }
 
