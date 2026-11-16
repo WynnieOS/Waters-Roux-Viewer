@@ -116,7 +116,7 @@ pub fn show(
                     .add(egui::Slider::new(&mut settings.camera.smoothing, 0.0..=50.0).text("Camera movement smoothing"))
                     .changed();
                 changed |= widgets::switch_labeled(ui, p, &mut settings.camera.track_focus_object, "Keep focused object tracked").changed();
-                ui.separator();
+                widgets::divider(ui, p);
                 ui.label("Cinematic skeleton follow (your own animated avatar)");
                 ui.horizontal_wrapped(|ui| {
                     for (target, label) in [
