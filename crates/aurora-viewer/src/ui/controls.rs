@@ -24,6 +24,8 @@ pub const CLASSIC_MOVEMENT: &str = "movement_controls";
 const WIDTH: f32 = 300.0;
 /// The body's width inside the window's margins (`widgets::Floater`).
 const INNER: f32 = WIDTH - 24.0;
+/// Minimum room for both camera sticks and the zoom rail with no overlap.
+const MIN_BODY_WIDTH: f32 = 2.0 * STICK + ZOOM_W;
 /// The minimized window's body: the joysticks and the zoom.
 const COMPACT_WIDTH: f32 = 2.0 * STICK + ZOOM_W + 3.0 * 12.0;
 const STICK: f32 = 88.0;
@@ -249,13 +251,15 @@ impl ControlsUi {
     }
 
     fn body(&mut self, ui: &mut egui::Ui, p: &Palette, view: &View, out: &mut Output) {
-        // Use the available resized width while keeping the original control
-        // layout readable at its previous default minimum.
-        ui.set_min_width(INNER.min(ui.available_width()));
+        // The floater can be freely resized; child rows must follow its actual
+        // width instead of staying at the original 276 px and clipping when narrow.
+        let width = responsive_body_width(ui.available_width());
+        ui.set_min_width(width);
         ui.spacing_mut().item_spacing.y = BODY_GAP;
         // the two tabs in pills, each half of the width; the free camera
         // takes the first and greys the other
         let free = view.free.is_some();
+        let tab_width = width / 2.0;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
             for (tab, icon, label) in [
@@ -269,25 +273,25 @@ impl ControlsUi {
                 };
                 let enabled = !free || tab == Tab::Camera;
                 let why = aurora_i18n::tr!("controls-free-movement-off");
-                if widgets::pill_tab_wide(ui, p, icon, label, self.tab == tab, INNER / 2.0, enabled, why).clicked() {
+                if widgets::pill_tab_wide(ui, p, icon, label, self.tab == tab, tab_width, enabled, why).clicked() {
                     self.tab = tab;
                 }
             }
         });
         match (self.tab, view.free) {
             (Tab::Camera, Some(free)) => free_tab(ui, p, view, free, out),
-            (Tab::Camera, None) => self.camera_tab(ui, p, view, out),
-            (Tab::Movement, _) => movement_tab(ui, p, view, out),
+            (Tab::Camera, None) => self.camera_tab(ui, p, view, out, width),
+            (Tab::Movement, _) => movement_tab(ui, p, view, out, width),
         }
     }
 
-    fn camera_tab(&mut self, ui: &mut egui::Ui, p: &Palette, view: &View, out: &mut Output) {
-        sticks(ui, p, view, out, INNER);
+    fn camera_tab(&mut self, ui: &mut egui::Ui, p: &Palette, view: &View, out: &mut Output, width: f32) {
+        sticks(ui, p, view, out, width);
         roll_controls(ui, p, view, out);
         // the four views of Preferences › Camera, in one click
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = ROW_GAP;
-            let w = (INNER - 3.0 * ROW_GAP) / 4.0;
+            let w = (width - 3.0 * ROW_GAP) / 4.0;
             for (preset, icon) in [
                 (CameraPreset::Rear, "user"),
                 (CameraPreset::Front, "user-circle"),
@@ -303,7 +307,7 @@ impl ControlsUi {
         });
         // two equal buttons and the reset; the saved positions below on the
         // same columns
-        let grid = ButtonGrid::new(INNER);
+        let grid = ButtonGrid::new(width);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = ROW_GAP;
             let object = widgets::action_button(
@@ -938,7 +942,7 @@ fn free_compact(ui: &mut egui::Ui, p: &Palette, view: &View, free: FreeView, out
     }
 }
 
-fn movement_tab(ui: &mut egui::Ui, p: &Palette, view: &View, out: &mut Output) {
+fn movement_tab(ui: &mut egui::Ui, p: &Palette, view: &View, out: &mut Output, width: f32) {
     pad(ui, p, view, out);
     modes(ui, p, view, out);
     // Stop flying and Stand up stay in place, greyed when they do not apply
@@ -946,7 +950,7 @@ fn movement_tab(ui: &mut egui::Ui, p: &Palette, view: &View, out: &mut Output) {
     // its layout
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = ROW_GAP;
-        let w = (INNER - ROW_GAP) / 2.0;
+        let w = (width - ROW_GAP) / 2.0;
         let stop = widgets::action_button_keyed(
             ui,
             p,
@@ -1539,9 +1543,27 @@ fn key_rows(ui: &mut egui::Ui, p: &Palette, rows: &[(Vec<KeyPart>, &str)], gap: 
     }
 }
 
+/// All combined-camera rows share the resized body's width, with just enough
+/// minimum space for the two joysticks and zoom controls.
+fn responsive_body_width(available_width: f32) -> f32 {
+    available_width.max(MIN_BODY_WIDTH)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resized_camera_and_movement_rows_follow_the_floater_width() {
+        for (available, expected) in [(180.0, 200.0), (276.0, 276.0), (420.0, 420.0)] {
+            let width = responsive_body_width(available);
+            assert_eq!(width, expected);
+            let grid = ButtonGrid::new(width);
+            assert!((grid.square_left + BUTTON_H - width).abs() < 0.001);
+            assert!((2.0 * ((width - ROW_GAP) / 2.0) + ROW_GAP - width).abs() < 0.001);
+            assert!(((width - 3.0 * ROW_GAP) / 4.0) > 0.0);
+        }
+    }
 
     #[test]
     fn a_long_roll_press_never_drags_or_snaps_its_floater() {
