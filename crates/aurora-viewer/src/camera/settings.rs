@@ -477,12 +477,7 @@ impl CameraSettings {
         self.zoom_time = fix(self.zoom_time, 0.0, 4.0, d.zoom_time);
         self.smoothing = fix(self.smoothing, *SMOOTHING_RANGE.start(), *SMOOTHING_RANGE.end(), d.smoothing);
         self.dynamic_strength = fix(self.dynamic_strength, 0.0, 30.0, d.dynamic_strength);
-        self.cinematic_follow_half_life = fix(
-            self.cinematic_follow_half_life,
-            0.0,
-            2.0,
-            d.cinematic_follow_half_life,
-        );
+        self.cinematic_follow_half_life = fix(self.cinematic_follow_half_life, 0.0, 2.0, d.cinematic_follow_half_life);
         self
     }
 }
@@ -624,8 +619,7 @@ mod cinematic_settings_tests {
             cinematic_follow_half_life: 0.25,
             ..old
         };
-        let roundtrip: CameraSettings =
-            serde_json::from_str(&serde_json::to_string(&current).unwrap()).unwrap();
+        let roundtrip: CameraSettings = serde_json::from_str(&serde_json::to_string(&current).unwrap()).unwrap();
         assert_eq!(roundtrip.cinematic_target, CinematicTarget::LeftArm);
         assert_eq!(roundtrip.cinematic_follow_half_life, 0.25);
         assert_eq!(CinematicTarget::Head.joint_name(), Some("mHead"));

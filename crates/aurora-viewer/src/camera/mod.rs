@@ -21,7 +21,9 @@ mod settings;
 
 pub use focus::FocusObject;
 pub use free::FreeCamera;
-pub use settings::{CameraPreset, CameraSettings, CameraShot, CinematicTarget, DEFAULT_FOV, FOV_RANGE, SMOOTHING_RANGE, SavedViews, VrView, zoom_lens};
+pub use settings::{
+    CameraPreset, CameraSettings, CameraShot, CinematicTarget, DEFAULT_FOV, FOV_RANGE, SMOOTHING_RANGE, SavedViews, VrView, zoom_lens,
+};
 
 /// Reference for a rolled view, shared with flycam handoff and AgentUpdate.
 /// At a vertical pole the world Z axis cannot define an up direction.
@@ -462,12 +464,9 @@ impl Camera {
         let desired = if settings.cinematic_target == CinematicTarget::Off {
             Vec3::ZERO
         } else {
-            self.cinematic_joint_world
-                .map(|joint| joint - default_focus)
-                .unwrap_or(Vec3::ZERO)
+            self.cinematic_joint_world.map(|joint| joint - default_focus).unwrap_or(Vec3::ZERO)
         };
-        let immediate = !self.initialized || !self.cinematic_offset.is_finite()
-            || self.cinematic_offset.distance_squared(desired) > 64.0;
+        let immediate = !self.initialized || !self.cinematic_offset.is_finite() || self.cinematic_offset.distance_squared(desired) > 64.0;
         let alpha = if immediate {
             1.0
         } else {
