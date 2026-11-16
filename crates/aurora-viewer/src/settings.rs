@@ -3522,7 +3522,7 @@ mod tests {
             draw_distance: 1024.0,
             ..Default::default()
         };
-        assert_eq!(s.sanitized().draw_distance, 1024.0);
+        assert_eq!(s.clone().sanitized().draw_distance, 1024.0);
         s.draw_distance = 2048.0;
         assert_eq!(s.sanitized().draw_distance, 1024.0);
     }
