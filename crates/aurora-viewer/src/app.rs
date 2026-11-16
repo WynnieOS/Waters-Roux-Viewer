@@ -6095,6 +6095,9 @@ impl App {
             }
         }
         if self.capture.is_none() {
+            if let Err(error) = ui::workspaces::capture(&self.egui_ctx, self.settings.workspace_mode, &self.panels) {
+                log::warn!("Could not save the active Waters Roux workspace: {error}");
+            }
             ui::layout::save(&self.egui_ctx);
         }
         // LLFavoritesOrderStorage::destroyClass: the favourites as they are
@@ -15091,7 +15094,14 @@ impl App {
         self.options_ui.joystick = self.joystick.snapshot.clone();
         self.options_ui.flycam_active = self.joystick.active;
         let before_camera = self.settings.camera.clone();
+        let before_workspace = self.settings.workspace_mode;
         let mut res = ui::options::show(ctx, p, &self.skin.icons, &mut self.settings, &mut self.options_ui, &mut open);
+        if before_workspace != self.settings.workspace_mode
+            && let Err(error) = ui::workspaces::switch(ctx, before_workspace, self.settings.workspace_mode, &mut self.panels)
+        {
+            log::warn!("Waters Roux workspace switch cancelled: {error}");
+            self.settings.workspace_mode = before_workspace;
+        }
         self.sync_appearance_camera();
         self.world.rlva.preserve_camera_settings(&mut self.settings.camera, &before_camera);
         if res.toggle_flycam {
