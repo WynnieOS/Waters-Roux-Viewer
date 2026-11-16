@@ -1,8 +1,13 @@
-# Alpha bug reports
+# Waters Roux — beta bug reports
+
+**Beta 28 V3 support routing:** Report a Bug and crash-report browser links must open [Waters Roux Issues](https://github.com/WynnieOS/Waters-Roux-Viewer/issues/new/choose), not Aurora's issue tracker. The underlying Rust binary/module names may still include `aurora` for source compatibility; that does not authorize routing user-submitted reports to the upstream project.
+
+**Direct GitHub App authorization is disabled pending registration of an independently verified Waters Roux GitHub App.** The previously embedded Aurora App Client ID must not be used. Residents may instead open a reviewed bug/crash draft in the browser and submit through GitHub manually. Existing local reports and private diagnostics should never be uploaded without explicit review. The direct-send details below describe the code path for a future vetted App and are not enabled for Beta V3.
+
 
 "Report a bug", in the top bar, the Help menu and on the login screen, opens
 the project's
-[GitHub issue forms](https://github.com/Aurora-Viewer/Aurora-Viewer/issues/new/choose)
+[Waters Roux GitHub issue forms](https://github.com/WynnieOS/Waters-Roux-Viewer/issues/new/choose)
 in the browser. The tester needs a GitHub account, chooses the bug report
 template and fills it in on GitHub. "Copy trace" and "Open report folder",
 in the crash window, give the full technical details, to review before
@@ -24,8 +29,7 @@ name, with no label (the crash triage below sets the type). "Open in the
 browser" opens a new issue with the same title and text instead (text in
 the clipboard when the link would be too long).
 
-The authorization is kept in the system credential store (Windows
-Credential Manager, entry "Aurora Viewer GitHub"), never in the settings,
+The authorization is kept in the system credential store (Windows Credential Manager, under the viewer-specific Waters Roux entry), never in the settings,
 the reports or the logs: an expiring user token and its refresh token,
 refreshed without any client secret (allowed for the Device Flow) and
 replaced at each refresh. "Forget the GitHub connection", in the crash
@@ -260,15 +264,14 @@ new authorisation from the tester.
 
 ### Setting up direct sending
 
-Create a **GitHub App**, in the developer settings of the Aurora-Viewer
-organisation, then:
+Before re-enabling direct sending, create a **new Waters Roux GitHub App** under the authorized WynnieOS account, then:
 
 - turn on **Enable Device Flow**, keep the expiry of the authorisations;
 - leave the callback and setup URLs empty and disable the webhook;
 - repository permissions: **Issues — Read and write**, read-only metadata,
   no other permission;
 - public application (**Any account**) for the testers; install it on the
-  organisation with only the Aurora-Viewer repository selected;
+  account with only the WynnieOS/Waters-Roux-Viewer repository selected;
 - copy the **public Client ID** into `bug_report/github.rs::CLIENT_ID`.
   The numeric App ID is not suitable. No Client secret and no private key
   may be added to the viewer.
