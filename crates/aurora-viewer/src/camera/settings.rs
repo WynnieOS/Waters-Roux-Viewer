@@ -26,6 +26,30 @@ mod first_person_tests {
     }
 }
 
+/// Animated-joint targets for the creator's third-person cinematic follow.
+/// Off is the default for older settings; target names come from the SL rig.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CinematicTarget {
+    #[default]
+    Off,
+    Head,
+    Torso,
+    LeftArm,
+    RightArm,
+}
+
+impl CinematicTarget {
+    pub const fn joint_name(self) -> Option<&'static str> {
+        match self {
+            Self::Off => None,
+            Self::Head => Some("mHead"),
+            Self::Torso => Some("mChest"),
+            Self::LeftArm => Some("mElbowLeft"),
+            Self::RightArm => Some("mElbowRight"),
+        }
+    }
+}
+
 /// Firestorm camera presets (app_settings/camera/*.xml).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum CameraPreset {
@@ -236,6 +260,10 @@ pub struct CameraSettings {
     pub mouselook_follow_eyes: bool,
     /// Opt-in smoothing of avatar-POV head movement for stable machinima.
     pub mouselook_stabilize: bool,
+    /// Optional creator camera follow for the local avatar's animated skeleton.
+    pub cinematic_target: CinematicTarget,
+    /// Half-life of follow transitions in seconds; zero follows immediately.
+    pub cinematic_follow_half_life: f32,
     /// FSScrollWheelExitsMouselook.
     pub wheel_exits_mouselook: bool,
     /// The angle of the right-button zoom in mouselook, remembered from one
@@ -301,6 +329,8 @@ impl Default for CameraSettings {
             show_avatar_in_mouselook: false,
             mouselook_follow_eyes: false,
             mouselook_stabilize: false,
+            cinematic_target: CinematicTarget::Off,
+            cinematic_follow_half_life: 0.15,
             wheel_exits_mouselook: true,
             // no zoom until the wheel is turned once while the button is held
             mouselook_zoom_fov: None,
@@ -447,6 +477,12 @@ impl CameraSettings {
         self.zoom_time = fix(self.zoom_time, 0.0, 4.0, d.zoom_time);
         self.smoothing = fix(self.smoothing, *SMOOTHING_RANGE.start(), *SMOOTHING_RANGE.end(), d.smoothing);
         self.dynamic_strength = fix(self.dynamic_strength, 0.0, 30.0, d.dynamic_strength);
+        self.cinematic_follow_half_life = fix(
+            self.cinematic_follow_half_life,
+            0.0,
+            2.0,
+            d.cinematic_follow_half_life,
+        );
         self
     }
 }
@@ -571,5 +607,44 @@ mod lens_zoom_tests {
             ..Default::default()
         };
         assert_eq!(saved.sanitized().fov, 5.0f32.to_radians());
+    }
+}
+
+#[cfg(test)]
+mod cinematic_settings_tests {
+    use super::*;
+
+    #[test]
+    fn older_settings_disable_joint_tracking_without_losing_camera_preferences() {
+        let old: CameraSettings = serde_json::from_str("{}").expect("old camera preferences");
+        assert_eq!(old.cinematic_target, CinematicTarget::Off);
+        assert_eq!(old.cinematic_follow_half_life, 0.15);
+        let current = CameraSettings {
+            cinematic_target: CinematicTarget::LeftArm,
+            cinematic_follow_half_life: 0.25,
+            ..old
+        };
+        let roundtrip: CameraSettings =
+            serde_json::from_str(&serde_json::to_string(&current).unwrap()).unwrap();
+        assert_eq!(roundtrip.cinematic_target, CinematicTarget::LeftArm);
+        assert_eq!(roundtrip.cinematic_follow_half_life, 0.25);
+        assert_eq!(CinematicTarget::Head.joint_name(), Some("mHead"));
+        assert_eq!(CinematicTarget::Torso.joint_name(), Some("mChest"));
+        assert_eq!(CinematicTarget::RightArm.joint_name(), Some("mElbowRight"));
+        assert_eq!(CinematicTarget::Off.joint_name(), None);
+    }
+
+    #[test]
+    fn cinematic_smoothing_sanitizes_untrusted_settings() {
+        let selected = CameraSettings {
+            cinematic_follow_half_life: 12.0,
+            ..CameraSettings::default()
+        };
+        assert_eq!(selected.sanitized().cinematic_follow_half_life, 2.0);
+        let invalid = CameraSettings {
+            cinematic_follow_half_life: f32::NAN,
+            ..CameraSettings::default()
+        };
+        assert_eq!(invalid.sanitized().cinematic_follow_half_life, 0.15);
     }
 }

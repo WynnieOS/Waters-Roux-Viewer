@@ -9399,7 +9399,10 @@ impl App {
                 draw_distance: self.settings.draw_distance,
                 region_width: self.world.main().map_or(256.0, |r| r.heightmap.size_x as f32),
             };
-            if frame.edit_tracking.is_some() || self.camera.needs_animated_eyes(&self.world.agent, &self.settings.camera) {
+            if frame.edit_tracking.is_some()
+                || self.camera.needs_animated_eyes(&self.world.agent, &self.settings.camera)
+                || self.settings.camera.cinematic_target != crate::camera::CinematicTarget::Off
+            {
                 // Evaluate the focused edit selection after the local drag,
                 // and first-person eyes after this frame's animation.
                 late_camera_frame = Some(frame);
@@ -9961,6 +9964,15 @@ impl App {
             let camera_changed = late_camera_frame.is_some() || panned;
             if let Some(mut frame) = late_camera_frame {
                 frame.eye_offset = self.scene.eyes_offset(&self.world, &self.world.agent_id);
+                // Use the avatar's evaluated animation and skeleton positions,
+                // not guessed static body offsets; evaluate after update_poses.
+                let cinematic_joint = self
+                    .settings
+                    .camera
+                    .cinematic_target
+                    .joint_name()
+                    .and_then(|name| self.scene.joint_world(&self.world, &self.world.agent_id, name, now));
+                self.camera.set_cinematic_focus(cinematic_joint);
                 if self.camera.needs_animated_eyes(&self.world.agent, &self.settings.camera) {
                     frame.now = now;
                 }

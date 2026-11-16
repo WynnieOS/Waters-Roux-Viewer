@@ -2,7 +2,7 @@
 //! it exposes live camera/lighting render settings and an opt-in native recorder.
 
 use super::widgets::{self, ActionKind, Floater};
-use crate::{settings::Settings, theme::Palette};
+use crate::{camera::CinematicTarget, settings::Settings, theme::Palette};
 use egui::{Context, Vec2};
 
 pub const WINDOW: &str = "waters_roux_machinima";
@@ -109,6 +109,30 @@ pub fn show(
                     .add(egui::Slider::new(&mut settings.camera.smoothing, 0.0..=50.0).text("Camera movement smoothing"))
                     .changed();
                 changed |= widgets::switch_labeled(ui, p, &mut settings.camera.track_focus_object, "Keep focused object tracked").changed();
+                ui.separator();
+                ui.label("Cinematic skeleton follow (your own animated avatar)");
+                ui.horizontal_wrapped(|ui| {
+                    for (target, label) in [
+                        (CinematicTarget::Off, "Off"),
+                        (CinematicTarget::Head, "Head"),
+                        (CinematicTarget::Torso, "Torso"),
+                        (CinematicTarget::LeftArm, "Left arm"),
+                        (CinematicTarget::RightArm, "Right arm"),
+                    ] {
+                        changed |= ui
+                            .selectable_value(&mut settings.camera.cinematic_target, target, label)
+                            .changed();
+                    }
+                });
+                if settings.camera.cinematic_target != CinematicTarget::Off {
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut settings.camera.cinematic_follow_half_life, 0.0..=2.0)
+                                .text("Joint-follow smoothing (s)"),
+                        )
+                        .changed();
+                    ui.small("Third-person camera only. Follows the selected rendered joint; Flycam, POV and scripted cameras keep their own behavior.");
+                }
                 changed |= widgets::switch_labeled(
                     ui,
                     p,
