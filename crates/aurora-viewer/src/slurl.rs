@@ -142,6 +142,8 @@ pub fn parse(input: &str) -> Option<Location> {
         "maps.secondlife.com/secondlife/",
         "https://slurl.com/secondlife/",
         "http://slurl.com/secondlife/",
+        "https://www.slurl.com/secondlife/",
+        "http://www.slurl.com/secondlife/",
         "slurl.com/secondlife/",
     ] {
         if lower.starts_with(prefix) {
@@ -152,12 +154,20 @@ pub fn parse(input: &str) -> Option<Location> {
     if let Some(r) = rest {
         let r = r.split(['?', '#']).next().unwrap_or("").trim_matches('/');
         let parts: Vec<&str> = r.split('/').collect();
-        let region = decode(parts.first()?).trim().to_owned();
-        if region.is_empty() {
+        if parts.is_empty() || parts.len() > 4 {
             return None;
         }
-        let pos = coords(&parts[1..parts.len().min(4)]).unwrap_or(Vec3::new(128.0, 128.0, 0.0));
+        let region = decode(parts[0]).trim().to_owned();
+        if region.is_empty() || region.contains(['/', '\\']) || region.chars().any(char::is_control) {
+            return None;
+        }
+        // Malformed coordinates must never silently become the region center.
+        let pos = coords(&parts[1..])?;
         return Some(Location { region, pos, grid: None });
+    }
+    // Unsupported app commands and arbitrary web URLs are not teleport targets.
+    if s.contains("://") || lower.starts_with("maps.secondlife.com/") || lower.starts_with("slurl.com/") {
+        return None;
     }
     // "Region (x, y, z)" as shown in the bar (optionally "Parcel, Region (...) - Maturity")
     if let (Some(open), Some(close)) = (s.rfind('('), s.rfind(')'))
@@ -179,12 +189,15 @@ pub fn parse(input: &str) -> Option<Location> {
     // "Region/x/y/z"
     if s.contains('/') {
         let parts: Vec<&str> = s.split('/').collect();
-        if let Some(pos) = coords(&parts[1..parts.len().min(4)]) {
-            let region = decode(parts[0]).trim().to_owned();
-            if !region.is_empty() {
-                return Some(Location { region, pos, grid: None });
-            }
+        if parts.len() > 4 {
+            return None;
         }
+        let pos = coords(&parts[1..])?;
+        let region = decode(parts[0]).trim().to_owned();
+        if region.is_empty() || region.contains('\\') || region.chars().any(char::is_control) {
+            return None;
+        }
+        return Some(Location { region, pos, grid: None });
     }
     // "Region, x, y, z"
     let parts: Vec<&str> = s.split(',').collect();
@@ -436,6 +449,28 @@ mod tests {
             ("Ahern".to_owned(), [128, 128, 0])
         );
         assert!(parse("   ").is_none());
+    }
+
+    #[test]
+    fn pasted_slurls_validate_coordinates_and_reject_other_web_links() {
+        let url = "https://www.slurl.com/secondlife/New%20Orleans/128/64/32";
+        assert_eq!(p(url), ("New Orleans".to_owned(), [128, 64, 32]));
+        assert_eq!(p("secondlife://New%20Orleans/128/64/32"), ("New Orleans".to_owned(), [128, 64, 32]));
+        for invalid in [
+            "https://maps.secondlife.com/secondlife/Ahern/NaN/2/3",
+            "https://maps.secondlife.com/secondlife/Ahern/invalid/2/3",
+            "secondlife://Ahern/0/infinite/5",
+            "secondlife://Ahern/1/2/3/4",
+            "secondlife:///app/agent/00000000-0000-0000-0000-000000000000/about",
+            "https://example.com/secondlife/Ahern/128/128/0",
+            "Ahern/nope/1/2",
+            "Ahern/1/2/3/4",
+            "https://www.fake-slurl.com/secondlife/Ahern/128/128/0",
+            "secondlife:///app/teleport/",
+        ] {
+            assert!(parse(invalid).is_none(), "invalid SLURL accepted: {invalid}");
+        }
+        assert_eq!(p("https://maps.secondlife.com/secondlife/Ahern"), ("Ahern".to_owned(), [128, 128, 0]));
     }
 
     #[test]
