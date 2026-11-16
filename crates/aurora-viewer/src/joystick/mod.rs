@@ -81,6 +81,8 @@ pub struct Settings {
     pub device: String,
     pub avatar_enabled: bool,
     pub flycam_enabled: bool,
+    /// V3: hide the on-screen Flycam banner without disabling camera control.
+    pub show_flycam_banner: bool,
     /// -1 disconnects a logical axis.
     pub mapping: [i8; CHANNELS],
     pub avatar: Tuning,
@@ -108,6 +110,7 @@ impl Default for Settings {
             device: String::new(),
             avatar_enabled: true,
             flycam_enabled: true,
+            show_flycam_banner: true,
             mapping: [1, 0, 2, 4, 3, 5, -1],
             avatar: Tuning {
                 gain: [1.0, 1.0, 1.0, 0.0, 0.1, 0.1, 0.0],
@@ -523,6 +526,16 @@ impl Controller {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn flycam_banner_setting_is_opt_out_and_migrates_old_profiles() {
+        let old: super::Settings = serde_json::from_str("{}").expect("older joystick profile");
+        assert!(old.show_flycam_banner);
+        let mut custom = old;
+        custom.show_flycam_banner = false;
+        let restored: super::Settings = serde_json::from_str(&serde_json::to_string(&custom).unwrap()).unwrap();
+        assert!(!restored.show_flycam_banner);
+    }
+
     use super::*;
 
     fn fixture() -> (Snapshot, Settings, Controller) {
