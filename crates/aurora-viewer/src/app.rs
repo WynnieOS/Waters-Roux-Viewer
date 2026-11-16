@@ -11425,9 +11425,8 @@ impl App {
         // stopped asking for frames at five minutes but stayed active, so a
         // user's MP4 could end in a frozen frame until they manually stopped.
         if self.recorder.reached_time_limit(Instant::now()) {
-            self.world.system_message(
-                "Recording reached the 30-minute limit; saving the MP4 automatically.".to_owned(),
-            );
+            self.world
+                .system_message("Recording reached the 30-minute limit; saving the MP4 automatically.".to_owned());
             self.stop_video_recording();
         }
         // Native machinima video reads the actual rendered world frames.
