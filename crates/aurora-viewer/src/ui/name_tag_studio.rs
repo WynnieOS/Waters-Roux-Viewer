@@ -174,8 +174,18 @@ fn shrink(image: image::RgbaImage) -> image::RgbaImage {
     image::imageops::resize(&image, width, height, image::imageops::FilterType::Lanczos3)
 }
 
+// Windows Explorer's Copy as path includes surrounding quotes. Accept that
+// form alongside paths selected from the picker and drag-and-drop.
+fn local_image_path(path: &str) -> &str {
+    let trimmed = path.trim();
+    trimmed
+        .strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .unwrap_or(trimmed)
+}
+
 fn decode_art(ctx: &Context, path: &str) -> Result<Art, String> {
-    let file = Path::new(path);
+    let file = Path::new(local_image_path(path));
     let meta = std::fs::metadata(file).map_err(|e| format!("Cannot open file: {e}"))?;
     if meta.len() > MAX_FILE {
         return Err("The image exceeds 32 MB. Compress it before importing.".into());
@@ -495,6 +505,44 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn accepts_windows_explorer_quoted_image_paths_without_replacing_filenames() {
+        assert_eq!(
+            local_image_path(r#"  "C:\\Users\\Creator\\Pictures\\my nametag.PNG"  "#),
+            r"C:\\Users\\Creator\\Pictures\\my nametag.PNG"
+        );
+        assert_eq!(local_image_path("C:/Pictures/tag.jpg"), "C:/Pictures/tag.jpg");
+        assert_eq!(local_image_path(""), "");
+    }
+
+    #[test]
+    fn png_jpg_and_gif_actually_decode_as_name_tag_backgrounds() {
+        use std::{io::Cursor, path::PathBuf};
+        let ctx = egui::Context::default();
+        let root: PathBuf = std::env::temp_dir().join(format!("waters-roux-nametag-import-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).expect("create isolated import fixture");
+        for (ext, format) in [
+            ("png", image::ImageFormat::Png),
+            ("jpg", image::ImageFormat::Jpeg),
+            ("gif", image::ImageFormat::Gif),
+        ] {
+            let still = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+                3,
+                2,
+                image::Rgb([210, 120, 140]),
+            ));
+            let mut encoded = Cursor::new(Vec::new());
+            still.write_to(&mut encoded, format).expect("encode tiny valid image");
+            let file = root.join(format!("creator-tag.{ext}"));
+            std::fs::write(&file, encoded.into_inner()).expect("write import fixture");
+            let path = format!(r#""{}""#, file.display());
+            let art = decode_art(&ctx, &path).expect("decode PNG, JPG or GIF image");
+            assert!(!art.frames.is_empty(), "{ext} must load at least one texture");
+            assert!(art.frames[0].size()[0] > 0 && art.frames[0].size()[1] > 0);
+        }
+        std::fs::remove_dir_all(root).expect("remove isolated import fixture");
+    }
+
     #[test]
     fn styles_sanitize_unsafe_values() {
         let mut style = Style {
