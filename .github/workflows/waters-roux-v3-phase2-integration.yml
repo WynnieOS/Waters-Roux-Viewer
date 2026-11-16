@@ -1,0 +1,125 @@
+name: Waters Roux V3 - phase 2 verified source integration
+
+on:
+  push:
+    branches:
+      - integrate/waters-roux-beta28-v3-phase2
+    paths:
+      - '.github/workflows/waters-roux-v3-phase2-integration.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: waters-roux-v3-phase2-source
+  cancel-in-progress: false
+
+jobs:
+  verify-and-preserve:
+    name: Merge, compile and test phase 2 before saving source
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - name: Check out protected, branded phase 2 branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: integrate/waters-roux-beta28-v3-phase2
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Merge pinned new feature code, never Aurora main
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name 'Waters Roux V3 Phase 2 Integration'
+          git config user.email 'ci@users.noreply.github.com'
+          $current = (git branch --show-current).Trim()
+          if ($current -ne 'integrate/waters-roux-beta28-v3-phase2') { throw 'Wrong source branch' }
+
+          # Six exact reviewed branch heads; never silently substitute moving tips.
+          $pins = @(
+            @{ Ref='feat/waters-roux-v3-resizable-camera-controls'; Sha='588e69285054be2d23168177efb6031055828028' },
+            @{ Ref='fix/waters-roux-v3-recorder-duration-finalization'; Sha='bf1b6229b0ced407a2b0ad56f75ae0da64a82f70' },
+            @{ Ref='feat/waters-roux-v3-hold-to-repeat-build-spinners'; Sha='b4aaa119da143cca1c0cc3acccabae4fe4996be3' },
+            @{ Ref='fix/waters-roux-v3-distinct-toolbar-icons'; Sha='b81eef438cf2e4d5455c13b7b79f4519d277eb80' },
+            @{ Ref='fix/waters-roux-v3-nametag-image-import'; Sha='51d0d5d4dd387aba7a360a06252a2560d98a4006' },
+            @{ Ref='fix/waters-roux-v3-draw-distance-regression'; Sha='df96033b23bc2e6f5bbcfc4b1e30fc9fef0377f7' }
+          )
+          foreach ($pin in $pins) {
+            git fetch --no-tags origin "refs/heads/$($pin.Ref)"
+            if ($LASTEXITCODE -ne 0) { throw "Cannot fetch $($pin.Ref)" }
+            $sha = (git rev-parse "refs/remotes/origin/$($pin.Ref)").Trim()
+            if ($LASTEXITCODE -ne 0 -or $sha -ne $pin.Sha) {
+              throw "The reviewed source for $($pin.Ref) changed: $sha. Stop for audit."
+            }
+            git merge --no-ff --no-edit $pin.Sha
+            if ($LASTEXITCODE -ne 0) { throw "Conflict integrating $($pin.Ref); no source will be pushed" }
+          }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Whitespace conflict after source integration' }
+
+          $required = @(
+            'assets/branding/waters-roux-logo.png',
+            'assets/branding/waters-roux-fleur-de-lis.svg',
+            'crates/aurora-viewer/src/app/recording/mp4.rs',
+            'docs/WATERS_ROUX_PRIVACY_STATUS.md'
+          )
+          foreach ($file in $required) {
+            if (!(Test-Path -LiteralPath $file)) { throw "Missing branded essential file $file" }
+          }
+          $checks = @(
+            @{ Path='crates/aurora-viewer/src/app.rs'; Token='self.recorder.reached_time_limit(Instant::now())' },
+            @{ Path='crates/aurora-viewer/src/app.rs'; Token='Action::QuickRecord => self.quick_record()' },
+            @{ Path='crates/aurora-viewer/src/ui/controls.rs'; Token='.compact_when_minimized(COMPACT_WIDTH + 20.0)' },
+            @{ Path='crates/aurora-viewer/src/ui/widgets.rs'; Token='SPINNER_HOLD_DELAY' },
+            @{ Path='crates/aurora-viewer/src/ui/toolbar/catalogue.rs'; Token='"group_titles", "id-filled"' },
+            @{ Path='crates/aurora-viewer/src/graphics_presets/saved.rs'; Token='saved graphics profiles clamp to the V3 1,024 m cap' },
+            @{ Path='crates/aurora-viewer/src/ui/name_tag_studio.rs'; Token='fn local_image_path(path: &str)' },
+            @{ Path='crates/aurora-viewer/src/ui/name_tag_studio.rs'; Token='png_jpg_and_gif_actually_decode_as_name_tag_backgrounds' }
+            @{ Path='crates/aurora-viewer/src/ui/bars.rs'; Token='icons.get("fleur-de-lis")' },
+            @{ Path='crates/aurora-viewer/src/snapshot/mod.rs'; Token='.join("Waters Roux")' },
+            @{ Path='crates/aurora-viewer/src/links.rs'; Token='WynnieOS/Waters-Roux-Viewer/issues/new/choose' }
+          )
+          foreach ($entry in $checks) {
+            $source = Get-Content -LiteralPath $entry.Path -Raw
+            if (!$source.Contains($entry.Token)) { throw "Missing expected V3 source check: $($entry.Path) $($entry.Token)" }
+          }
+
+          cargo fmt --all
+          if ($LASTEXITCODE -ne 0) { throw 'Could not normalize integrated Rust formatting' }
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Whitespace error from Rustfmt' }
+          $changed = @(git status --porcelain)
+          if ($changed.Count -gt 0) {
+            git add --all
+            if ($LASTEXITCODE -ne 0) { throw 'Could not stage formatting' }
+            git commit -m 'style(v3): format integrated phase 2 source'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not commit formatting' }
+          }
+          cargo fmt --all -- --check
+          if ($LASTEXITCODE -ne 0) { throw 'Rustfmt is still failing' }
+
+      - name: Validate combined Rust source before any push
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { throw 'Integrated Clippy failed. Branch not updated.' }
+          cargo test --locked -p aurora-viewer --bin aurora-viewer
+          if ($LASTEXITCODE -ne 0) { throw 'Combined viewer tests failed. Branch not updated.' }
+
+      - name: Save validated integrated source (not a viewer installer)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git log -8 --oneline
+          git push origin HEAD:refs/heads/integrate/waters-roux-beta28-v3-phase2
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot persist validated integrated source' }
+          Write-Host 'Phase 2 SOURCE passes Windows lint and unit tests; no executable was published.'
+
+      - name: Release limits
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host 'STOP: no packaging or public release from this workflow.'
+          Write-Host 'Still required: complete 18-section feature implementation, actual in-world camera/media acceptance, branded Windows artifact inspection and exact-artifact security validation.'

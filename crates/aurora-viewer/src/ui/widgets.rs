@@ -239,8 +239,24 @@ fn title_in_reach(
     (asked.is_some() || kept != pos).then_some(kept)
 }
 
+// Held increment keys reuse this state per caret rather than per XYZ row.
+// Quick clicks still step once on release; a long hold starts after 350ms.
+#[derive(Clone, Copy)]
+struct StepHold {
+    started: f64,
+    last_repeat: f64,
+    repeated: bool,
+}
+
+const SPINNER_HOLD_DELAY: f64 = 0.35;
+const SPINNER_REPEAT_INTERVAL: f64 = 0.11;
+
+fn step_due(hold: StepHold, now: f64) -> bool {
+    now >= hold.started + SPINNER_HOLD_DELAY && now >= hold.last_repeat + SPINNER_REPEAT_INTERVAL
+}
+
 /// Two compact increment buttons beside numeric fields (LLSpinCtrl).
-/// Uses theme faces and Tabler glyphs, and inherits disabled state.
+/// A click steps once; hold to repeat without dragging the numeric text.
 pub(crate) fn step_buttons(ui: &mut egui::Ui, height: f32) -> i8 {
     let mut step = 0;
     ui.allocate_ui_with_layout(Vec2::new(13.0, height), egui::Layout::top_down(egui::Align::Center), |ui| {
@@ -262,8 +278,29 @@ pub(crate) fn step_buttons(ui: &mut egui::Ui, height: f32) -> i8 {
                 );
             }
             response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), label));
-            if response.on_hover_text(label).clicked() {
-                step = direction;
+            let response = response.on_hover_text(label);
+            let key = response.id.with("waters_roux_spinner_hold");
+            let now = ui.input(|input| input.time);
+            let held = ui.is_enabled() && response.is_pointer_button_down_on();
+            let previous = ui.data(|data| data.get_temp::<StepHold>(key));
+            if held {
+                let mut state = previous.unwrap_or(StepHold {
+                    started: now,
+                    last_repeat: now,
+                    repeated: false,
+                });
+                if step_due(state, now) {
+                    state.last_repeat = now;
+                    state.repeated = true;
+                    step = direction;
+                }
+                ui.data_mut(|data| data.insert_temp(key, state));
+                ui.ctx().request_repaint_after(std::time::Duration::from_millis(16));
+            } else {
+                ui.data_mut(|data| data.remove::<StepHold>(key));
+                if response.clicked() && !previous.is_some_and(|state| state.repeated) {
+                    step = direction;
+                }
             }
         }
     });
@@ -3148,6 +3185,31 @@ pub fn icon_menu(ui: &mut egui::Ui, p: &Palette, name: &str, tip: &str, content:
         None => egui::Button::new(tip),
     };
     super::menu::button(ui, p, button, content).on_hover_text(tip);
+}
+
+#[cfg(test)]
+mod spinner_repeat_tests {
+    use super::*;
+
+    #[test]
+    fn hold_delay_and_repeat_interval_never_double_step_a_quick_click() {
+        let at = 12.0;
+        let hold = StepHold {
+            started: at,
+            last_repeat: at,
+            repeated: false,
+        };
+        assert!(!step_due(hold, at));
+        assert!(!step_due(hold, at + 0.34));
+        assert!(step_due(hold, at + 0.35));
+        let repeated = StepHold {
+            last_repeat: at + SPINNER_HOLD_DELAY,
+            repeated: true,
+            ..hold
+        };
+        assert!(!step_due(repeated, at + 0.40));
+        assert!(step_due(repeated, at + SPINNER_HOLD_DELAY + SPINNER_REPEAT_INTERVAL + 0.01));
+    }
 }
 
 #[cfg(test)]
