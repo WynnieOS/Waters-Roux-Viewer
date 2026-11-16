@@ -252,8 +252,7 @@ const SPINNER_HOLD_DELAY: f64 = 0.35;
 const SPINNER_REPEAT_INTERVAL: f64 = 0.11;
 
 fn step_due(hold: StepHold, now: f64) -> bool {
-    now >= hold.started + SPINNER_HOLD_DELAY
-        && now >= hold.last_repeat + SPINNER_REPEAT_INTERVAL
+    now >= hold.started + SPINNER_HOLD_DELAY && now >= hold.last_repeat + SPINNER_REPEAT_INTERVAL
 }
 
 /// Two compact increment buttons beside numeric fields (LLSpinCtrl).
