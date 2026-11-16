@@ -2,6 +2,18 @@ use super::*;
 use std::sync::atomic::AtomicU32;
 
 #[test]
+fn waters_roux_is_the_default_photo_folder_without_overriding_custom_paths() {
+    assert_eq!(default_folder().file_name().and_then(|name| name.to_str()), Some("Waters Roux"));
+
+    let chosen = std::path::PathBuf::from("resident-chosen/photo-folder");
+    let prefs = Settings {
+        folder: Some(chosen.clone()),
+        ..Settings::default()
+    };
+    assert_eq!(prefs.folder(), chosen, "preserve residents' manually selected photo folder");
+}
+
+#[test]
 fn the_viewfinder_scale_is_the_photos_height_over_the_viewfinders() {
     // an 8K photo of the window's proportions: 4 times its height
     assert_eq!(viewfinder_scale((7680, 4320), (1920, 1080), 100), 4.0);
