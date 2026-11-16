@@ -178,10 +178,7 @@ fn shrink(image: image::RgbaImage) -> image::RgbaImage {
 // form alongside paths selected from the picker and drag-and-drop.
 fn local_image_path(path: &str) -> &str {
     let trimmed = path.trim();
-    trimmed
-        .strip_prefix('"')
-        .and_then(|s| s.strip_suffix('"'))
-        .unwrap_or(trimmed)
+    trimmed.strip_prefix('"').and_then(|s| s.strip_suffix('"')).unwrap_or(trimmed)
 }
 
 fn decode_art(ctx: &Context, path: &str) -> Result<Art, String> {
@@ -526,11 +523,7 @@ mod tests {
             ("jpg", image::ImageFormat::Jpeg),
             ("gif", image::ImageFormat::Gif),
         ] {
-            let still = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
-                3,
-                2,
-                image::Rgb([210, 120, 140]),
-            ));
+            let still = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(3, 2, image::Rgb([210, 120, 140])));
             let mut encoded = Cursor::new(Vec::new());
             still.write_to(&mut encoded, format).expect("encode tiny valid image");
             let file = root.join(format!("creator-tag.{ext}"));
