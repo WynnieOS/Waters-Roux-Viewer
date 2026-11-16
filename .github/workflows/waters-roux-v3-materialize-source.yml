@@ -1,0 +1,60 @@
+name: Waters Roux V3 - preserve integrated source snapshot
+
+on:
+  push:
+    branches:
+      - feat/waters-roux-beta28-v3
+    paths:
+      - '.github/workflows/waters-roux-v3-materialize-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  preserve-source:
+    name: Reconstruct pinned source into separate non-release branch
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout V3 staging branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/waters-roux-beta28-v3
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Configure CI identity
+        shell: pwsh
+        run: |
+          git config user.name "Waters Roux Source Recovery"
+          git config user.email "ci@users.noreply.github.com"
+
+      - name: Reconstruct original branded input merges and MP4 wiring
+        shell: pwsh
+        run: ./scripts/reconstruct-waters-roux-v3-source.ps1
+
+      - name: Persist recovered source in new review-only branch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = 'recovery/waters-roux-beta28-v3-integrated-source'
+          $existing = & git ls-remote --heads origin "refs/heads/$target"
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to check for existing source-recovery branch' }
+          if ($existing) { throw "Refusing to replace existing $target. Review before retrying." }
+          git switch -c $target
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated recovered-source branch' }
+          git add --all
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to stage recovered source changes' }
+          git diff --cached --stat
+          git commit -m "build(v3): preserve pinned Waters Roux V2 integrated source for review"
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to commit recovered source' }
+          git push origin "HEAD:refs/heads/$target"
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to push recovered source branch; do not bypass repository policy' }
+          "RECOVERED-SOURCE-ONLY: committed to $target. No executable or beta package was released."
+
+      - name: Explicit acceptance limits
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host 'Source snapshot is NOT approval. Separate Windows build, Rust tests, code review, security checks, and human in-world QA are mandatory.'
+          Write-Host 'Never distribute the old Chrome-blocked artifact or package an Aurora fallback.'
