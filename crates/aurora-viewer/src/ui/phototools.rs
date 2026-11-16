@@ -36,9 +36,8 @@ fn create_photo_preset(settings: &mut Settings, name: &str) -> bool {
     if !saved::valid_name(name) || settings.graphics_saved.contains_key(name) {
         return false;
     }
-    settings
-        .graphics_saved
-        .insert(name.to_owned(), Saved::capture(settings));
+    let snapshot = Saved::capture(settings);
+    settings.graphics_saved.insert(name.to_owned(), snapshot);
     settings.graphics_saved_active = Some(name.to_owned());
     true
 }
