@@ -144,6 +144,23 @@ pub fn capture(ctx: &egui::Context, mode: Mode, panels: &Panels) -> Result<(), S
     crate::atomic_file::write(&windows(mode), &data).map_err(|e| e.to_string())
 }
 
+/// Restore the selected mode's open tools on startup, after the normal
+/// settings-backed panel defaults are applied. The legacy Everyday profile
+/// remains unchanged until the resident has actually saved a workspace.
+pub fn restore_open_panels(mode: Mode, panels: &mut Panels) -> Result<(), String> {
+    let focus = match std::fs::read(windows(mode)) {
+        Ok(bytes) => Some(serde_json::from_slice::<FocusPanels>(&bytes).map_err(|e| e.to_string())?),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            if mode == Mode::Everyday { None } else { Some(FocusPanels::defaults(mode)) }
+        }
+        Err(error) => return Err(error.to_string()),
+    };
+    if let Some(focus) = focus {
+        focus.apply(panels);
+    }
+    Ok(())
+}
+
 /// Save the outgoing workspace, restore the incoming one's positions and
 /// relevant panels. The first visit gets useful default open windows; the
 /// second visit restores the user's own arrangement.

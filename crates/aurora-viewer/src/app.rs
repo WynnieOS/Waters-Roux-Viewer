@@ -1494,7 +1494,12 @@ impl App {
             Err(e) => log::warn!("logo decode failed: {e}"),
         });
 
-        let panels = Panels::from_settings(&settings);
+        let mut panels = Panels::from_settings(&settings);
+        // The global egui layout is loaded above; restore this mode's own
+        // open creator panels without resetting the user's saved settings.
+        if let Err(error) = ui::workspaces::restore_open_panels(settings.workspace_mode, &mut panels) {
+            log::warn!("Waters Roux workspace panel state could not be restored: {error}");
+        }
         let chat_ui = ChatUi::from_settings(&settings);
         let mut scene = Scene::new(cache, lib.clone());
         scene.jobs.execute(|| {
