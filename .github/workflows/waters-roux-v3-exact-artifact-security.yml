@@ -41,9 +41,9 @@ permissions:
 
 jobs:
   exact-artifact-security:
-    # Never scan a default/old artifact in response to a PR-file edit.
-    # Reusable calls and manual runs must identify the exact ZIP producer.
-    if: ${{ github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch' }}
+    # Reusable workflows inherit the CALLER's event name. Require a concrete
+    # run ID instead, so an independent PR-file check never scans a stale ZIP.
+    if: ${{ inputs.artifact_run_id != '' }}
     name: Validate exact packaged ZIP and independent ClamAV scan
     runs-on: ubuntu-latest
     timeout-minutes: 55
