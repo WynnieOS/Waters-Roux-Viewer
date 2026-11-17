@@ -110,8 +110,7 @@ fn gif_two_frames() -> Vec<u8> {
                 [
                     image::Frame::from_parts(red, 0, 0, image::Delay::from_numer_denom_ms(100, 1)),
                     image::Frame::from_parts(blue, 0, 0, image::Delay::from_numer_denom_ms(200, 1)),
-                ]
-                .into_iter(),
+                ],
             )
             .expect("write synthetic animated GIF");
     }
