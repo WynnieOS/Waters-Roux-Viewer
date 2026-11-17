@@ -1456,6 +1456,12 @@ fn shade_material(in: VsOut, m: Material) -> Shaded {
         col = max(col-m.emissive,vec3<f32>(0.0))*water_scene_light(in.world_pos)+m.emissive;
     }
     col = rez_apply(rec, in, m.n, col);
+    // Classic objects already took LL haze above and skip apply_air_fog.
+    // Give them the same real shadowed atmospheric scattering as PBR faces,
+    // without applying it twice or glowing through underwater geometry.
+    if (hazed && !camera_underwater() && !(water_fx_on(256u) && in.world_pos.z < camera_water_level())) {
+        col += shadowed_sun_shafts(in.world_pos);
+    }
     if (!hazed || camera_underwater() || (water_fx_on(256u) && in.world_pos.z<camera_water_level())) {
         col = apply_fog(col, in.world_pos);
     }
