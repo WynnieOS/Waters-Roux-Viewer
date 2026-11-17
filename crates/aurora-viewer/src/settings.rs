@@ -1576,6 +1576,9 @@ pub struct ColorSettings {
     /// Microphone-off badge: participant is unavailable/not in voice.
     /// Do not confuse this with proof the participant muted themselves.
     pub voice_unavailable: Option<Rgba>,
+    /// Known moderator-muted participant (distinct from disconnected voice).
+    /// Never infer voluntary local microphone mute from an unavailable badge.
+    pub voice_muted: Option<Rgba>,
     // minimap
     pub map_me: Rgba,
     pub map_other: Rgba,
@@ -1631,6 +1634,7 @@ impl Default for ColorSettings {
             voice_loud: None,
             voice_idle: None,
             voice_unavailable: None,
+            voice_muted: None,
             map_me: hex(0x8B5CF6),
             map_other: hex(0x4ADE80),
             map_friend: hex(0x818CF8),
