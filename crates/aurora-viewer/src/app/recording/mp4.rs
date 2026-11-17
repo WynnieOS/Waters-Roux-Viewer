@@ -415,6 +415,97 @@ mod tests {
     use super::*;
 
     #[test]
+    fn own_microphone_pcm_is_stereo_without_stealing_world_samples() {
+        let file = std::env::temp_dir().join(format!("waters-roux-mic-{}.pcm", uuid::Uuid::new_v4()));
+        let mut output = File::create(&file).expect("create mic PCM");
+        write_microphone_packet(&mut output, &[0.25; 480]).expect("record mic sample");
+        output.flush().expect("flush mic PCM");
+        drop(output);
+        let bytes = fs::read(&file).expect("read mic PCM");
+        assert_eq!(bytes.len(), 1920, "10 ms of 48 kHz stereo PCM");
+        assert_eq!(&bytes[0..2], &bytes[2..4], "mono microphone must be duplicated to left and right");
+        assert_ne!(&bytes[0..2], &[0u8; 2], "mic voice samples cannot be discarded");
+        fs::remove_file(file).expect("clean mic fixture");
+    }
+
+    #[test]
+    fn h264_mp4_mixes_own_microphone_and_world_audio_into_decodable_aac() {
+        if std::env::var_os("WATERS_ROUX_TEST_MP4").is_none() {
+            return;
+        }
+        let ffmpeg = locate_encoder().expect("bundled encoder for mic regression");
+        let ffprobe = ffmpeg.with_file_name(if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" });
+        assert!(ffprobe.is_file(), "bundled ffprobe needed");
+        let root = std::env::temp_dir().join(format!("waters-roux-mic-mix-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).expect("create mic fixture");
+        let video = root.join("silent.mp4");
+        let world = root.join("world.pcm");
+        let microphone = root.join("microphone.pcm");
+        let final_mp4 = root.join("narration.mp4");
+        let mut encoder = VideoEncoder::start(&ffmpeg, &video, 64, 64, Options::default()).expect("start video");
+        for _ in 0..30 {
+            encoder.write(&vec![127u8; 64 * 64 * 4]).expect("encode frame");
+        }
+        assert_eq!(encoder.finish().expect("finish video"), 30);
+        let mut world_file = File::create(&world).expect("world track");
+        let mut mic_file = File::create(&microphone).expect("mic track");
+        for chunk in 0..100 {
+            let mut world_pcm = [0.0; 960];
+            let mut mic_pcm = [0.0; 480];
+            for i in 0..480 {
+                let time = (chunk * 480 + i) as f32 / 48_000.0;
+                let a = 0.12 * (time * 440.0 * std::f32::consts::TAU).sin();
+                let b = 0.12 * (time * 880.0 * std::f32::consts::TAU).sin();
+                world_pcm[i * 2] = a;
+                world_pcm[i * 2 + 1] = a;
+                mic_pcm[i] = b;
+            }
+            write_audio_packet(&mut world_file, &world_pcm).expect("world PCM");
+            write_microphone_packet(&mut mic_file, &mic_pcm).expect("own microphone PCM");
+        }
+        drop(world_file);
+        drop(mic_file);
+        mux_world_and_microphone(&ffmpeg, &video, &world, &microphone, &final_mp4)
+            .expect("mix both opt-in sources into AAC");
+        let probe = ffmpeg_command(&ffprobe)
+            .args(["-v", "error", "-show_entries", "stream=codec_type,codec_name,channels,sample_rate", "-show_entries", "format=duration", "-of", "json"])
+            .arg(&final_mp4)
+            .output()
+            .expect("ffprobe mixed MP4");
+        assert!(probe.status.success());
+        let meta: serde_json::Value = serde_json::from_slice(&probe.stdout).expect("valid codec JSON");
+        let streams = meta["streams"].as_array().expect("stream array");
+        assert!(streams.iter().any(|s| s["codec_type"] == "video" && s["codec_name"] == "h264"));
+        assert!(streams.iter().any(|s| s["codec_type"] == "audio" && s["codec_name"] == "aac" && s["channels"] == 2 && s["sample_rate"] == "48000"));
+        let duration: f64 = meta["format"]["duration"].as_str().expect("duration").parse().expect("duration numeric");
+        assert!((0.95..=1.10).contains(&duration), "own voice must not change video playback speed: {duration}");
+        let decoded = ffmpeg_command(&ffmpeg)
+            .args(["-hide_banner", "-loglevel", "error", "-i"])
+            .arg(&final_mp4)
+            .args(["-map", "0:a:0", "-ar", "48000", "-ac", "1", "-f", "s16le", "-"])
+            .output()
+            .expect("decode narration");
+        assert!(decoded.status.success(), "AAC must decode");
+        let samples: Vec<f64> = decoded.stdout.chunks_exact(2)
+            .map(|b| f64::from(i16::from_le_bytes([b[0], b[1]])))
+            .collect();
+        assert!(samples.len() >= 47_000, "missing microphone audio: {} samples", samples.len());
+        let spectral = |hz: f64| {
+            let coeff = 2.0 * (std::f64::consts::TAU * hz / 48_000.0).cos();
+            let (mut s1, mut s2) = (0.0, 0.0);
+            for &sample in samples.iter().take(48_000) {
+                let current = sample + coeff * s1 - s2;
+                s2 = s1;
+                s1 = current;
+            }
+            (s1 * s1 + s2 * s2 - coeff * s1 * s2).max(0.0).sqrt()
+        };
+        assert!(spectral(440.0) > 100_000.0, "world audio was lost");
+        assert!(spectral(880.0) > 100_000.0, "local microphone was lost");
+        fs::remove_dir_all(root).expect("remove temporary microphone and video test files");
+    }
+
+    #[test]
     fn requested_audio_track_stays_present_without_world_audio_samples() {
         let path = std::env::temp_dir().join(format!("waters-roux-empty-audio-{}.pcm", uuid::Uuid::new_v4()));
         let mut file = File::create(&path).expect("create silence test file");
@@ -457,6 +548,7 @@ mod tests {
                 fps: 30,
                 ..Options::default()
             },
+            None,
             None,
             None,
             exe,
