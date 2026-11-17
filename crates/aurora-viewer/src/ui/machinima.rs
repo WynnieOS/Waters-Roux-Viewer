@@ -185,6 +185,13 @@ pub fn show(
                             .add(egui::Slider::new(&mut settings.bloom_strength, 0.05..=1.0).text("Bloom strength"))
                             .changed();
                     }
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut settings.god_rays_strength, 0.0..=1.0)
+                                .text("Shadowed volumetric god rays (0 = off)"),
+                        )
+                        .changed();
+                    ui.small("Requires shadows and a visible sun. Sparse shadow-ray samples respond to the region's EEP sky; off by default.");
                     changed |= widgets::switch_labeled(ui, p, &mut settings.ssr, "Screen-space reflections").changed();
                     let mut quality = settings.shadow_quality;
                     if ui.add(egui::Slider::new(&mut quality, 0..=4).text("Shadow quality")).changed() {
