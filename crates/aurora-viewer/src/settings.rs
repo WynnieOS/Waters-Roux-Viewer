@@ -588,6 +588,9 @@ pub struct Settings {
     pub bloom: bool,
     /// The share of the light over the threshold it spreads (0.05 to 1).
     pub bloom_strength: f32,
+    /// Real shadow-aware atmospheric light scattering (0 disables sun shafts).
+    /// Requires sunlight and cascaded shadows; off by default for performance.
+    pub god_rays_strength: f32,
     /// GPU occlusion culling: objects hidden behind others are not drawn
     /// (Firestorm UseOcclusion, on by default). Renamed from `gpu_occlusion`
     /// (off while it cost more than it saved) so that saved settings take
@@ -1926,6 +1929,7 @@ impl Default for Settings {
             glow: true,
             bloom: false,
             bloom_strength: BLOOM_STRENGTH,
+            god_rays_strength: 0.0,
             occlusion_culling: true,
             lod_factor: 2.0,
             tree_lod_factor: 0.5,
@@ -2944,6 +2948,11 @@ impl Settings {
         } else {
             BLOOM_STRENGTH
         };
+        self.god_rays_strength = if self.god_rays_strength.is_finite() {
+            self.god_rays_strength.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         self.lod_factor = self.lod_factor.clamp(0.5, 4.0);
         let area = |v: f32, default: f32| if v.is_finite() { v.clamp(0.0, 1.0e6) } else { default };
         self.large_surface_prim_threshold = area(self.large_surface_prim_threshold, 75.0);
@@ -3227,6 +3236,7 @@ impl Settings {
                 Tonemapper::KhronosNeutral
             },
             hdr: self.hdr_emissive,
+            god_rays_strength: self.god_rays_strength,
             shadow_resolution: self.shadow_params().0,
             projector_shadow_limit: if self.projector_shadows { self.projector_shadow_limit } else { 0 },
             ssao: self.ssao,
@@ -3535,6 +3545,23 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn waters_roux_volumetric_god_rays_default_off_and_bounded() {
+        let fresh = Settings::default();
+        assert_eq!(fresh.god_rays_strength, 0.0);
+        assert_eq!(fresh.render_settings().god_rays_strength, 0.0);
+        let mut custom = fresh;
+        custom.god_rays_strength = 99.0;
+        let custom = custom.sanitized();
+        assert_eq!(custom.god_rays_strength, 1.0);
+        assert_eq!(custom.render_settings().god_rays_strength, 1.0);
+        let bad = Settings {
+            god_rays_strength: f32::INFINITY,
+            ..Settings::default()
+        };
+        assert_eq!(bad.sanitized().god_rays_strength, 0.0);
     }
 
     #[test]
