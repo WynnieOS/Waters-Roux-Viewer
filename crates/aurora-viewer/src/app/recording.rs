@@ -192,8 +192,9 @@ impl Recorder {
                 Some(active) => Some(active),
                 None => {
                     let requested = (!input_device.trim().is_empty()).then(|| input_device.to_owned());
-                    let opened = aurora_audio::MicCapture::open(requested)
-                        .map_err(|e| format!("Cannot record your microphone: {e}. Check Windows microphone permissions and device selection."))?;
+                    let opened = aurora_audio::MicCapture::open(requested).map_err(|e| {
+                        format!("Cannot record your microphone: {e}. Check Windows microphone permissions and device selection.")
+                    })?;
                     opened.set_gain(microphone_gain);
                     Some(opened)
                 }

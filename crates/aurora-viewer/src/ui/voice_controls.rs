@@ -397,9 +397,7 @@ fn indicator_with_colors(
     level: Level,
     colors: &crate::settings::ColorSettings,
 ) -> (&'static str, egui::Color32) {
-    let chosen = |color: Option<crate::settings::Rgba>, fallback: egui::Color32| {
-        color.map(crate::ui::colors::c).unwrap_or(fallback)
-    };
+    let chosen = |color: Option<crate::settings::Rgba>, fallback: egui::Color32| color.map(crate::ui::colors::c).unwrap_or(fallback);
     if level.muted {
         return ("microphone-off", chosen(colors.voice_muted, p.danger));
     }
@@ -719,8 +717,7 @@ mod tests {
         colors.voice_unavailable = Some([90, 100, 110, 255]);
         colors.voice_quiet = Some([33, 44, 55, 255]);
         colors.voice_loud = Some([220, 180, 30, 255]);
-        let restored: crate::settings::ColorSettings =
-            serde_json::from_str(&serde_json::to_string(&colors).unwrap()).unwrap();
+        let restored: crate::settings::ColorSettings = serde_json::from_str(&serde_json::to_string(&colors).unwrap()).unwrap();
         let state = |level, speaking, muted| Level { level, speaking, muted };
         let muted = indicator_with_colors(&p, State::Joined, state(0.7, true, true), &restored);
         assert_eq!(muted, ("microphone-off", crate::ui::colors::c([170, 30, 90, 255])));

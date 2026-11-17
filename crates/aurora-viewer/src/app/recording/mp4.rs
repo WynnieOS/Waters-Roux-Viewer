@@ -244,8 +244,21 @@ fn mux_world_and_microphone(
         .args([
             "-filter_complex",
             "[1:a][2:a]amix=inputs=2:duration=longest:dropout_transition=0,aresample=async=1:first_pts=0,apad[mixed]",
-            "-map", "0:v:0", "-map", "[mixed]", "-c:v", "copy",
-            "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", "-f", "mp4",
+            "-map",
+            "0:v:0",
+            "-map",
+            "[mixed]",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-shortest",
+            "-movflags",
+            "+faststart",
+            "-f",
+            "mp4",
         ])
         .arg(mux_work)
         .stdin(Stdio::null())
@@ -388,9 +401,7 @@ pub(super) fn encode(
     check_mp4(&video_work)?;
 
     match (audio_bytes > 0, microphone_bytes > 0) {
-        (true, true) => mux_world_and_microphone(
-            &ffmpeg, &video_work, &audio_work, &microphone_work, &mux_work,
-        )?,
+        (true, true) => mux_world_and_microphone(&ffmpeg, &video_work, &audio_work, &microphone_work, &mux_work)?,
         (true, false) => mux_world_audio(&ffmpeg, &video_work, &audio_work, &mux_work)?,
         (false, true) => mux_world_audio(&ffmpeg, &video_work, &microphone_work, &mux_work)?,
         (false, false) => {}
@@ -444,24 +455,44 @@ mod tests {
         assert_eq!(feed.push(&samples), 48_000);
         let (tx, rx) = std::sync::mpsc::sync_channel(4);
         let pixels = vec![128u8; 64 * 64 * 4];
-        tx.send(Packet::Frame(64, 64, pixels.clone(), Duration::ZERO)).expect("initial frame");
-        tx.send(Packet::Frame(64, 64, pixels.clone(), Duration::from_millis(500))).expect("motion clock");
-        tx.send(Packet::Frame(64, 64, pixels, Duration::from_millis(900))).expect("last frame");
+        tx.send(Packet::Frame(64, 64, pixels.clone(), Duration::ZERO))
+            .expect("initial frame");
+        tx.send(Packet::Frame(64, 64, pixels.clone(), Duration::from_millis(500)))
+            .expect("motion clock");
+        tx.send(Packet::Frame(64, 64, pixels, Duration::from_millis(900)))
+            .expect("last frame");
         tx.send(Packet::Stop(Duration::from_secs(1))).expect("stop at 1s");
         drop(tx);
         let (saved, total, unique) = encode(
             rx,
             path.clone(),
-            Options { height: 0, ..Options::default() },
+            Options {
+                height: 0,
+                ..Options::default()
+            },
             None,
             Some(mic_tap),
             None,
             ffmpeg.clone(),
-        ).expect("MP4 worker must record own microphone");
+        )
+        .expect("MP4 worker must record own microphone");
         assert_eq!((total, unique), (30, 3));
-        assert_eq!(mic.available(), 48_000, "microphone recording must not consume samples reserved for voice");
+        assert_eq!(
+            mic.available(),
+            48_000,
+            "microphone recording must not consume samples reserved for voice"
+        );
         let probe = ffmpeg_command(&ffprobe)
-            .args(["-v", "error", "-show_entries", "stream=codec_name,codec_type", "-show_entries", "format=duration", "-of", "json"])
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_name,codec_type",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+            ])
             .arg(&saved)
             .output()
             .expect("probe microphone-only MP4");
@@ -469,10 +500,19 @@ mod tests {
         let meta: serde_json::Value = serde_json::from_slice(&probe.stdout).expect("probe JSON");
         let streams = meta["streams"].as_array().expect("streams");
         assert!(streams.iter().any(|s| s["codec_type"] == "video" && s["codec_name"] == "h264"));
-        assert!(streams.iter().any(|s| s["codec_type"] == "audio" && s["codec_name"] == "aac"),
-            "MP4 microphone-only narration must have AAC: {meta}");
-        let duration: f64 = meta["format"]["duration"].as_str().expect("duration").parse().expect("duration numeric");
-        assert!((0.95..=1.1).contains(&duration), "video and narration must have matching timeline: {duration}");
+        assert!(
+            streams.iter().any(|s| s["codec_type"] == "audio" && s["codec_name"] == "aac"),
+            "MP4 microphone-only narration must have AAC: {meta}"
+        );
+        let duration: f64 = meta["format"]["duration"]
+            .as_str()
+            .expect("duration")
+            .parse()
+            .expect("duration numeric");
+        assert!(
+            (0.95..=1.1).contains(&duration),
+            "video and narration must have matching timeline: {duration}"
+        );
         fs::remove_file(saved).expect("cleanup mic-only MP4");
     }
 
@@ -513,10 +553,18 @@ mod tests {
         }
         drop(world_file);
         drop(mic_file);
-        mux_world_and_microphone(&ffmpeg, &video, &world, &microphone, &final_mp4)
-            .expect("mix both opt-in sources into AAC");
+        mux_world_and_microphone(&ffmpeg, &video, &world, &microphone, &final_mp4).expect("mix both opt-in sources into AAC");
         let probe = ffmpeg_command(&ffprobe)
-            .args(["-v", "error", "-show_entries", "stream=codec_type,codec_name,channels,sample_rate", "-show_entries", "format=duration", "-of", "json"])
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_type,codec_name,channels,sample_rate",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+            ])
             .arg(&final_mp4)
             .output()
             .expect("ffprobe mixed MP4");
@@ -524,9 +572,20 @@ mod tests {
         let meta: serde_json::Value = serde_json::from_slice(&probe.stdout).expect("valid codec JSON");
         let streams = meta["streams"].as_array().expect("stream array");
         assert!(streams.iter().any(|s| s["codec_type"] == "video" && s["codec_name"] == "h264"));
-        assert!(streams.iter().any(|s| s["codec_type"] == "audio" && s["codec_name"] == "aac" && s["channels"] == 2 && s["sample_rate"] == "48000"));
-        let duration: f64 = meta["format"]["duration"].as_str().expect("duration").parse().expect("duration numeric");
-        assert!((0.95..=1.10).contains(&duration), "own voice must not change video playback speed: {duration}");
+        assert!(
+            streams
+                .iter()
+                .any(|s| s["codec_type"] == "audio" && s["codec_name"] == "aac" && s["channels"] == 2 && s["sample_rate"] == "48000")
+        );
+        let duration: f64 = meta["format"]["duration"]
+            .as_str()
+            .expect("duration")
+            .parse()
+            .expect("duration numeric");
+        assert!(
+            (0.95..=1.10).contains(&duration),
+            "own voice must not change video playback speed: {duration}"
+        );
         let decoded = ffmpeg_command(&ffmpeg)
             .args(["-hide_banner", "-loglevel", "error", "-i"])
             .arg(&final_mp4)
@@ -534,7 +593,9 @@ mod tests {
             .output()
             .expect("decode narration");
         assert!(decoded.status.success(), "AAC must decode");
-        let samples: Vec<f64> = decoded.stdout.chunks_exact(2)
+        let samples: Vec<f64> = decoded
+            .stdout
+            .chunks_exact(2)
             .map(|b| f64::from(i16::from_le_bytes([b[0], b[1]])))
             .collect();
         assert!(samples.len() >= 47_000, "missing microphone audio: {} samples", samples.len());

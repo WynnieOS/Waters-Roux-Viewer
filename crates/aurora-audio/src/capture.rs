@@ -451,7 +451,11 @@ impl MicCapture {
         let (tx, rx) = bounded(400);
         let id = self.inner.shared.recording_id.fetch_add(1, Ordering::Relaxed) + 1;
         *self.inner.shared.recording.lock() = Some((id, tx));
-        MicRecordingTap { rx, shared: Arc::clone(&self.inner.shared), id }
+        MicRecordingTap {
+            rx,
+            shared: Arc::clone(&self.inner.shared),
+            id,
+        }
     }
 }
 
