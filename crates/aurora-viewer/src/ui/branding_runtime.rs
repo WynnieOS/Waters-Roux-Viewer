@@ -250,10 +250,7 @@ fn prepare(ctx: &Context, appearance: &Appearance, slot: Slot, preview: bool) ->
                             .iter()
                             .map(|frame| TextureFrame {
                                 sharp: texture(ctx, "waters_roux_artwork", &frame.sharp),
-                                soft: frame
-                                    .soft
-                                    .as_ref()
-                                    .map(|image| texture(ctx, "waters_roux_frosted_artwork", image)),
+                                soft: frame.soft.as_ref().map(|image| texture(ctx, "waters_roux_frosted_artwork", image)),
                             })
                             .collect();
                         Textures {
@@ -289,14 +286,7 @@ fn prepare(ctx: &Context, appearance: &Appearance, slot: Slot, preview: bool) ->
                     let native_size = [frames[0].pixels.width(), frames[0].pixels.height()];
                     let frames = frames
                         .into_iter()
-                        .map(|frame| {
-                            decoded_frame(
-                                image::DynamicImage::ImageRgba8(frame.pixels),
-                                slot,
-                                key.blur,
-                                frame.delay_ms,
-                            )
-                        })
+                        .map(|frame| decoded_frame(image::DynamicImage::ImageRgba8(frame.pixels), slot, key.blur, frame.delay_ms))
                         .collect();
                     Decoded { native_size, frames }
                 })
@@ -317,7 +307,9 @@ fn prepare(ctx: &Context, appearance: &Appearance, slot: Slot, preview: bool) ->
         if remaining_ms > 0 {
             ctx.request_repaint_after(Duration::from_millis(remaining_ms));
         }
-        t.frames.get(index).map(|frame| (frame.sharp.clone(), frame.soft.clone(), t.native_size))
+        t.frames
+            .get(index)
+            .map(|frame| (frame.sharp.clone(), frame.soft.clone(), t.native_size))
     })
 }
 
