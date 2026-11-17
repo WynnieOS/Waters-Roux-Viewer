@@ -25,8 +25,8 @@ use super::{AUDIO_CHANNELS, Options, Packet, SAMPLE_RATE, dimensions, expected_f
 /// and steal focus from the viewer. Background throttling can then freeze
 /// the in-world scene that the recorder is supposed to capture.
 fn ffmpeg_command(executable: &Path) -> Command {
-    // Only Windows mutates the FFmpeg process flags; avoid unused-mut on
-    // Linux/macOS when all warnings are errors in cross-platform CI.
+    // Only Windows mutates this command to hide FFmpeg's console window.
+    // On Linux/macOS an unconditional `mut` fails Clippy -D unused-mut.
     #[cfg(windows)]
     let mut command = Command::new(executable);
     #[cfg(not(windows))]
