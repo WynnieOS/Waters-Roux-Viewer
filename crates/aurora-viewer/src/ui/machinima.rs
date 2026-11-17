@@ -185,6 +185,10 @@ pub fn show(
                             .add(egui::Slider::new(&mut settings.bloom_strength, 0.05..=1.0).text("Bloom strength"))
                             .changed();
                     }
+                    changed |= ui
+                        .add(egui::Slider::new(&mut settings.motion_blur_strength, 0.0..=1.0).text("Cinematic camera motion blur (0 = off)"))
+                        .changed();
+                    ui.small("Camera panning/rotation only; recording HUDs and interface stay sharp. Off by default.");
                     changed |= widgets::switch_labeled(ui, p, &mut settings.ssr, "Screen-space reflections").changed();
                     let mut quality = settings.shadow_quality;
                     if ui.add(egui::Slider::new(&mut quality, 0..=4).text("Shadow quality")).changed() {
