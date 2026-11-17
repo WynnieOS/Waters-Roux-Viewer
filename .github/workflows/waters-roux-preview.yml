@@ -126,6 +126,8 @@ jobs:
             # and world sound must produce two audible sources in one synced AAC.
             cargo test --locked -p aurora-viewer --bin aurora-viewer h264_mp4_mixes_own_microphone_and_world_audio_into_decodable_aac -- --nocapture
             if ($LASTEXITCODE -ne 0) { throw 'Own microphone + world AAC regression failed. Do not package a narration-broken recorder.' }
+            cargo test --locked -p aurora-viewer --bin aurora-viewer h264_mp4_recording_worker_captures_own_microphone_without_world_mix -- --nocapture
+            if ($LASTEXITCODE -ne 0) { throw 'Own microphone recorder-path regression failed. Do not package a mic-silent MP4.' }
             $probeJson = & $ffprobe -v error -show_entries 'stream=codec_name,codec_type,width,height,r_frame_rate,nb_frames' -show_entries 'format=duration' -of json $fixture | Out-String
             if ($LASTEXITCODE -ne 0) { throw 'Packaged ffprobe cannot inspect the actual recorder MP4.' }
             $metadata = $probeJson | ConvertFrom-Json
