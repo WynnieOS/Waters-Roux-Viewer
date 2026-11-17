@@ -1,0 +1,31 @@
+name: Waters Roux V3 — one-shot branch-only rustfmt
+on:
+  push:
+    branches: [feature/waters-roux-v3-completion]
+    paths:
+      - '.github/workflows/waters-roux-v3-format-once.yml'
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: true
+      - name: Install repo Rust toolchain and formatter
+        run: |
+          rustup update stable --no-self-update
+          rustup component add rustfmt
+      - name: Format the existing V3 completion branch
+        run: cargo fmt --all
+      - name: Commit only formatting corrections to the completion branch
+        run: |
+          git add -- crates/aurora-audio/src crates/aurora-viewer/src
+          if git diff --cached --quiet; then
+            echo "Already formatted."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "style(v3): rustfmt microphone recorder and voice color changes"
+          git push origin HEAD:feature/waters-roux-v3-completion
