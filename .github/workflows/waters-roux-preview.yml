@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: waters-roux-preview-${{ github.ref }}
@@ -175,3 +176,16 @@ jobs:
             ${{ env.WR_PREVIEW_ZIP }}.sha256
           retention-days: 14
           compression-level: 6
+
+  v3_exact_windows_artifact_security:
+    name: Scan the exact packaged V3 Windows ZIP (blocking)
+    # The completed preview job has uploaded its archive and SHA256 sidecar.
+    # Scan this run's bytes, never a previous preview's historical artifact.
+    needs: preview
+    if: ${{ github.ref == 'refs/heads/waters-roux-v3-unified-review' || (github.event_name == 'pull_request' && github.base_ref == 'waters-roux-v3-unified-review') }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/waters-roux-v3-exact-artifact-security.yml
+    with:
+      artifact_run_id: ${{ format('{0}', github.run_id) }}
