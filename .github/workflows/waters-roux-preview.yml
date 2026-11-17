@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/waters-roux-preview.yml'
+      - '.github/workflows/waters-roux-v3-exact-artifact-security.yml'
       - 'crates/**'
       - 'assets/branding/**'
       - 'scripts/package*.ps1'
@@ -24,9 +25,10 @@ permissions:
 concurrency:
   group: waters-roux-preview-${{ github.ref }}
   # Supersede obsolete V3 preview builds when the protected review branch or
-  # a V3 pull-request head moves. The exact-head CI and security gates still
-  # apply; this only avoids packaging known-outdated development commits.
-  cancel-in-progress: ${{ github.ref == 'refs/heads/feat/waters-roux-beta27' || github.ref == 'refs/heads/waters-roux-v3-unified-review' || (github.event_name == 'pull_request' && github.base_ref == 'waters-roux-v3-unified-review') }}
+  # a V3 pull-request head moves, including the unified V3 head of PR #37.
+  # The exact-head CI and security gates still apply; this only avoids
+  # packaging known-outdated development commits.
+  cancel-in-progress: ${{ github.ref == 'refs/heads/feat/waters-roux-beta27' || github.ref == 'refs/heads/waters-roux-v3-unified-review' || (github.event_name == 'pull_request' && (github.head_ref == 'waters-roux-v3-unified-review' || github.base_ref == 'waters-roux-v3-unified-review')) }}
 
 jobs:
   preview:
@@ -175,3 +177,17 @@ jobs:
             ${{ env.WR_PREVIEW_ZIP }}.sha256
           retention-days: 14
           compression-level: 6
+
+  # This is a separate Linux job that downloads the ZIP from the preview job
+  # above. It NEVER recompiles the viewer, edits the ZIP or approves distribution.
+  # The caller's run ID prevents silently scanning an older, unrelated package.
+  scan-exact-v3-windows-zip:
+    name: Independently validate and scan exact V3 Windows ZIP
+    needs: preview
+    if: ${{ needs.preview.result == 'success' && (github.head_ref == 'waters-roux-v3-unified-review' || github.base_ref == 'waters-roux-v3-unified-review' || github.ref == 'refs/heads/waters-roux-v3-unified-review') }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/waters-roux-v3-exact-artifact-security.yml
+    with:
+      artifact_run_id: ${{ format('{0}', github.run_id) }}
