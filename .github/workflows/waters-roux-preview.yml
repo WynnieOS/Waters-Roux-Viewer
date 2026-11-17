@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/waters-roux-preview.yml'
+      - '.github/workflows/waters-roux-v3-exact-artifact-security.yml'
       - 'crates/**'
       - 'assets/branding/**'
       - 'scripts/package*.ps1'
@@ -25,9 +26,10 @@ permissions:
 concurrency:
   group: waters-roux-preview-${{ github.ref }}
   # Supersede obsolete V3 preview builds when the protected review branch or
-  # a V3 pull-request head moves. The exact-head CI and security gates still
-  # apply; this only avoids packaging known-outdated development commits.
-  cancel-in-progress: ${{ github.ref == 'refs/heads/feat/waters-roux-beta27' || github.ref == 'refs/heads/waters-roux-v3-unified-review' || (github.event_name == 'pull_request' && github.base_ref == 'waters-roux-v3-unified-review') }}
+  # a V3 pull-request head moves, including the unified V3 head of PR #37.
+  # The exact-head CI and security gates still apply; this only avoids
+  # packaging known-outdated development commits.
+  cancel-in-progress: ${{ github.ref == 'refs/heads/feat/waters-roux-beta27' || github.ref == 'refs/heads/waters-roux-v3-unified-review' || (github.event_name == 'pull_request' && (github.head_ref == 'waters-roux-v3-unified-review' || github.base_ref == 'waters-roux-v3-unified-review')) }}
 
 jobs:
   preview:
@@ -182,7 +184,7 @@ jobs:
     # The completed preview job has uploaded its archive and SHA256 sidecar.
     # Scan this run's bytes, never a previous preview's historical artifact.
     needs: preview
-    if: ${{ github.ref == 'refs/heads/waters-roux-v3-unified-review' || (github.event_name == 'pull_request' && github.base_ref == 'waters-roux-v3-unified-review') }}
+    if: ${{ needs.preview.result == 'success' && (github.head_ref == 'waters-roux-v3-unified-review' || github.base_ref == 'waters-roux-v3-unified-review' || github.ref == 'refs/heads/waters-roux-v3-unified-review') }}
     permissions:
       contents: read
       actions: read
