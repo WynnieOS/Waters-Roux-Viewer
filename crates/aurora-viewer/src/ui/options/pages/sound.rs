@@ -559,6 +559,12 @@ fn voice(cx: &mut Cx) {
             &field!(colors.voice_unavailable),
             |ui, s| voice_color_swatch(ui, &p, "unavailable", &mut s.colors.voice_unavailable, p.danger),
         );
+        cx.row(
+            "Moderator-muted microphone color",
+            "Used only when voice explicitly reports a moderator mute; cannot identify a resident's local microphone mute.",
+            &field!(colors.voice_muted),
+            |ui, s| voice_color_swatch(ui, &p, "moderator_muted", &mut s.colors.voice_muted, p.danger),
+        );
         cx.toggle(tr!("voice-show-visualizers"), "", &field!(audio.voice_visualizer));
         cx.toggle(tr!("voice-show-self"), "", &field!(audio.voice_visualizer_self));
         cx.toggle(tr!("voice-show-dot"), "", &field!(audio.voice_visualizer_dot));

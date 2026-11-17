@@ -46,7 +46,7 @@ use std::sync::Arc;
 use crossbeam_channel::{Sender, bounded};
 use parking_lot::Mutex;
 
-pub use capture::{CAPTURE_SAMPLE_RATE, MAX_INPUT_GAIN, MicCapture, MicFeed, OVERDRIVEN_POWER_LEVEL};
+pub use capture::{CAPTURE_SAMPLE_RATE, MAX_INPUT_GAIN, MicCapture, MicFeed, MicRecordingTap, OVERDRIVEN_POWER_LEVEL};
 pub use decode::SoundClip;
 pub use devices::{DeviceLister, DeviceLists, input_devices, output_devices};
 pub use mixer::{Channel, ChannelSettings, ENGINE_SAMPLE_RATE};

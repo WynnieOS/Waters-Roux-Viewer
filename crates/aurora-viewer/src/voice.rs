@@ -89,6 +89,12 @@ pub struct Voice {
 }
 
 impl Voice {
+    /// Reuse the same input stream for explicit local MP4 microphone recording;
+    /// voice keeps its own independent reader and transmit rules.
+    pub fn recording_microphone(&self) -> Option<MicCapture> {
+        self.mic.clone()
+    }
+
     /// Drop capture and the transport; update reconnects to the wanted channel.
     pub fn restart(&mut self) {
         self.session = None;
