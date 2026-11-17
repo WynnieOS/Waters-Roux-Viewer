@@ -592,6 +592,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn animated_gif_frames_follow_time_and_loop_without_jerking() {
+        let delays = [100, 200, 50];
+        assert_eq!(animation_step(&delays, 0), (0, 100));
+        assert_eq!(animation_step(&delays, 99), (0, 1));
+        assert_eq!(animation_step(&delays, 100), (1, 200));
+        assert_eq!(animation_step(&delays, 299), (1, 1));
+        assert_eq!(animation_step(&delays, 300), (2, 50));
+        assert_eq!(animation_step(&delays, 349), (2, 1));
+        assert_eq!(animation_step(&delays, 350), (0, 100));
+        assert_eq!(animation_step(&[0], 1000), (0, 0), "static images schedule no refresh");
+        assert_eq!(animation_step(&[], 1000), (0, 0), "invalid animations never loop");
+    }
+
+    #[test]
     fn branding_runtime_logo_placement_preserves_aspect_and_bounds() {
         let ctx = Context::default();
         let texture = ctx.load_texture(
