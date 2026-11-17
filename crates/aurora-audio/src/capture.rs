@@ -70,6 +70,9 @@ struct MicShared {
     /// Name of the device being captured ("" = none).
     device: Mutex<String>,
     fallback: AtomicBool,
+    /// The currently opted-in recorder has an independent bounded queue.
+    recording: Mutex<Option<(u64, Sender<[f32; METER_BLOCK]>)>>,
+    recording_id: AtomicU64,
 }
 
 impl MicShared {
@@ -82,6 +85,8 @@ impl MicShared {
             captured: AtomicU64::new(0),
             device: Mutex::new(String::new()),
             fallback: AtomicBool::new(false),
+            recording: Mutex::new(None),
+            recording_id: AtomicU64::new(0),
         }
     }
 
@@ -100,6 +105,8 @@ struct MicWriter {
     block_fill: usize,
     history: [f32; METER_BLOCKS],
     history_pos: usize,
+    recording_block: [f32; METER_BLOCK],
+    recording_fill: usize,
 }
 
 impl MicWriter {
@@ -112,6 +119,8 @@ impl MicWriter {
             block_fill: 0,
             history: [0.0; METER_BLOCKS],
             history_pos: 0,
+            recording_block: [0.0; METER_BLOCK],
+            recording_fill: 0,
         }
     }
 
@@ -131,6 +140,16 @@ impl MicWriter {
                 let v = if v.is_finite() { v.clamp(-1.0, 1.0) } else { 0.0 };
                 *o = v;
                 self.meter(v);
+                self.recording_block[self.recording_fill] = v;
+                self.recording_fill += 1;
+                if self.recording_fill == METER_BLOCK {
+                    // Nonblocking fan-out: the recorder must NEVER consume the
+                    // voice client's single-reader queue or stall its callback.
+                    if let Some((_, tx)) = self.shared.recording.lock().as_ref() {
+                        let _ = tx.try_send(self.recording_block);
+                    }
+                    self.recording_fill = 0;
+                }
             }
             let (done, _) = self.prod.push_partial_slice(&buf[..chunk.len()]);
             queued += done.len();
@@ -422,6 +441,40 @@ impl MicCapture {
     /// value that stops growing means the device delivers nothing.
     pub fn samples_captured(&self) -> u64 {
         self.inner.shared.captured.load(Ordering::Relaxed)
+    }
+
+    /// Subscribe to this *existing* captured microphone for a user-requested
+    /// MP4, without opening it twice or stealing samples from Second Life voice.
+    /// Each block is 10 ms of 48 kHz mono PCM after mic processing/input gain.
+    /// A bounded queue prevents a stalled video encoder from blocking voice.
+    pub fn recording_tap(&self) -> MicRecordingTap {
+        let (tx, rx) = bounded(400);
+        let id = self.inner.shared.recording_id.fetch_add(1, Ordering::Relaxed) + 1;
+        *self.inner.shared.recording.lock() = Some((id, tx));
+        MicRecordingTap { rx, shared: Arc::clone(&self.inner.shared), id }
+    }
+}
+
+/// Independent, opt-in microphone recording queue. Dropping it disables the
+/// tap immediately, even when the microphone remains open for WebRTC voice.
+pub struct MicRecordingTap {
+    rx: Receiver<[f32; METER_BLOCK]>,
+    shared: Arc<MicShared>,
+    id: u64,
+}
+
+impl MicRecordingTap {
+    pub fn try_pop(&self) -> Option<[f32; METER_BLOCK]> {
+        self.rx.try_recv().ok()
+    }
+}
+
+impl Drop for MicRecordingTap {
+    fn drop(&mut self) {
+        let mut current = self.shared.recording.lock();
+        if current.as_ref().is_some_and(|(id, _)| *id == self.id) {
+            *current = None;
+        }
     }
 }
 
