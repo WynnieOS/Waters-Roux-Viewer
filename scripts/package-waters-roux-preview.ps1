@@ -50,7 +50,7 @@ WATERS ROUX VIEWER — BETA 27 — PORTABLE DEVELOPMENT PREVIEW
 5. Use Login or Loading to choose independent background and logo images.
    Use Glass for 10–100% opacity and its supported visual controls.
    Preferences > Accessibility > High Contrast provides opaque panels.
-6. Choose Image opens the native file picker. Backgrounds accept PNG/JPEG;
+6. Choose Image opens the native file picker. Backgrounds accept PNG/JPEG/GIF;
    logos accept PNG. Inspect the preview, then Apply. Cancel discards the
    pending choices. Reset restores the current section; Defaults restores
    the complete official preset. Official artwork may be missing: see below.
