@@ -485,7 +485,11 @@ fn image_controls(
         .color(p.muted),
     );
     if !logo {
-        ui.label(RichText::new("PNG/JPEG or animated GIF backgrounds. GIF playback follows the saved frame delays.").small().color(p.muted));
+        ui.label(
+            RichText::new("PNG/JPEG or animated GIF backgrounds. GIF playback follows the saved frame delays.")
+                .small()
+                .color(p.muted),
+        );
     }
     ui.add_enabled_ui(!matches!(image.choice, ImageChoice::Hidden), |ui| {
         if !logo {
