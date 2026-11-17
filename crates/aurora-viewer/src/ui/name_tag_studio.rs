@@ -7,7 +7,13 @@ use crate::{settings::Settings, theme::Palette};
 use egui::{Color32, Context, Pos2, Rect, TextureHandle, TextureOptions, Vec2};
 use image::{AnimationDecoder, ImageDecoder};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, io::Cursor, path::Path};
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    io::Cursor,
+    path::Path,
+    sync::mpsc::{self, Receiver, TryRecvError},
+};
 
 pub const WINDOW: &str = "waters_roux_nametag_designer";
 // Original assets may be high-resolution; scale to a bounded GPU texture
@@ -171,7 +177,23 @@ struct Art {
     total: f64,
 }
 
+/// File I/O and image decoding are done on a worker. GPU uploads stay on the
+/// paint thread, but are bounded to two frames per repaint.
+struct DecodedArt {
+    frames: VecDeque<image::RgbaImage>,
+    delays: Vec<f64>,
+    total: f64,
+}
+
 enum Cache {
+    Loading { path: String, receiver: Receiver<Result<DecodedArt, String>> },
+    Uploading {
+        path: String,
+        frames: VecDeque<image::RgbaImage>,
+        uploaded: Vec<TextureHandle>,
+        delays: Vec<f64>,
+        total: f64,
+    },
     Ready(Art),
     Failed { path: String, reason: String },
 }
@@ -179,8 +201,8 @@ enum Cache {
 impl Cache {
     fn path(&self) -> &str {
         match self {
+            Self::Loading { path, .. } | Self::Uploading { path, .. } | Self::Failed { path, .. } => path,
             Self::Ready(art) => &art.path,
-            Self::Failed { path, .. } => path,
         }
     }
 }
@@ -218,7 +240,7 @@ fn local_image_path(path: &str) -> &str {
     trimmed.strip_prefix('"').and_then(|s| s.strip_suffix('"')).unwrap_or(trimmed)
 }
 
-fn decode_art(ctx: &Context, path: &str) -> Result<Art, String> {
+fn decode_art(path: &str) -> Result<DecodedArt, String> {
     let file = Path::new(local_image_path(path));
     let meta = std::fs::metadata(file).map_err(|e| format!("Cannot open file: {e}"))?;
     if meta.len() > MAX_FILE {
@@ -229,7 +251,7 @@ fn decode_art(ctx: &Context, path: &str) -> Result<Art, String> {
         return Err("Choose a PNG, JPG, JPEG, or GIF file.".into());
     }
     let bytes = std::fs::read(file).map_err(|e| format!("Cannot read image: {e}"))?;
-    let mut frames = Vec::new();
+    let mut frames = VecDeque::new();
     let mut delays = Vec::new();
     if ext == "gif" {
         let decoder = image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).map_err(|e| format!("Invalid GIF: {e}"))?;
@@ -237,12 +259,12 @@ fn decode_art(ctx: &Context, path: &str) -> Result<Art, String> {
         if !fits_size(w, h, MAX_GIF_SIDE) {
             return Err("GIF dimensions must be at most 2048 × 2048 pixels.".into());
         }
-        for (i, frame) in decoder.into_frames().take(MAX_FRAMES).enumerate() {
+        for frame in decoder.into_frames().take(MAX_FRAMES) {
             let frame = frame.map_err(|e| format!("GIF frame could not be decoded: {e}"))?;
             let (num, den) = frame.delay().numer_denom_ms();
             let seconds = (num as f64 / den.max(1) as f64 / 1000.0).clamp(0.08, 2.0);
             let rgba = shrink(frame.into_buffer());
-            frames.push(to_texture(ctx, format!("waters-roux-name-tag-gif-{i}"), &rgba));
+            frames.push_back(rgba);
             delays.push(seconds);
         }
     } else {
@@ -256,19 +278,14 @@ fn decode_art(ctx: &Context, path: &str) -> Result<Art, String> {
         let rgba = image::load_from_memory(&bytes)
             .map_err(|e| format!("Cannot decode image: {e}"))?
             .to_rgba8();
-        frames.push(to_texture(ctx, "waters-roux-name-tag-background".into(), &shrink(rgba)));
+        frames.push_back(shrink(rgba));
         delays.push(1.0);
     }
     if frames.is_empty() {
         return Err("The file has no readable image frames.".into());
     }
     let total = delays.iter().sum();
-    Ok(Art {
-        path: path.into(),
-        frames,
-        delays,
-        total,
-    })
+    Ok(DecodedArt { frames, delays, total })
 }
 
 /// A visible import error instead of silently discarding ordinary PNG/JPG/GIFs.
@@ -287,14 +304,67 @@ pub fn texture(ctx: &Context, style: &Style, now: f64) -> Option<TextureHandle> 
     }
     ART.with_borrow_mut(|cache| {
         if cache.as_ref().is_none_or(|asset| asset.path() != style.image_path) {
-            *cache = Some(match decode_art(ctx, &style.image_path) {
-                Ok(art) => Cache::Ready(art),
-                Err(reason) => Cache::Failed {
-                    path: style.image_path.clone(),
-                    reason,
-                },
+            // Never decode large image assets on the render thread. When a
+            // resident switches paths, the previous receiver is dropped; a
+            // stale worker can no longer overwrite the new selection.
+            let path = style.image_path.clone();
+            let worker_path = path.clone();
+            let worker_ctx = ctx.clone();
+            let (sender, receiver) = mpsc::sync_channel(1);
+            let started = std::thread::Builder::new()
+                .name("waters-roux-nametag-art".into())
+                .spawn(move || {
+                    let result = decode_art(&worker_path);
+                    let _ = sender.send(result);
+                    worker_ctx.request_repaint();
+                });
+            *cache = Some(match started {
+                Ok(_) => Cache::Loading { path, receiver },
+                Err(e) => Cache::Failed { path, reason: format!("Cannot load image in background: {e}") },
             });
         }
+
+        let completed = match cache.as_ref() {
+            Some(Cache::Loading { receiver, .. }) => match receiver.try_recv() {
+                Ok(result) => Some(result),
+                Err(TryRecvError::Disconnected) => Some(Err("Background image loader stopped unexpectedly.".into())),
+                Err(TryRecvError::Empty) => None,
+            },
+            _ => None,
+        };
+        if let Some(result) = completed {
+            *cache = Some(match result {
+                Ok(decoded) => Cache::Uploading {
+                    path: style.image_path.clone(),
+                    frames: decoded.frames,
+                    uploaded: Vec::with_capacity(decoded.delays.len()),
+                    delays: decoded.delays,
+                    total: decoded.total,
+                },
+                Err(reason) => Cache::Failed { path: style.image_path.clone(), reason },
+            });
+        }
+
+        // Stagger texture creation so an animated GIF never uploads all of
+        // its frames in a single paint. The preview appears once all frames
+        // are ready, then follows the original animation timestamps.
+        let mut upload_finished = false;
+        if let Some(Cache::Uploading { frames, uploaded, .. }) = cache.as_mut() {
+            for _ in 0..2 {
+                let Some(frame) = frames.pop_front() else { break };
+                uploaded.push(to_texture(ctx, format!("waters-roux-name-tag-frame-{}", uploaded.len()), &frame));
+            }
+            upload_finished = frames.is_empty();
+            if !upload_finished {
+                ctx.request_repaint();
+            }
+        }
+        if upload_finished
+            && let Some(Cache::Uploading { path, uploaded, delays, total, .. }) = cache.take()
+        {
+            *cache = Some(Cache::Ready(Art { path, frames: uploaded, delays, total }));
+        }
+
         let Some(Cache::Ready(art)) = cache.as_ref() else {
             return None;
         };
@@ -570,7 +640,6 @@ mod tests {
     #[test]
     fn png_jpg_and_gif_actually_decode_as_name_tag_backgrounds() {
         use std::{io::Cursor, path::PathBuf};
-        let ctx = egui::Context::default();
         let root: PathBuf = std::env::temp_dir().join(format!("waters-roux-nametag-import-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&root).expect("create isolated import fixture");
         for (ext, format) in [
@@ -584,9 +653,9 @@ mod tests {
             let file = root.join(format!("creator-tag.{ext}"));
             std::fs::write(&file, encoded.into_inner()).expect("write import fixture");
             let path = format!(r#""{}""#, file.display());
-            let art = decode_art(&ctx, &path).expect("decode PNG, JPG or GIF image");
-            assert!(!art.frames.is_empty(), "{ext} must load at least one texture");
-            assert!(art.frames[0].size()[0] > 0 && art.frames[0].size()[1] > 0);
+            let art = decode_art(&path).expect("decode PNG, JPG or GIF image");
+            assert!(!art.frames.is_empty(), "{ext} must load at least one image frame");
+            assert!(art.frames[0].width() > 0 && art.frames[0].height() > 0);
         }
         std::fs::remove_dir_all(root).expect("remove isolated import fixture");
     }
