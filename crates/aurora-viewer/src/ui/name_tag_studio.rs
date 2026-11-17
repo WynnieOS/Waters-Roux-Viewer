@@ -186,7 +186,10 @@ struct DecodedArt {
 }
 
 enum Cache {
-    Loading { path: String, receiver: Receiver<Result<DecodedArt, String>> },
+    Loading {
+        path: String,
+        receiver: Receiver<Result<DecodedArt, String>>,
+    },
     Uploading {
         path: String,
         frames: VecDeque<image::RgbaImage>,
@@ -195,7 +198,10 @@ enum Cache {
         total: f64,
     },
     Ready(Art),
-    Failed { path: String, reason: String },
+    Failed {
+        path: String,
+        reason: String,
+    },
 }
 
 impl Cache {
@@ -311,16 +317,17 @@ pub fn texture(ctx: &Context, style: &Style, now: f64) -> Option<TextureHandle> 
             let worker_path = path.clone();
             let worker_ctx = ctx.clone();
             let (sender, receiver) = mpsc::sync_channel(1);
-            let started = std::thread::Builder::new()
-                .name("waters-roux-nametag-art".into())
-                .spawn(move || {
-                    let result = decode_art(&worker_path);
-                    let _ = sender.send(result);
-                    worker_ctx.request_repaint();
-                });
+            let started = std::thread::Builder::new().name("waters-roux-nametag-art".into()).spawn(move || {
+                let result = decode_art(&worker_path);
+                let _ = sender.send(result);
+                worker_ctx.request_repaint();
+            });
             *cache = Some(match started {
                 Ok(_) => Cache::Loading { path, receiver },
-                Err(e) => Cache::Failed { path, reason: format!("Cannot load image in background: {e}") },
+                Err(e) => Cache::Failed {
+                    path,
+                    reason: format!("Cannot load image in background: {e}"),
+                },
             });
         }
 
@@ -341,7 +348,10 @@ pub fn texture(ctx: &Context, style: &Style, now: f64) -> Option<TextureHandle> 
                     delays: decoded.delays,
                     total: decoded.total,
                 },
-                Err(reason) => Cache::Failed { path: style.image_path.clone(), reason },
+                Err(reason) => Cache::Failed {
+                    path: style.image_path.clone(),
+                    reason,
+                },
             });
         }
 
@@ -360,9 +370,20 @@ pub fn texture(ctx: &Context, style: &Style, now: f64) -> Option<TextureHandle> 
             }
         }
         if upload_finished
-            && let Some(Cache::Uploading { path, uploaded, delays, total, .. }) = cache.take()
+            && let Some(Cache::Uploading {
+                path,
+                uploaded,
+                delays,
+                total,
+                ..
+            }) = cache.take()
         {
-            *cache = Some(Cache::Ready(Art { path, frames: uploaded, delays, total }));
+            *cache = Some(Cache::Ready(Art {
+                path,
+                frames: uploaded,
+                delays,
+                total,
+            }));
         }
 
         let Some(Cache::Ready(art)) = cache.as_ref() else {
