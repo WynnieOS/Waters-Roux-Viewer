@@ -163,8 +163,8 @@ struct FrameU {
     /// ([`photo_part`]); zero otherwise. The screen-space reflections fade
     /// at the photo's edges, not the tile's.
     photo: [f32; 4],
-    /// x: the material textures' mip bias (main view under FSR drawing the
-    /// world smaller, [`crate::fsr::mip_bias`]); 0 in every other pass.
+    /// x: material texture mip bias (FSR); y: main-view optional
+    /// shadow-marched atmospheric sun-scattering strength (zero for captures).
     tex_lod: [f32; 4],
 }
 
@@ -6616,6 +6616,14 @@ impl Backend {
         self.motion_cut |= self.motion_now && !self.motion_kept;
         let mut main = self.frame_uniforms(fu, fu.view, Some(fu.camera_pos), &cascades, &splits);
         main.cam_up[3] = camera_water_level;
+        // Main world view only: the sun must be visible and cascaded shadows
+        // enabled. Every reflection, probe, underwater or HUD frame remains
+        // at the zeroed uniform, so disabled god rays cost no shadow lookups.
+        main.tex_lod[1] = if f.shadows && !f.cutout && f.sun_visible > 0.0 {
+            self.settings.god_rays_strength.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         if f.photo_tile != Mat4::IDENTITY {
             main.photo = photo_part(f.photo_tile);
         }
