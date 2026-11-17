@@ -386,16 +386,27 @@ pub struct VoiceControlsUi {
 /// The icon and color of a participant's voice indicator
 /// (LLOutputMonitorCtrl: level bars, the muted speaker for a moderator mute).
 fn indicator(p: &Palette, state: State, level: Level) -> (&'static str, egui::Color32) {
+    indicator_with_colors(p, state, level, &crate::ui::colors::get())
+}
+
+/// Keep the actual microphone state separate from its configurable appearance:
+/// a moderator mute is explicit; disconnected voice never implies local mute.
+fn indicator_with_colors(
+    p: &Palette,
+    state: State,
+    level: Level,
+    colors: &crate::settings::ColorSettings,
+) -> (&'static str, egui::Color32) {
+    let chosen = |color: Option<crate::settings::Rgba>, fallback: egui::Color32| {
+        color.map(crate::ui::colors::c).unwrap_or(fallback)
+    };
     if level.muted {
-        return ("microphone-off", p.danger);
+        return ("microphone-off", chosen(colors.voice_muted, p.danger));
     }
     match state {
-        State::Joined if level.speaking => (
-            "microphone-filled",
-            p.success.gamma_multiply(0.55 + 0.45 * level.level.clamp(0.0, 1.0)),
-        ),
-        State::Joined => ("microphone-filled", p.muted_dim),
-        State::Invited | State::Left => ("microphone-off", p.muted_dim),
+        State::Joined if level.speaking => ("microphone-filled", super::voice_tag::level_color(p, level.level, colors)),
+        State::Joined => ("microphone-filled", chosen(colors.voice_idle, p.muted_dim)),
+        State::Invited | State::Left => ("microphone-off", chosen(colors.voice_unavailable, p.muted_dim)),
     }
 }
 
@@ -695,6 +706,33 @@ mod tests {
     fn a_row_keeps_its_id_when_the_rows_reorder() {
         assert_eq!(row_id(id(1)), row_id(id(1)));
         assert_ne!(row_id(id(1)), row_id(id(2)));
+    }
+
+    #[test]
+    fn voice_roster_distinguishes_moderator_mute_from_idle_and_unavailable_colors() {
+        let p = crate::theme::Theme::default().palette();
+        let old: crate::settings::ColorSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!(old.voice_muted, None);
+        let mut colors = old;
+        colors.voice_muted = Some([170, 30, 90, 255]);
+        colors.voice_idle = Some([25, 160, 145, 255]);
+        colors.voice_unavailable = Some([90, 100, 110, 255]);
+        colors.voice_quiet = Some([33, 44, 55, 255]);
+        colors.voice_loud = Some([220, 180, 30, 255]);
+        let restored: crate::settings::ColorSettings =
+            serde_json::from_str(&serde_json::to_string(&colors).unwrap()).unwrap();
+        let state = |level, speaking, muted| Level { level, speaking, muted };
+        let muted = indicator_with_colors(&p, State::Joined, state(0.7, true, true), &restored);
+        assert_eq!(muted, ("microphone-off", crate::ui::colors::c([170, 30, 90, 255])));
+        let quiet = indicator_with_colors(&p, State::Joined, state(0.0, true, false), &restored);
+        assert_eq!(quiet, ("microphone-filled", crate::ui::colors::c([33, 44, 55, 255])));
+        let loud = indicator_with_colors(&p, State::Joined, state(0.7, true, false), &restored);
+        assert_eq!(loud, ("microphone-filled", crate::ui::colors::c([220, 180, 30, 255])));
+        let idle = indicator_with_colors(&p, State::Joined, state(0.0, false, false), &restored);
+        assert_eq!(idle, ("microphone-filled", crate::ui::colors::c([25, 160, 145, 255])));
+        let unavailable = indicator_with_colors(&p, State::Left, state(0.0, false, false), &restored);
+        assert_eq!(unavailable, ("microphone-off", crate::ui::colors::c([90, 100, 110, 255])));
+        assert_ne!(muted.1, unavailable.1, "disconnect must not masquerade as moderator mute");
     }
 
     #[test]
