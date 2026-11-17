@@ -424,9 +424,7 @@ fn decode_gif_frames(bytes: &[u8], slot: Slot) -> Result<Vec<AnimatedFrame>, Err
     }
     let mut frames = Vec::new();
     for next in decoder.into_frames() {
-        if frames.len() >= MAX_GIF_FRAMES
-            || (frames.len() as u64 + 1) * pixels_per_frame > MAX_GIF_PIXELS
-        {
+        if frames.len() >= MAX_GIF_FRAMES || (frames.len() as u64 + 1) * pixels_per_frame > MAX_GIF_PIXELS {
             return Err(Error::TooLarge);
         }
         let frame = next.map_err(|_| Error::Decode)?;
