@@ -140,7 +140,10 @@ fn animated_gif_is_imported_into_both_backgrounds_with_frame_timing() {
     let profile = dir.0.join("profile");
     let name = import_at(&profile, &source, Slot::LoginBackground).expect("import login GIF");
     assert!(name.ends_with(".gif") && safe_name(&name));
-    assert_eq!(name, import_at(&profile, &source, Slot::LoadingBackground).expect("reuse GIF bytes"));
+    assert_eq!(
+        name,
+        import_at(&profile, &source, Slot::LoadingBackground).expect("reuse GIF bytes")
+    );
     assert_eq!(std::fs::read(profile.join("images").join(name)).expect("stored GIF"), bytes);
 }
 
