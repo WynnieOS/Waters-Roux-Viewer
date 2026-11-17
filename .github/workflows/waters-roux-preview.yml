@@ -23,8 +23,10 @@ permissions:
 
 concurrency:
   group: waters-roux-preview-${{ github.ref }}
-  # The release dependency cache is established; supersede stale Beta 27 builds.
-  cancel-in-progress: ${{ github.ref == 'refs/heads/feat/waters-roux-beta27' }}
+  # Supersede obsolete V3 preview builds when the protected review branch or
+  # a V3 pull-request head moves. The exact-head CI and security gates still
+  # apply; this only avoids packaging known-outdated development commits.
+  cancel-in-progress: ${{ github.ref == 'refs/heads/feat/waters-roux-beta27' || github.ref == 'refs/heads/waters-roux-v3-unified-review' || (github.event_name == 'pull_request' && github.base_ref == 'waters-roux-v3-unified-review') }}
 
 jobs:
   preview:
