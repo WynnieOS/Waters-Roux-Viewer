@@ -298,6 +298,13 @@ pub fn show(
                     "Include in-world sounds and received voice (48 kHz stereo)",
                 )
                 .changed();
+                changed |= widgets::switch_labeled(
+                    ui,
+                    p,
+                    &mut settings.recording.capture_microphone,
+                    "Record my own microphone / narration (48 kHz, opt-in)",
+                )
+                .changed();
                 changed |= widgets::switch_labeled(ui, p, &mut settings.recording.capture_huds, "Include my HUD attachments").changed();
                 changed |= widgets::switch_labeled(
                     ui,
@@ -308,11 +315,13 @@ pub fn show(
                 .changed();
                 ui.label("Turn either option off for a clean cinematic capture. Changes apply when starting a new recording.");
                 ui.label("Recording other residents' conversations may require their consent.");
-                ui.label("Your microphone narration and unrelated desktop audio are not captured yet.");
+                ui.label("World sounds and your own microphone can be enabled independently. With both selected they are mixed into one AAC track.");
+                ui.label("Uses the selected microphone in Preferences > Sound and Voice. If it is unavailable, recording will not start.");
                 ui.label("Records H.264 video to a real MP4 file; optional in-world audio is encoded as AAC. Recording requires the bundled FFmpeg encoder.");
                 ui.label("MP4 finishing happens in the background after Stop. Wait for the Saved MP4 message before exiting.");
                 ui.label("Quick Record: press F9 to start or stop anywhere in-world, including Flycam. Change the key in Preferences > Shortcuts.");
-                ui.label("Voice chat and in-world audio may require consent. Microphone narration is not captured.");
+                ui.label("Your microphone is recorded locally only when its checkbox is enabled; other desktop applications are not captured.");
+                ui.label("If other residents' voices can be heard, obtain their consent before recording or sharing.");
                 ui.horizontal(|ui| {
                     if finalizing {
                         ui.strong("Finalizing H.264 video and AAC audio… keep the viewer open.");
