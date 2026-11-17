@@ -16,21 +16,12 @@ on:
         description: 'Optional independently obtained SHA256 for the nested ZIP'
         required: false
         type: string
-  push:
-    branches: [security/waters-roux-v3-exact-artifact]
-    paths:
-      - '.github/workflows/waters-roux-v3-exact-artifact-security.yml'
-  pull_request:
-    branches: [waters-roux-v3-unified-review]
-    paths:
-      - '.github/workflows/waters-roux-v3-exact-artifact-security.yml'
   workflow_dispatch:
     inputs:
       artifact_run_id:
-        description: 'Successful Waters Roux V3 Windows preview Actions run ID (default: previous combined V3 QA build)'
+        description: 'Exact GitHub Actions run ID of the V3 Windows preview to scan'
         type: string
-        required: false
-        default: '43916721614'
+        required: true
       expected_zip_sha256:
         description: 'Optional independent expected 64-char SHA256 of the exact nested ZIP'
         type: string
@@ -50,7 +41,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: Waters-Roux-Viewer-Beta-28-V3-DEVELOPMENT-Windows
-          run-id: ${{ inputs.artifact_run_id || '43916721614' }}
+          run-id: ${{ inputs.artifact_run_id }}
           repository: WynnieOS/Waters-Roux-Viewer
           github-token: ${{ github.token }}
           path: scan-input
@@ -58,7 +49,7 @@ jobs:
       - name: Validate nested ZIP checksum, safe paths and exact binaries without executing
         shell: bash
         env:
-          WR_ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id || '43916721614' }}
+          WR_ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
           WR_EXPECTED_ZIP_SHA256: ${{ inputs.expected_zip_sha256 || '' }}
         run: |
           set -euo pipefail
