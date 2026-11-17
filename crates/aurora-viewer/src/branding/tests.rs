@@ -106,12 +106,10 @@ fn gif_two_frames() -> Vec<u8> {
         let red = image::RgbaImage::from_pixel(4, 3, image::Rgba([255, 0, 0, 255]));
         let blue = image::RgbaImage::from_pixel(4, 3, image::Rgba([0, 0, 255, 255]));
         encoder
-            .encode_frames(
-                [
-                    image::Frame::from_parts(red, 0, 0, image::Delay::from_numer_denom_ms(100, 1)),
-                    image::Frame::from_parts(blue, 0, 0, image::Delay::from_numer_denom_ms(200, 1)),
-                ],
-            )
+            .encode_frames([
+                image::Frame::from_parts(red, 0, 0, image::Delay::from_numer_denom_ms(100, 1)),
+                image::Frame::from_parts(blue, 0, 0, image::Delay::from_numer_denom_ms(200, 1)),
+            ])
             .expect("write synthetic animated GIF");
     }
     bytes
