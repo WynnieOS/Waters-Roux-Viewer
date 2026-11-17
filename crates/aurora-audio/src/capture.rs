@@ -846,6 +846,21 @@ mod tests {
     }
 
     #[test]
+    fn microphone_recording_tap_does_not_consume_voice_samples_and_stops_on_drop() {
+        let (mut feed, mic) = MicCapture::virtual_input();
+        let tap = mic.recording_tap();
+        assert_eq!(feed.push(&[0.25; 480]), 480);
+        let samples = tap.try_pop().expect("recording receives separate 10 ms sample block");
+        assert!(samples.iter().all(|s| (*s - 0.25).abs() < 1e-6));
+        let mut voice = [0.0; 480];
+        assert_eq!(mic.read(&mut voice), 480, "recording must not steal from WebRTC voice");
+        assert!(voice.iter().all(|s| (*s - 0.25).abs() < 1e-6));
+        drop(tap);
+        assert_eq!(feed.push(&[0.5; 480]), 480);
+        assert!(mic.inner.shared.recording.lock().is_none(), "no capture after opt-out");
+    }
+
+    #[test]
     fn level_follows_firestorm_tuning_scale() {
         assert_eq!(tuning_level(0.0), 0.0);
         assert!((tuning_level(1.0) - 0.8).abs() < 1e-6);
