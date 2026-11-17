@@ -13611,7 +13611,14 @@ impl App {
                 .system_message("Enter Second Life before starting the video recorder.".to_owned());
             return;
         }
-        match self.recorder.start(self.settings.recording, self.audio_engine.as_ref()) {
+        let microphone = self.voice.recording_microphone();
+        match self.recorder.start(
+            self.settings.recording,
+            self.audio_engine.as_ref(),
+            microphone,
+            &self.settings.audio.input_device,
+            self.settings.audio.mic_gain,
+        ) {
             Ok(path) => {
                 let before = self.settings.show_huds;
                 if before != self.settings.recording.capture_huds {
