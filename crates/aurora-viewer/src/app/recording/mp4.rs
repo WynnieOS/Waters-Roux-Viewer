@@ -595,8 +595,10 @@ mod tests {
         assert!(decoded.status.success(), "AAC must decode");
         let samples: Vec<f64> = decoded
             .stdout
-            .chunks_exact(2)
-            .map(|b| f64::from(i16::from_le_bytes([b[0], b[1]])))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|b| f64::from(i16::from_le_bytes(*b)))
             .collect();
         assert!(samples.len() >= 47_000, "missing microphone audio: {} samples", samples.len());
         let spectral = |hz: f64| {
