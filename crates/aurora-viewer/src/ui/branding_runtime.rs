@@ -6,6 +6,7 @@ use crate::branding::{Accent, Appearance, ImageChoice, ImageSettings, Slot, Tint
 use crate::theme::Palette;
 use egui::{Context, CornerRadius, Id, Painter, Pos2, Rect, Shape, TextureHandle, TextureOptions, Vec2};
 use std::sync::{Arc, Mutex, mpsc};
+use std::time::{Duration, Instant};
 
 const SLOTS: [Slot; 4] = [Slot::LoginBackground, Slot::LoginLogo, Slot::LoadingBackground, Slot::LoadingLogo];
 
@@ -19,16 +20,27 @@ struct AssetKey {
     blur: f32,
 }
 
-struct Decoded {
-    native_size: [u32; 2],
+struct DecodedFrame {
     sharp: image::RgbaImage,
     soft: Option<image::RgbaImage>,
+    delay_ms: u64,
+}
+
+struct Decoded {
+    native_size: [u32; 2],
+    frames: Vec<DecodedFrame>,
+}
+
+struct TextureFrame {
+    sharp: TextureHandle,
+    soft: Option<TextureHandle>,
 }
 
 struct Textures {
     native_size: [u32; 2],
-    sharp: TextureHandle,
-    soft: Option<TextureHandle>,
+    frames: Vec<TextureFrame>,
+    delays: Vec<u64>,
+    started: Instant,
 }
 
 #[derive(Default)]
@@ -179,6 +191,38 @@ fn texture(ctx: &Context, label: &str, pixels: &image::RgbaImage) -> TextureHand
     )
 }
 
+fn decoded_frame(image: image::DynamicImage, slot: Slot, blur: f32, delay_ms: u64) -> DecodedFrame {
+    let bound = if is_background(slot) { (2560, 1600) } else { (1024, 1024) };
+    let sharp = image.thumbnail(bound.0, bound.1).to_rgba8();
+    let soft = if is_background(slot) {
+        let small = image.thumbnail(800, 600).to_rgba8();
+        Some(if blur > 0.0 { image::imageops::blur(&small, blur) } else { small })
+    } else {
+        None
+    };
+    DecodedFrame { sharp, soft, delay_ms }
+}
+
+/// Returns the active GIF frame and milliseconds until the next boundary.
+/// Static images return zero delay and never schedule animation repaints.
+fn animation_step(delays: &[u64], elapsed_ms: u64) -> (usize, u64) {
+    if delays.len() <= 1 {
+        return (0, 0);
+    }
+    let period: u64 = delays.iter().copied().sum();
+    if period == 0 {
+        return (0, 0);
+    }
+    let mut pos = elapsed_ms % period;
+    for (i, &delay) in delays.iter().enumerate() {
+        if pos < delay {
+            return (i, delay - pos);
+        }
+        pos -= delay;
+    }
+    (0, delays[0])
+}
+
 fn prepare(ctx: &Context, appearance: &Appearance, slot: Slot, preview: bool) -> Option<(TextureHandle, Option<TextureHandle>, [u32; 2])> {
     let settings = appearance.image(slot).clone();
     let key = AssetKey {
@@ -199,13 +243,25 @@ fn prepare(ctx: &Context, appearance: &Appearance, slot: Slot, preview: bool) ->
             Ok(decoded) => {
                 let ready_key = pending_key.clone();
                 if ready_key == key {
-                    entry.textures = decoded.map(|decoded| Textures {
-                        native_size: decoded.native_size,
-                        sharp: texture(ctx, "waters_roux_artwork", &decoded.sharp),
-                        soft: decoded
-                            .soft
-                            .as_ref()
-                            .map(|image| texture(ctx, "waters_roux_frosted_artwork", image)),
+                    entry.textures = decoded.map(|decoded| {
+                        let delays = decoded.frames.iter().map(|frame| frame.delay_ms).collect();
+                        let frames = decoded
+                            .frames
+                            .iter()
+                            .map(|frame| TextureFrame {
+                                sharp: texture(ctx, "waters_roux_artwork", &frame.sharp),
+                                soft: frame
+                                    .soft
+                                    .as_ref()
+                                    .map(|image| texture(ctx, "waters_roux_frosted_artwork", image)),
+                            })
+                            .collect();
+                        Textures {
+                            native_size: decoded.native_size,
+                            frames,
+                            delays,
+                            started: Instant::now(),
+                        }
                     });
                     entry.key = Some(ready_key);
                 }
@@ -225,27 +281,44 @@ fn prepare(ctx: &Context, appearance: &Appearance, slot: Slot, preview: bool) ->
         entry.pending = Some((key.clone(), receiver));
         let ctx = ctx.clone();
         std::thread::spawn(move || {
-            let decoded = crate::branding::load_image(&settings, slot).map(|image| {
-                let native_size = [image.width(), image.height()];
-                let bound = if is_background(slot) { (2560, 1600) } else { (1024, 1024) };
-                let sharp = image.thumbnail(bound.0, bound.1).to_rgba8();
-                let soft = if is_background(slot) {
-                    let small = image.thumbnail(800, 600).to_rgba8();
-                    Some(if key.blur > 0.0 {
-                        image::imageops::blur(&small, key.blur)
-                    } else {
-                        small
+            // Animated GIFs are decoded and resized once on this worker.
+            // The same frame index drives sharp + frosted layers, so motion
+            // never jumps between the glass overlay and the actual background.
+            let decoded = crate::branding::load_animation(&settings, slot)
+                .map(|frames| {
+                    let native_size = [frames[0].pixels.width(), frames[0].pixels.height()];
+                    let frames = frames
+                        .into_iter()
+                        .map(|frame| {
+                            decoded_frame(
+                                image::DynamicImage::ImageRgba8(frame.pixels),
+                                slot,
+                                key.blur,
+                                frame.delay_ms,
+                            )
+                        })
+                        .collect();
+                    Decoded { native_size, frames }
+                })
+                .or_else(|| {
+                    crate::branding::load_image(&settings, slot).map(|image| {
+                        let native_size = [image.width(), image.height()];
+                        let frames = vec![decoded_frame(image, slot, key.blur, 0)];
+                        Decoded { native_size, frames }
                     })
-                } else {
-                    None
-                };
-                Decoded { native_size, sharp, soft }
-            });
+                });
             let _ = sender.send(decoded);
             ctx.request_repaint();
         });
     }
-    entry.textures.as_ref().map(|t| (t.sharp.clone(), t.soft.clone(), t.native_size))
+    entry.textures.as_ref().and_then(|t| {
+        let elapsed_ms = u64::try_from(t.started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let (index, remaining_ms) = animation_step(&t.delays, elapsed_ms);
+        if remaining_ms > 0 {
+            ctx.request_repaint_after(Duration::from_millis(remaining_ms));
+        }
+        t.frames.get(index).map(|frame| (frame.sharp.clone(), frame.soft.clone(), t.native_size))
+    })
 }
 
 /// A quiet neutral background when official artwork is missing. It is
