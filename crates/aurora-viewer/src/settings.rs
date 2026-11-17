@@ -588,6 +588,9 @@ pub struct Settings {
     pub bloom: bool,
     /// The share of the light over the threshold it spreads (0.05 to 1).
     pub bloom_strength: f32,
+    /// Opt-in camera-panning motion blur (0 disables the screen-space effect).
+    /// The renderer excludes UI, HUDs, cutout photos and camera resets.
+    pub motion_blur_strength: f32,
     /// GPU occlusion culling: objects hidden behind others are not drawn
     /// (Firestorm UseOcclusion, on by default). Renamed from `gpu_occlusion`
     /// (off while it cost more than it saved) so that saved settings take
@@ -1926,6 +1929,7 @@ impl Default for Settings {
             glow: true,
             bloom: false,
             bloom_strength: BLOOM_STRENGTH,
+            motion_blur_strength: 0.0,
             occlusion_culling: true,
             lod_factor: 2.0,
             tree_lod_factor: 0.5,
@@ -2944,6 +2948,11 @@ impl Settings {
         } else {
             BLOOM_STRENGTH
         };
+        self.motion_blur_strength = if self.motion_blur_strength.is_finite() {
+            self.motion_blur_strength.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         self.lod_factor = self.lod_factor.clamp(0.5, 4.0);
         let area = |v: f32, default: f32| if v.is_finite() { v.clamp(0.0, 1.0e6) } else { default };
         self.large_surface_prim_threshold = area(self.large_surface_prim_threshold, 75.0);
@@ -3227,6 +3236,7 @@ impl Settings {
                 Tonemapper::KhronosNeutral
             },
             hdr: self.hdr_emissive,
+            motion_blur_strength: self.motion_blur_strength,
             shadow_resolution: self.shadow_params().0,
             projector_shadow_limit: if self.projector_shadows { self.projector_shadow_limit } else { 0 },
             ssao: self.ssao,
@@ -3535,6 +3545,23 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn waters_roux_camera_motion_blur_is_opt_in_and_bounded() {
+        let fresh = Settings::default();
+        assert_eq!(fresh.motion_blur_strength, 0.0);
+        assert_eq!(fresh.render_settings().motion_blur_strength, 0.0);
+        let mut custom = fresh;
+        custom.motion_blur_strength = 1.5;
+        let custom = custom.sanitized();
+        assert_eq!(custom.motion_blur_strength, 1.0);
+        assert_eq!(custom.render_settings().motion_blur_strength, 1.0);
+        let broken = Settings {
+            motion_blur_strength: f32::NAN,
+            ..Settings::default()
+        };
+        assert_eq!(broken.sanitized().motion_blur_strength, 0.0);
     }
 
     #[test]
