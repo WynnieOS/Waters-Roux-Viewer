@@ -4,6 +4,18 @@ name: Waters Roux V3 — independent exact Windows artifact security scan
 # changes an artifact's checksum, or declares Chrome Safe Browsing cleared.
 # Beta 28 V3 distribution remains blocked pending actual resident approval.
 on:
+  # Called only by the completed Windows V3 preview job to scan the exact ZIP
+  # uploaded by that SAME run. No rebuild of the binaries in this workflow.
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        description: 'The exact Windows preview run whose artifact is scanned'
+        type: string
+        required: true
+      expected_zip_sha256:
+        description: 'Optional independently known nested ZIP SHA256'
+        type: string
+        required: false
   push:
     branches: [security/waters-roux-v3-exact-artifact]
     paths:
