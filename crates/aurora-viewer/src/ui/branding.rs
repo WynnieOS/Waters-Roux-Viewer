@@ -304,7 +304,7 @@ impl Editor {
             .name("waters-roux-artwork-picker".into())
             .spawn(move || {
                 let logo = matches!(slot, Slot::LoginLogo | Slot::LoadingLogo);
-                let extensions: &[&str] = if logo { &["png"] } else { &["png", "jpg", "jpeg"] };
+                let extensions: &[&str] = if logo { &["png"] } else { &["png", "jpg", "jpeg", "gif"] };
                 let result = rfd::FileDialog::new()
                     .set_title(&title)
                     .add_filter(&title, extensions)
@@ -484,6 +484,13 @@ fn image_controls(
         .small()
         .color(p.muted),
     );
+    if !logo {
+        ui.label(
+            RichText::new("PNG/JPEG or animated GIF backgrounds. GIF playback follows the saved frame delays.")
+                .small()
+                .color(p.muted),
+        );
+    }
     ui.add_enabled_ui(!matches!(image.choice, ImageChoice::Hidden), |ui| {
         if !logo {
             ui.horizontal_wrapped(|ui| {
