@@ -113,7 +113,7 @@ struct Frame {
     motion_prev_vp: mat4x4<f32>,
     motion_reproj: mat4x4<f32>,
     photo: vec4<f32>,           // the main view of a photo tile: its part of the photo (left, top, width, height); zero otherwise
-    tex_lod: vec4<f32>,         // x: the material textures' mip bias (FSR drawing the world smaller than the window, fsr.rs mip_bias); 0 otherwise
+    tex_lod: vec4<f32>,         // x: FSR mip bias; y: main-view shadowed god-rays intensity, 0 on other passes
 };
 
 // frame.features.x: "HDR and Emissive" off, the Legacy Viewer's G-buffer has
@@ -1143,12 +1143,12 @@ fn apply_air_fog(col:vec3<f32>,world_pos:vec3<f32>)->vec3<f32> {
     if (frame.sky_ll.x < 0.5) {
         // a sky with a reflection probe ambiance: hazeF.glsl, as its surfaces
         // are lit by softenLightF's non-classic branch (env.rs)
-        return ll_haze(col, ll_atmos(world_pos - frame.camera_pos.xyz));
+        return ll_haze(col, ll_atmos(world_pos - frame.camera_pos.xyz)) + shadowed_sun_shafts(world_pos);
     }
     let dist = distance(world_pos, frame.camera_pos.xyz);
     let height_factor = exp(-max(world_pos.z - frame.params.y, 0.0) * 0.004);
     let f = 1.0 - exp(-dist * frame.fog.w * height_factor);
-    return mix(col, frame.fog.rgb, clamp(f, 0.0, 1.0));
+    return mix(col, frame.fog.rgb, clamp(f, 0.0, 1.0)) + shadowed_sun_shafts(world_pos);
 }
 
 fn apply_fog(col: vec3<f32>, world_pos: vec3<f32>) -> vec3<f32> {
@@ -1453,6 +1453,47 @@ fn shadow_factor(world_pos: vec3<f32>, n: vec3<f32>, vertex_depth: f32) -> f32 {
     // fade out at the far end of the last cascade
     let fade = clamp((splits.z - view_depth) / (splits.z * 0.1), 0.0, 1.0);
     return mix(1.0, s, fade);
+}
+
+// One-bounce light scattering in a homogeneous air volume. Six sparse,
+// bounded ray-march steps query the *real* directional cascade shadow maps
+// along the eye-to-surface segment. Roofs, trees and walls occlude the sun;
+// empty-space sun glow is deliberately not simulated with a fake radial blur.
+// Called only for the main world view; uniform y is zero for probes/HUDs.
+fn shadowed_sun_shafts(world_pos: vec3<f32>) -> vec3<f32> {
+    let strength = frame.tex_lod.y;
+    if (strength <= 0.001 || frame.params.z < 0.5 || frame.sun_dir.w <= 0.05) {
+        return vec3<f32>(0.0);
+    }
+    let segment = world_pos - frame.camera_pos.xyz;
+    let full_distance = length(segment);
+    if (full_distance < 0.3) {
+        return vec3<f32>(0.0);
+    }
+    let direction = segment / full_distance;
+    let sun = normalize(frame.sun_dir.xyz);
+    // Forward-scattering lobe; only pixels near the sun direction incur
+    // shadow-ray queries. This avoids a 6x shadow cost over the whole frame.
+    let angular = pow(max(dot(direction, sun), 0.0), 12.0);
+    if (angular < 0.001) {
+        return vec3<f32>(0.0);
+    }
+    let reach = min(full_distance, min(frame.cascade_splits.z, 128.0));
+    if (reach <= 0.0) {
+        return vec3<f32>(0.0);
+    }
+    // Beer-Lambert extinction with a small clear-air floor so beams remain
+    // visible in bright EEP skies while becoming stronger with haze.
+    let density = max(frame.fog.w, 0.006);
+    var lit = 0.0;
+    for (var i: u32 = 0u; i < 6u; i = i + 1u) {
+        let d = reach * (f32(i) + 0.5) / 6.0;
+        let p = frame.camera_pos.xyz + direction * d;
+        lit += shadow_factor(p, sun, d) * exp(-density * d);
+    }
+    let in_scatter = (lit / 6.0) * (1.0 - exp(-density * reach));
+    let gain = clamp(in_scatter * angular * strength * 0.26, 0.0, 0.20);
+    return max(frame.sun_color.rgb, vec3<f32>(0.0)) * gain;
 }
 
 // ---------------------------------------------------------------- BRDF

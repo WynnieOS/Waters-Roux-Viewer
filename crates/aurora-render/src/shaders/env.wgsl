@@ -376,6 +376,13 @@ fn sky_full_at(dir: vec3<f32>, foot: SkyFootprint) -> vec3<f32> {
         let disk = smoothstep(0.99955, 0.9997, mu) * clamp(sd.z * 10.0 + 1.0, 0.0, 1.0);
         col += frame.sun_color.rgb * disk * 6.0 * cover;
     }
+    // The unobstructed sky has no scene surface to call apply_air_fog:
+    // sample sunlit air towards the view horizon to show shafts between
+    // trees/buildings against the sky, with cloud opacity attenuating them.
+    // Other capture passes receive tex_lod.y = 0 and skip the work.
+    if (frame.tex_lod.y > 0.001 && !camera_underwater()) {
+        col += shadowed_sun_shafts(frame.camera_pos.xyz + d * 128.0) * cover;
+    }
     return col;
 }
 

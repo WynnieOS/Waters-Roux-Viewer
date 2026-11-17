@@ -163,8 +163,8 @@ struct FrameU {
     /// ([`photo_part`]); zero otherwise. The screen-space reflections fade
     /// at the photo's edges, not the tile's.
     photo: [f32; 4],
-    /// x: the material textures' mip bias (main view under FSR drawing the
-    /// world smaller, [`crate::fsr::mip_bias`]); 0 in every other pass.
+    /// x: material texture mip bias (FSR); y: main-view optional
+    /// shadow-marched atmospheric sun-scattering strength (zero for captures).
     tex_lod: [f32; 4],
 }
 
@@ -196,9 +196,12 @@ struct PostU {
     auto_exposure: f32,
     /// A cut-out photo (cutout.rs): 1 the snapshot, 2 the live view.
     cutout: f32,
-    _pad: f32,
+    /// Opt-in camera-pan blur; replaces an unused padding float.
+    motion_blur: f32,
     /// The part of the photo the frame draws ([`photo_part`]).
     photo_part: [f32; 4],
+    /// Previous camera rotation/projection from current screen clip.
+    motion_reproj: [[f32; 4]; 4],
 }
 
 /// Where `PostU::auto_exposure` sits in the post uniforms.
@@ -6613,6 +6616,14 @@ impl Backend {
         self.motion_cut |= self.motion_now && !self.motion_kept;
         let mut main = self.frame_uniforms(fu, fu.view, Some(fu.camera_pos), &cascades, &splits);
         main.cam_up[3] = camera_water_level;
+        // Main world view only: the sun must be visible and cascaded shadows
+        // enabled. Every reflection, probe, underwater or HUD frame remains
+        // at the zeroed uniform, so disabled god rays cost no shadow lookups.
+        main.tex_lod[1] = if f.shadows && !f.cutout && f.sun_visible > 0.0 {
+            self.settings.god_rays_strength.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         if f.photo_tile != Mat4::IDENTITY {
             main.photo = photo_part(f.photo_tile);
         }
@@ -6998,6 +7009,18 @@ impl Backend {
         // gammaCorrect, which only encodes and clamps (legacyGamma kept on
         // skies without a probe ambiance, as no_post below)
         let hdr = self.settings.hdr;
+        // Reconstruct the previous camera view without world translation:
+        // this is camera-pan blur, not an invented object-motion velocity.
+        // HUDs/UI are composited later. Camera resets and cutout photos stay sharp.
+        let motion_blur = if !f.cutout && snapshot.is_none() && !self.motion_cut && self.prev_motion_view.is_some() {
+            self.settings.motion_blur_strength.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let motion_reproj = self.prev_motion_view.map_or(Mat4::IDENTITY, |(prev_proj, prev_view)| {
+            let rotation_only = |view: Mat4| Mat4::from_cols(view.x_axis, view.y_axis, view.z_axis, Vec4::W);
+            prev_proj * rotation_only(prev_view) * (f.proj * rotation_only(f.view)).inverse()
+        });
         let post = PostU {
             exposure: if hdr { f.exposure } else { 1.0 },
             // SMAA works on a gamma-encoded 8-bit image
@@ -7054,8 +7077,9 @@ impl Backend {
                 (true, true) => 1.0,
                 (true, false) => 2.0,
             },
-            _pad: 0.0,
+            motion_blur,
             photo_part: photo_part(f.photo_tile),
+            motion_reproj: motion_reproj.to_cols_array_2d(),
         };
         self.queue.write_buffer(&self.post_buffer, 0, bytemuck::bytes_of(&post));
         if let (true, Some(t)) = (self.contact_now, &self.targets.contact) {

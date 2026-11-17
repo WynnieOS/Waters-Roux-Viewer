@@ -29,11 +29,14 @@ struct PostParams {
     // shows through each pixel; 1: the photo, straight color and coverage,
     // 2: the live view, over a checkerboard
     cutout: f32,
-    _pad: f32,
+    // 0 = off; camera-only rotational shutter without blurring HUD/UI.
+    motion_blur: f32,
     // the part of the photo this frame draws, in fractions of the photo
     // (left, top, width, height; 0, 0, 1, 1 outside a tiled photo): the
     // glow's 512 x 512 texels are the whole photo's, as in one pass
     photo_part: vec4<f32>,
+    // Maps the current camera ray to the previous frame's clip coordinates.
+    motion_reproj: mat4x4<f32>,
 };
 @group(0) @binding(2) var<uniform> post: PostParams;
 // Blurred glow (512x512, display space), see glow.wgsl.
@@ -196,6 +199,38 @@ fn tap(uv: vec2<f32>) -> vec3<f32> {
     return legacy_gamma(tap_linear(uv));
 }
 
+// Physically motivated camera-rotation shutter along the projected angular
+// velocity of the image. No extra full-frame texture or temporal buffer is
+// needed; a camera/location cut is disabled by the CPU. This intentionally
+// does NOT claim to blur moving objects independently of the camera.
+fn camera_motion_shutter(uv: vec2<f32>) -> vec3<f32> {
+    // The full-screen triangle uses uv.y increasing downward.
+    let clip = vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 1.0, 1.0);
+    let old = post.motion_reproj * clip;
+    if (old.w <= 1.0e-5) {
+        return tap(uv);
+    }
+    let old_uv = vec2<f32>(
+        0.5 * (old.x / old.w + 1.0),
+        0.5 * (1.0 - old.y / old.w),
+    );
+    // Cap the shutter arc: rapid mouse flicks must not smear half the scene.
+    let travel = clamp(
+        (old_uv - uv) * post.motion_blur * 0.75,
+        vec2<f32>(-0.025),
+        vec2<f32>(0.025),
+    );
+    if (dot(travel, travel) < 1.0e-7) {
+        return tap(uv);
+    }
+    var average = vec3<f32>(0.0);
+    for (var i: i32 = 0; i < 5; i = i + 1) {
+        let shutter_offset = (f32(i) - 2.0) * 0.25;
+        average += tap(clamp(uv + travel * shutter_offset, vec2<f32>(0.0), vec2<f32>(1.0)));
+    }
+    return average * 0.2;
+}
+
 // FXAA (Lottes, "FXAA 2" PC variant) on tonemapped color.
 fn fxaa(uv: vec2<f32>) -> vec3<f32> {
     let texel = 1.0 / vec2<f32>(textureDimensions(hdr));
@@ -323,6 +358,9 @@ fn fs_post(in: Out) -> @location(0) vec4<f32> {
         m = legacy_gamma(srgb_to_linear_post(cas(in.uv)));
     } else {
         m = tap(in.uv);
+    }
+    if (post.motion_blur > 0.0) {
+        m = camera_motion_shutter(in.uv);
     }
     if (post.glow > 0.5) {
         // glowcombineF.glsl: added in display space, then clamped by the 8-bit target

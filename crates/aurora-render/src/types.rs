@@ -1053,6 +1053,10 @@ pub struct RenderSettings {
     /// (LLPipeline::gammaCorrect), no emissive on the PBR faces drawn into
     /// its G-buffer (HAS_EMISSIVE) and reflection probes in 8 bits.
     pub hdr: bool,
+    /// Optional cinema camera-motion blur, normalized 0..=1. No UI or HUD blur.
+    pub motion_blur_strength: f32,
+    /// Opt-in shadowed atmospheric sunlight scattering.
+    pub god_rays_strength: f32,
     /// Shadow map resolution per cascade (0 = shadows off).
     pub shadow_resolution: u32,
     /// Maximum simultaneous projector shadow maps (0 disables them).
@@ -1099,6 +1103,8 @@ impl Default for RenderSettings {
             fsr_sharpness: Some(0.8),
             tonemapper: Tonemapper::KhronosNeutral,
             hdr: true,
+            motion_blur_strength: 0.0,
+            god_rays_strength: 0.0,
             shadow_resolution: 2048,
             projector_shadow_limit: 2,
             ssao: 1,
