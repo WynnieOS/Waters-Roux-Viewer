@@ -98,6 +98,52 @@ fn import_preserves_png_bytes_alpha_and_survives_original_deletion() {
     assert_eq!(decoded.get_pixel(2, 1).0, [80, 140, 160, 140]);
 }
 
+/// Tiny two-frame image created locally: no third-party or resident artwork.
+fn gif_two_frames() -> Vec<u8> {
+    let mut bytes = Vec::new();
+    {
+        let mut encoder = image::codecs::gif::GifEncoder::new(&mut bytes);
+        let red = image::RgbaImage::from_pixel(4, 3, image::Rgba([255, 0, 0, 255]));
+        let blue = image::RgbaImage::from_pixel(4, 3, image::Rgba([0, 0, 255, 255]));
+        encoder
+            .encode_frames(
+                [
+                    image::Frame::from_parts(red, 0, 0, image::Delay::from_numer_denom_ms(100, 1)),
+                    image::Frame::from_parts(blue, 0, 0, image::Delay::from_numer_denom_ms(200, 1)),
+                ]
+                .into_iter(),
+            )
+            .expect("write synthetic animated GIF");
+    }
+    bytes
+}
+
+#[test]
+fn animated_gif_is_imported_into_both_backgrounds_with_frame_timing() {
+    let bytes = gif_two_frames();
+    assert_eq!(validate_bytes(&bytes, Slot::LoginBackground), Ok(ImageFormat::Gif));
+    assert_eq!(validate_bytes(&bytes, Slot::LoadingBackground), Ok(ImageFormat::Gif));
+    assert_eq!(decode_bytes(&bytes, Slot::LoginLogo).unwrap_err(), Error::LogoFormat);
+    assert_eq!(decode_bytes(&bytes, Slot::LoadingLogo).unwrap_err(), Error::LogoFormat);
+
+    let frames = decode_gif_frames(&bytes, Slot::LoginBackground).expect("animated frames");
+    assert_eq!(frames.len(), 2);
+    assert_eq!(frames[0].pixels.dimensions(), (4, 3));
+    assert_eq!(frames[0].pixels.get_pixel(0, 0).0[0], 255);
+    assert_eq!(frames[1].pixels.get_pixel(0, 0).0[2], 255);
+    assert_eq!(frames[0].delay_ms, 100);
+    assert_eq!(frames[1].delay_ms, 200);
+
+    let dir = TestDirectory::new();
+    let source = dir.0.join("personal.gif");
+    std::fs::write(&source, &bytes).expect("local test GIF");
+    let profile = dir.0.join("profile");
+    let name = import_at(&profile, &source, Slot::LoginBackground).expect("import login GIF");
+    assert!(name.ends_with(".gif") && safe_name(&name));
+    assert_eq!(name, import_at(&profile, &source, Slot::LoadingBackground).expect("reuse GIF bytes"));
+    assert_eq!(std::fs::read(profile.join("images").join(name)).expect("stored GIF"), bytes);
+}
+
 #[test]
 fn jpeg_is_supported_for_backgrounds_but_logos_require_png() {
     let bytes = encoded(ImageFormat::Jpeg);
@@ -113,7 +159,7 @@ fn malformed_unsupported_and_excessive_images_are_rejected_before_publication() 
         decode_bytes(b"not an image", Slot::LoginBackground).unwrap_err(),
         Error::Unsupported
     );
-    assert_eq!(decode_bytes(b"GIF89a", Slot::LoginBackground).unwrap_err(), Error::Unsupported);
+    assert!(decode_bytes(b"GIF89a", Slot::LoginBackground).is_err());
     let mut truncated = encoded(ImageFormat::Png);
     truncated.truncate(truncated.len() / 2);
     assert!(decode_bytes(&truncated, Slot::LoginLogo).is_err());
