@@ -699,6 +699,20 @@ fn light(cx: &mut Cx) {
                 },
             );
         });
+        cx.row(
+            "Volumetric god rays",
+            "Shadow-aware sun beams through atmospheric fog; needs enabled shadows and EEP sunlight. Off by default for FPS.",
+            &field!(god_rays_strength),
+            |ui, s| {
+                ui.add(
+                    egui::Slider::new(&mut s.god_rays_strength, 0.0..=1.0)
+                        .custom_parser(aurora_i18n::parse_number)
+                        .step_by(0.05)
+                        .trailing_fill(true),
+                )
+                .changed()
+            },
+        );
     });
 }
 
