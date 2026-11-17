@@ -429,6 +429,54 @@ mod tests {
     }
 
     #[test]
+    fn h264_mp4_recording_worker_captures_own_microphone_without_world_mix() {
+        if std::env::var_os("WATERS_ROUX_TEST_MP4").is_none() {
+            return;
+        }
+        let ffmpeg = locate_encoder().expect("bundled encoder");
+        let ffprobe = ffmpeg.with_file_name(if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" });
+        let path = std::env::temp_dir().join(format!("waters-roux-mic-only-{}.mp4", uuid::Uuid::new_v4()));
+        let (mut feed, mic) = aurora_audio::MicCapture::virtual_input();
+        let mic_tap = mic.recording_tap();
+        let samples: Vec<f32> = (0..48_000usize)
+            .map(|n| 0.22 * (n as f32 * 660.0 * std::f32::consts::TAU / 48_000.0).sin())
+            .collect();
+        assert_eq!(feed.push(&samples), 48_000);
+        let (tx, rx) = std::sync::mpsc::sync_channel(4);
+        let pixels = vec![128u8; 64 * 64 * 4];
+        tx.send(Packet::Frame(64, 64, pixels.clone(), Duration::ZERO)).expect("initial frame");
+        tx.send(Packet::Frame(64, 64, pixels.clone(), Duration::from_millis(500))).expect("motion clock");
+        tx.send(Packet::Frame(64, 64, pixels, Duration::from_millis(900))).expect("last frame");
+        tx.send(Packet::Stop(Duration::from_secs(1))).expect("stop at 1s");
+        drop(tx);
+        let (saved, total, unique) = encode(
+            rx,
+            path.clone(),
+            Options { height: 0, ..Options::default() },
+            None,
+            Some(mic_tap),
+            None,
+            ffmpeg.clone(),
+        ).expect("MP4 worker must record own microphone");
+        assert_eq!((total, unique), (30, 3));
+        assert_eq!(mic.available(), 48_000, "microphone recording must not consume samples reserved for voice");
+        let probe = ffmpeg_command(&ffprobe)
+            .args(["-v", "error", "-show_entries", "stream=codec_name,codec_type", "-show_entries", "format=duration", "-of", "json"])
+            .arg(&saved)
+            .output()
+            .expect("probe microphone-only MP4");
+        assert!(probe.status.success());
+        let meta: serde_json::Value = serde_json::from_slice(&probe.stdout).expect("probe JSON");
+        let streams = meta["streams"].as_array().expect("streams");
+        assert!(streams.iter().any(|s| s["codec_type"] == "video" && s["codec_name"] == "h264"));
+        assert!(streams.iter().any(|s| s["codec_type"] == "audio" && s["codec_name"] == "aac"),
+            "MP4 microphone-only narration must have AAC: {meta}");
+        let duration: f64 = meta["format"]["duration"].as_str().expect("duration").parse().expect("duration numeric");
+        assert!((0.95..=1.1).contains(&duration), "video and narration must have matching timeline: {duration}");
+        fs::remove_file(saved).expect("cleanup mic-only MP4");
+    }
+
+    #[test]
     fn h264_mp4_mixes_own_microphone_and_world_audio_into_decodable_aac() {
         if std::env::var_os("WATERS_ROUX_TEST_MP4").is_none() {
             return;
