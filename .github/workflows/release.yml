@@ -11,6 +11,11 @@ name: Release
 # The Nightly workflow calls it with the beta tag it has just pushed (a tag
 # pushed with the workflow token starts no workflow by itself); a tag with
 # a pre-release part is published as a GitHub pre-release.
+#
+# WATERS ROUX FORK SAFETY GATE: This is the inherited Aurora publishing
+# workflow. Its package names, update manifest and release titles are Aurora.
+# Disable its jobs on WynnieOS/Waters-Roux-Viewer. Only a separate explicitly
+# approved and branded Waters Roux release pipeline may publish builds.
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+*']
@@ -37,10 +42,11 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   windows:
+    if: ${{ github.repository != 'WynnieOS/Waters-Roux-Viewer' }}
     runs-on: windows-latest
     env:
       TAG: ${{ inputs.tag || github.event_name == 'push' && github.ref_name || 'dry-run' }}
@@ -123,7 +129,7 @@ jobs:
   # Fedora, Ubuntu 24.04 and later) run it.
   linux:
     needs: windows
-    if: ${{ !cancelled() && (needs.windows.result == 'success' || github.event_name == 'pull_request') }}
+    if: ${{ github.repository != 'WynnieOS/Waters-Roux-Viewer' && !cancelled() && (needs.windows.result == 'success' || github.event_name == 'pull_request') }}
     runs-on: ubuntu-24.04
     env:
       TAG: ${{ inputs.tag || github.event_name == 'push' && github.ref_name || 'dry-run' }}
@@ -189,7 +195,7 @@ jobs:
   # to the release page, as on Linux.
   macos:
     needs: windows
-    if: ${{ !cancelled() && (needs.windows.result == 'success' || github.event_name == 'pull_request') }}
+    if: ${{ github.repository != 'WynnieOS/Waters-Roux-Viewer' && !cancelled() && (needs.windows.result == 'success' || github.event_name == 'pull_request') }}
     runs-on: macos-15
     env:
       TAG: ${{ inputs.tag || github.event_name == 'push' && github.ref_name || 'dry-run' }}
