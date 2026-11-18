@@ -58,6 +58,12 @@ pub struct Style {
     /// "cover" crops to fill, "contain" preserves the entire image,
     /// "stretch" fills the name tag without preserving aspect ratio.
     pub image_fit: String,
+    /// Independent styling for glass name plates (unrelated to classic custom tags).
+    pub plate_style_enabled: bool,
+    pub plate_tint: [u8; 4],
+    pub plate_border_color: [u8; 4],
+    /// Plate surface transparency, without dimming the resident's actual name.
+    pub plate_surface_opacity: f32,
 }
 
 impl Default for Style {
@@ -90,6 +96,10 @@ impl Default for Style {
             show_username: true,
             show_status: true,
             image_fit: "cover".into(),
+            plate_style_enabled: false,
+            plate_tint: [39, 27, 49, 255],
+            plate_border_color: [224, 170, 240, 255],
+            plate_surface_opacity: 1.0,
         }
     }
 }
@@ -140,6 +150,11 @@ impl Style {
             self.text_height.clamp(-40.0, 40.0)
         } else {
             0.0
+        };
+        self.plate_surface_opacity = if self.plate_surface_opacity.is_finite() {
+            self.plate_surface_opacity.clamp(0.15, 1.0)
+        } else {
+            1.0
         };
         self.detail_size = if self.detail_size.is_finite() {
             self.detail_size.clamp(9.0, 24.0)
@@ -458,7 +473,7 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
     floater.show(ctx, p, open, |ui| {
         ui.label("Design every visible part of avatar name tags on your viewer.");
         changed |= widgets::switch_labeled(ui, p, &mut style.enabled, "Enable my custom name tags").changed();
-        widgets::tabs(ui, p, &mut tab, &[("Typography", true), ("Background", true), ("Layout", true)]);
+        widgets::tabs(ui, p, &mut tab, &[("Typography", true), ("Background", true), ("Layout", true), ("Plates", true)]);
         widgets::divider(ui, p);
         egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| match tab {
             0 => {
@@ -543,7 +558,7 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
                 }
                 ui.label("Tip: you can also drag a local PNG, JPG or GIF onto this window.");
             }
-            _ => {
+            2 => {
                 ui.strong("Tag shape and position");
                 changed |= ui
                     .add(egui::Slider::new(&mut style.padding, 2.0..=32.0).text("Space around name"))
@@ -567,10 +582,48 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
                 changed |= widgets::switch_labeled(ui, p, &mut settings.show_friend_name_tags, "Friends' name tags").changed();
                 changed |= widgets::switch_labeled(ui, p, &mut settings.show_other_name_tags, "Other residents' name tags").changed();
             }
+            _ => {
+                ui.strong("Glass name plates");
+                ui.label("Edit the plates with profile pictures, status dots and voice rings. These settings are local, independent of regular and custom name tags.");
+                changed |= widgets::switch_labeled(ui, p, &mut style.plate_style_enabled, "Customize glass plates").changed();
+                ui.add_enabled_ui(style.plate_style_enabled, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Plate background");
+                        changed |= widgets::color_button(ui, p, "name-plate-surface-color", &mut style.plate_tint, true).changed();
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Plate border");
+                        changed |= widgets::color_button(ui, p, "name-plate-border-color", &mut style.plate_border_color, true).changed();
+                    });
+                    changed |= ui
+                        .add(egui::Slider::new(&mut style.plate_surface_opacity, 0.15..=1.0).text("Plate surface opacity"))
+                        .changed();
+                });
+                ui.small("The plate name and status information remain legible when you change the surface opacity. Nothing is uploaded to Second Life.");
+            }
         });
         widgets::divider(ui, p);
         ui.strong("Live preview");
         let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 92.0), egui::Sense::hover());
+        if tab == 3 {
+            let plate = rect.shrink2(Vec2::new(24.0, 12.0));
+            let tint = if style.plate_style_enabled {
+                let [r, g, b, a] = style.plate_tint;
+                Color32::from_rgba_unmultiplied(r, g, b, a).gamma_multiply(style.plate_surface_opacity)
+            } else {
+                p.navy.lerp_to_gamma(p.bar, 0.5)
+            };
+            let border = if style.plate_style_enabled {
+                let [r, g, b, a] = style.plate_border_color;
+                Color32::from_rgba_unmultiplied(r, g, b, a).gamma_multiply(style.plate_surface_opacity)
+            } else {
+                p.muted
+            };
+            let radius = plate.height() * 0.5;
+            ui.painter().rect_filled(plate, radius, tint);
+            ui.painter().rect_stroke(plate, radius, egui::Stroke::new(1.0, border), egui::StrokeKind::Inside);
+            ui.painter().text(plate.center(), egui::Align2::CENTER_CENTER, "Example Resident • Voice ◉", egui::FontId::proportional(16.0), p.ink);
+        } else {
         ui.painter().rect_filled(rect, style.corner_radius, style.color(1.0));
         if let Some(texture) = texture(ctx, style, ui.input(|i| i.time)) {
             let (dest, uv) = image_rect(&texture, rect, &style.image_fit);
@@ -602,6 +655,7 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
         };
         ui.painter()
             .text(rect.center(), egui::Align2::CENTER_CENTER, "Example Resident", font, text);
+        }
         if widgets::action_button(ui, p, "refresh", "Restore defaults", ActionKind::Flat, Vec2::new(0.0, 29.0)).clicked() {
             reset = true;
         }
