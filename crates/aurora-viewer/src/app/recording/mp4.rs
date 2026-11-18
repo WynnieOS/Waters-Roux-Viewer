@@ -78,10 +78,35 @@ pub(super) fn locate_encoder() -> Result<PathBuf, String> {
         .into())
 }
 
+// The live encoder can write more errors than an OS pipe can hold. Drain
+// stderr for the *entire* recording, not only after waiting for FFmpeg to
+// exit, or a full pipe can deadlock both the encoder and MP4 finalization.
+// Keep only the newest diagnostics so long sessions use bounded memory.
+const MAX_FFMPEG_ERROR_BYTES: usize = 8 * 1024;
+
+fn drain_encoder_stderr(mut input: impl Read) -> String {
+    let mut tail = Vec::with_capacity(MAX_FFMPEG_ERROR_BYTES);
+    let mut chunk = [0u8; 4096];
+    loop {
+        match input.read(&mut chunk) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => {
+                tail.extend_from_slice(&chunk[..n]);
+                if tail.len() > MAX_FFMPEG_ERROR_BYTES {
+                    let discard = tail.len() - MAX_FFMPEG_ERROR_BYTES;
+                    tail.drain(..discard);
+                }
+            }
+        }
+    }
+    String::from_utf8_lossy(&tail).into_owned()
+}
+
 /// If encoding encounters an error, close and reap the child so a stale
 /// FFmpeg process can never keep writing after a failed recording.
 struct VideoEncoder {
     child: Child,
+    stderr_reader: Option<std::thread::JoinHandle<String>>,
     width: u32,
     height: u32,
     frames: u64,
@@ -94,7 +119,7 @@ impl VideoEncoder {
         // The old persisted field name remains for backwards compatibility.
         // Lower x264 CRF means higher visual quality: range 16..26.
         let crf = (16 + (100 - u32::from(options.jpeg_quality)) / 2).to_string();
-        let child = ffmpeg_command(ffmpeg)
+        let mut child = ffmpeg_command(ffmpeg)
             .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"])
             .args(["-f", "rawvideo", "-pixel_format", "rgba", "-video_size", &size])
             .args(["-framerate", &fps, "-i", "pipe:0"])
@@ -106,8 +131,25 @@ impl VideoEncoder {
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| format!("Cannot launch H.264 encoder: {e}"))?;
+        let Some(stderr) = child.stderr.take() else {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("Cannot monitor H.264 encoder errors".into());
+        };
+        let stderr_reader = match std::thread::Builder::new()
+            .name("waters-roux-ffmpeg-errors".into())
+            .spawn(move || drain_encoder_stderr(stderr))
+        {
+            Ok(handle) => handle,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("Cannot monitor H.264 encoder errors: {error}"));
+            }
+        };
         Ok(Self {
             child,
+            stderr_reader: Some(stderr_reader),
             width,
             height,
             frames: 0,
@@ -129,10 +171,7 @@ impl VideoEncoder {
         // End-of-stream is required: the MP4 index (moov) is written on exit.
         self.child.stdin.take();
         let status = self.child.wait().map_err(|e| format!("H.264 encoder exit: {e}"))?;
-        let mut details = String::new();
-        if let Some(mut stderr) = self.child.stderr.take() {
-            let _ = stderr.read_to_string(&mut details);
-        }
+        let details = self.stderr_reader.take().and_then(|handle| handle.join().ok()).unwrap_or_default();
         if !status.success() {
             return Err(format!(
                 "H.264 encoder failed ({status}): {}",
@@ -148,6 +187,9 @@ impl Drop for VideoEncoder {
         // A finished process is already reaped; killing it is harmless.
         let _ = self.child.kill();
         let _ = self.child.wait();
+        if let Some(stderr_reader) = self.stderr_reader.take() {
+            let _ = stderr_reader.join();
+        }
     }
 }
 
@@ -429,6 +471,17 @@ pub(super) fn encode(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ffmpeg_stderr_drain_keeps_recent_errors_after_more_than_pipe_capacity() {
+        // Simulates a chatty encoder over a long capture: 256 KiB exceeds
+        // typical OS pipe buffers, while retained diagnostic memory stays bounded.
+        let mut output = vec![b'X'; 256 * 1024];
+        output.extend_from_slice(b"\\nLATEST_FFMPEG_ERROR\\n");
+        let details = drain_encoder_stderr(std::io::Cursor::new(output));
+        assert!(details.len() <= MAX_FFMPEG_ERROR_BYTES, "diagnostic output must stay bounded");
+        assert!(details.contains("LATEST_FFMPEG_ERROR"), "final errors must be preserved");
+    }
 
     #[test]
     fn own_microphone_pcm_is_stereo_without_stealing_world_samples() {
