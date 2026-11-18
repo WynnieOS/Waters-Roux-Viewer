@@ -56,6 +56,10 @@ pub(super) struct Env<'a> {
     /// The friends' color of Preferences › Colors, when their plates take
     /// a tint of it (Preferences › Avatars, on by default).
     pub friend: Option<Color32>,
+    /// Local viewer-only overrides for the glass name-plate surface.
+    pub plate_tint_override: Option<Color32>,
+    pub plate_border_override: Option<Color32>,
+    pub plate_surface_opacity: f32,
     /// Changes with the skin's colors: what was built with others is rebuilt.
     skin: u64,
 }
@@ -71,6 +75,9 @@ impl<'a> Env<'a> {
             semibold: crate::ui::fonts::semibold(painter.ctx()),
             tint: p.navy.lerp_to_gamma(p.bar, 0.5),
             friend: None,
+            plate_tint_override: None,
+            plate_border_override: None,
+            plate_surface_opacity: 1.0,
             skin: {
                 use std::hash::{Hash, Hasher};
                 let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -224,7 +231,7 @@ fn face(env: &Env<'_>, level: Level, c: &Content, t: f32) -> Face {
         .nameplate_name
         .map(crate::ui::colors::set_color)
         .unwrap_or_else(|| c.role.name_color(p, &crate::ui::colors::get()));
-    let color = surface_tint(env, c).map(|bg| readable_name(color, bg, p.ink)).unwrap_or(color);
+    let color = env.plate_tint_override.or_else(|| surface_tint(env, c)).map(|bg| readable_name(color, bg, p.ink)).unwrap_or(color);
     let mut format = match level {
         // the far pill's name is a regular weight
         Level::Far => TextFormat::simple(FontId::proportional(m.name_pt), color),
@@ -410,11 +417,11 @@ fn background(env: &Env<'_>, rect: Rect, st: &State, alpha: f32, far: f32, c: &C
         // inside the antialiased edge of the surface, which hides the blur's own
         let radius = rect.height() * 0.5 - 0.5;
         env.painter
-            .add(aurora_render::glass_region(rect.shrink(0.5), radius, st.glass * alpha, GLASS_SHADE));
+            .add(aurora_render::glass_region(rect.shrink(0.5), radius, st.glass * alpha * env.plate_surface_opacity, GLASS_SHADE));
     }
     let key = SurfaceKey {
-        tint: surface_tint(env, c).unwrap_or(env.tint),
-        border: surface_border(env, c),
+        tint: env.plate_tint_override.or_else(|| surface_tint(env, c)).unwrap_or(env.tint),
+        border: env.plate_border_override.or_else(|| surface_border(env, c)),
         size: rect.size(),
         halo: st.halo,
         glass: st.glass,
@@ -446,7 +453,7 @@ fn background(env: &Env<'_>, rect: Rect, st: &State, alpha: f32, far: f32, c: &C
         }
         plate
     });
-    surface.emit(env.painter, rect.min.to_vec2(), alpha);
+    surface.emit(env.painter, rect.min.to_vec2(), alpha * env.plate_surface_opacity);
 }
 
 /// What the voice adds to a plate, in points: a ring around it over a glow,
