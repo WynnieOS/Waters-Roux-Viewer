@@ -54,6 +54,10 @@ jobs:
           prefix-key: waters-roux-release-preview
       - name: Build portable Windows application
         shell: pwsh
+        # Compile the product's human-readable channel into its About/window
+        # title. Keep technical SemVer/Git identity untouched for the updater.
+        env:
+          WATERS_ROUX_RELEASE_LABEL: ${{ (contains(github.head_ref, 'v3') || contains(github.base_ref, 'v3') || contains(github.ref, 'v3')) && 'Beta 28 V3' || 'Beta 27' }}
         run: cargo build --release --locked -p aurora-viewer --features xr-static-loader
       - name: Assemble accurately labeled development preview
         shell: pwsh
