@@ -1,0 +1,91 @@
+name: Waters Roux V3 - Windows and Linux source readiness
+
+# Scoped product gate for the Windows/Linux beta. macOS has an independent
+# platform track: it is intentionally NOT a dependency of these two jobs.
+# This workflow does not publish installers, approve release, or rewrite
+# inherited Aurora CI workflows / third-party license notices.
+on:
+  push:
+    branches: [fix/waters-roux-v3-windows-linux-qa]
+  pull_request:
+    branches: [waters-roux-v3-unified-review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: waters-roux-v3-win-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-source:
+    name: Windows x64 - source build and tests
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Rust
+        run: |
+          rustup update stable --no-self-update
+          rustup component add rustfmt clippy
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Strict Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Viewer unit tests
+        run: cargo test --locked -p aurora-viewer --bin aurora-viewer
+      - name: Compile full Windows viewer
+        run: cargo build --release --locked -p aurora-viewer --features xr-static-loader
+      - name: Verify executable identifies Waters Roux
+        shell: pwsh
+        run: |
+          $out = (& './target/release/aurora-viewer.exe' --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $out.StartsWith('Waters Roux Viewer ')) {
+            throw "Compiled executable has incorrect brand/version: $out"
+          }
+          Write-Host "Verified executable: $out"
+      - name: Readiness disclaimer
+        run: echo "Source QA only - package, record, antivirus, update and live Second Life tests are still required."
+
+  linux-source:
+    name: Linux x86-64 - source build and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
+      - name: Set up Rust
+        run: |
+          rustup update stable --no-self-update
+          rustup component add rustfmt clippy
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Strict Clippy (Linux platform)
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings -A dead-code
+      - name: Linux workspace tests
+        run: cargo test --profile ci --locked --workspace
+      - name: Compile full Linux viewer
+        run: cargo build --release --locked -p aurora-viewer
+      - name: Verify Linux binary identifies Waters Roux
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x target/release/aurora-viewer
+          version="$(target/release/aurora-viewer --version)"
+          [[ "$version" == 'Waters Roux Viewer '* ]] || { echo "Unexpected product identity: $version"; exit 1; }
+          echo "Verified executable: $version"
+      - name: Flag inherited Linux packaging branding for follow-up
+        shell: bash
+        run: |
+          if grep -q '^Name=Aurora Viewer' packaging/linux/aurora-viewer.desktop; then
+            echo '::warning::Linux .desktop packaging still uses Aurora identity; must be replaced and smoke-tested before Linux distribution.'
+          fi
+          if grep -q 'aurora-install.json' scripts/package.ps1; then
+            echo '::warning::Inherited Aurora updater metadata requires a Waters Roux-safe migration plan before Linux or Windows upgrade delivery.'
+          fi
+      - name: Readiness disclaimer
+        run: echo 'Source QA only - no Linux installer/archive has been packaged or released.'
