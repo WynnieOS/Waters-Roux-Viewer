@@ -324,7 +324,7 @@ pub fn top(
         menu_options(&resp, p, st, &mut action);
         let open = egui::Popup::is_id_open(ui.ctx(), egui::Popup::default_response_id(&resp));
         slot_face(ui, p, wolf, resp.hovered() || open, false);
-        paint_icon(ui, icons, "crown", wolf, 18.0, p.ink);
+        paint_icon(ui, icons, super::WATERS_ROUX_MENU_ICON, wolf, 18.0, p.ink);
         menu::dropdown_placed(
             &resp,
             p,
@@ -1111,6 +1111,17 @@ fn rate_text(kbps: f32) -> String {
 mod tests {
     use super::super::{IslandsLook, StatusInfo};
     use super::*;
+
+    #[test]
+    fn glass_islands_menu_uses_the_embedded_waters_roux_fleur_de_lis() {
+        assert_eq!(super::WATERS_ROUX_MENU_ICON, "fleur-de-lis");
+        let context = egui::Context::default();
+        let icons = Icons::load(&context, None);
+        assert!(
+            icons.get(super::WATERS_ROUX_MENU_ICON).is_some(),
+            "Both navigation layouts need a real embedded fleur-de-lis icon"
+        );
+    }
 
     fn status(stretch: bool, bug: bool) -> StatusInfo<'static> {
         StatusInfo {
