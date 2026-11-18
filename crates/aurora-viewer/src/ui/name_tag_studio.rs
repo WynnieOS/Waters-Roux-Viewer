@@ -792,7 +792,11 @@ mod tests {
 
     #[test]
     fn plate_surface_opacity_is_safely_clamped() {
-        let mut style = Style { plate_style_enabled: true, plate_surface_opacity: f32::NAN, ..Style::default() };
+        let mut style = Style {
+            plate_style_enabled: true,
+            plate_surface_opacity: f32::NAN,
+            ..Style::default()
+        };
         style.sanitize();
         assert_eq!(style.plate_surface_opacity, 1.0);
         style.plate_surface_opacity = -10.0;
