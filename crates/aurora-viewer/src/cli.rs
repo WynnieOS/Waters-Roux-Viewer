@@ -245,6 +245,8 @@ fn title_with(title: Option<&str>, profile_dir: &str, version: &str) -> String {
         None => format!("Waters Roux Viewer — {release}"),
     };
     match profile_label(profile_dir) {
+        // "release" is a compiler optimization profile, not official product status.
+        Some("Release") => format!("{base} (Optimized)"),
         Some(p) => format!("{base} ({p})"),
         None => base,
     }
@@ -315,7 +317,7 @@ mod tests {
         );
         assert_eq!(
             title_with(None, "release", "0.2.0"),
-            format!("Waters Roux Viewer — {label} (Release)")
+            format!("Waters Roux Viewer — {label} (Optimized)")
         );
         assert_eq!(
             title_with(None, "debugging", "0.2.0"),
