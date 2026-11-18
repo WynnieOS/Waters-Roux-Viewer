@@ -171,11 +171,7 @@ impl VideoEncoder {
         // End-of-stream is required: the MP4 index (moov) is written on exit.
         self.child.stdin.take();
         let status = self.child.wait().map_err(|e| format!("H.264 encoder exit: {e}"))?;
-        let details = self
-            .stderr_reader
-            .take()
-            .and_then(|handle| handle.join().ok())
-            .unwrap_or_default();
+        let details = self.stderr_reader.take().and_then(|handle| handle.join().ok()).unwrap_or_default();
         if !status.success() {
             return Err(format!(
                 "H.264 encoder failed ({status}): {}",
