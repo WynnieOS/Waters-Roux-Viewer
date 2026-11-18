@@ -699,6 +699,34 @@ fn light(cx: &mut Cx) {
                 },
             );
         });
+        cx.row(
+            "Volumetric god rays",
+            "Shadowed sunlight shafts in atmospheric air; requires EEP sun and shadows. Default OFF for performance.",
+            &field!(god_rays_strength),
+            |ui, s| {
+                ui.add(
+                    egui::Slider::new(&mut s.god_rays_strength, 0.0..=1.0)
+                        .custom_parser(aurora_i18n::parse_number)
+                        .step_by(0.05)
+                        .trailing_fill(true),
+                )
+                .changed()
+            },
+        );
+        cx.row(
+            "Cinematic camera motion blur",
+            "Optional screen-space shutter for camera pans and turns. Off by default; does not blur user interface or HUDs.",
+            &field!(motion_blur_strength),
+            |ui, s| {
+                ui.add(
+                    egui::Slider::new(&mut s.motion_blur_strength, 0.0..=1.0)
+                        .custom_parser(aurora_i18n::parse_number)
+                        .step_by(0.05)
+                        .trailing_fill(true),
+                )
+                .changed()
+            },
+        );
     });
 }
 

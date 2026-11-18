@@ -2,10 +2,27 @@
 //! it exposes live camera/lighting render settings and an opt-in native recorder.
 
 use super::widgets::{self, ActionKind, Floater};
-use crate::{settings::Settings, theme::Palette};
+use crate::{camera::CinematicTarget, settings::Settings, theme::Palette};
 use egui::{Context, Vec2};
 
 pub const WINDOW: &str = "waters_roux_machinima";
+
+/// Match Preferences and PhotoTools: the renderer's shadow switch and
+/// quality slider must always stay in sync.
+fn set_machinima_shadow_quality(settings: &mut Settings, quality: u8) {
+    settings.shadow_quality = quality.min(4);
+    settings.shadows = settings.shadow_quality > 0;
+}
+
+/// FSR owns world render resolution; match PhotoTools and Graphics Preferences.
+fn manual_render_scale_enabled(settings: &Settings) -> bool {
+    settings.antialiasing != 7
+}
+
+/// The existing renderer disables CAS when HDR is off or FSR supplies RCAS.
+fn cas_sharpen_enabled(settings: &Settings) -> bool {
+    settings.hdr_emissive && settings.antialiasing != 7
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Action {
@@ -109,6 +126,30 @@ pub fn show(
                     .add(egui::Slider::new(&mut settings.camera.smoothing, 0.0..=50.0).text("Camera movement smoothing"))
                     .changed();
                 changed |= widgets::switch_labeled(ui, p, &mut settings.camera.track_focus_object, "Keep focused object tracked").changed();
+                widgets::divider(ui, p);
+                ui.label("Cinematic skeleton follow (your own animated avatar)");
+                ui.horizontal_wrapped(|ui| {
+                    for (target, label) in [
+                        (CinematicTarget::Off, "Off"),
+                        (CinematicTarget::Head, "Head"),
+                        (CinematicTarget::Torso, "Torso"),
+                        (CinematicTarget::LeftArm, "Left arm"),
+                        (CinematicTarget::RightArm, "Right arm"),
+                    ] {
+                        changed |= ui
+                            .selectable_value(&mut settings.camera.cinematic_target, target, label)
+                            .changed();
+                    }
+                });
+                if settings.camera.cinematic_target != CinematicTarget::Off {
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut settings.camera.cinematic_follow_half_life, 0.0..=2.0)
+                                .text("Joint-follow smoothing (s)"),
+                        )
+                        .changed();
+                    ui.small("Third-person camera only. Follows the selected rendered joint; Flycam, POV and scripted cameras keep their own behavior.");
+                }
                 changed |= widgets::switch_labeled(
                     ui,
                     p,
@@ -123,7 +164,10 @@ pub fn show(
                 egui::ScrollArea::vertical().max_height(245.0).show(ui, |ui| {
                     changed |= widgets::switch_labeled(ui, p, &mut settings.hdr_emissive, "HDR / emissive lighting").changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut settings.exposure, 0.25..=4.0).text("Exposure"))
+                        .add_enabled(
+                            settings.hdr_emissive,
+                            egui::Slider::new(&mut settings.exposure, 0.25..=4.0).text("Exposure"),
+                        )
                         .changed();
                     changed |= widgets::switch_labeled(ui, p, &mut settings.dof.enabled, "Depth of field").changed();
                     ui.add_enabled_ui(settings.dof.enabled, |ui| {
@@ -141,18 +185,92 @@ pub fn show(
                             .add(egui::Slider::new(&mut settings.bloom_strength, 0.05..=1.0).text("Bloom strength"))
                             .changed();
                     }
-                    changed |= widgets::switch_labeled(ui, p, &mut settings.ssr, "Screen-space reflections").changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut settings.shadow_quality, 0..=4).text("Shadow quality"))
+                        .add(egui::Slider::new(&mut settings.motion_blur_strength, 0.0..=1.0).text("Cinematic camera motion blur (0 = off)"))
                         .changed();
+                    ui.small("Camera panning/rotation only; recording HUDs and interface stay sharp. Off by default.");
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut settings.god_rays_strength, 0.0..=1.0)
+                                .text("Shadowed volumetric god rays (0 = off)"),
+                        )
+                        .changed();
+                    ui.small("Requires shadows and a visible EEP sun. Samples real scene shadow maps; off by default.");
+                    changed |= widgets::switch_labeled(ui, p, &mut settings.ssr, "Screen-space reflections").changed();
+                    let mut quality = settings.shadow_quality;
+                    if ui.add(egui::Slider::new(&mut quality, 0..=4).text("Shadow quality")).changed() {
+                        set_machinima_shadow_quality(settings, quality);
+                        changed = true;
+                    }
                     changed |= ui
                         .add(egui::Slider::new(&mut settings.draw_distance, 32.0..=1024.0).text("Draw distance (m)"))
                         .changed();
+                    ui.collapsing("Anti-aliasing and image quality", |ui| {
+                        egui::ComboBox::from_id_salt("waters-roux-machinima-antialiasing")
+                            .selected_text(match settings.antialiasing {
+                                0 => "Off",
+                                1 => "FXAA",
+                                2 => "MSAA 2×",
+                                3 => "MSAA 4×",
+                                4 => "MSAA 8×",
+                                5 => "TAA",
+                                6 => "SMAA",
+                                7 => "FSR 3.1",
+                                _ => "Unknown",
+                            })
+                            .show_ui(ui, |ui| {
+                                for (mode, label) in [
+                                    (0, "Off"),
+                                    (1, "FXAA"),
+                                    (2, "MSAA 2×"),
+                                    (3, "MSAA 4×"),
+                                    (4, "MSAA 8×"),
+                                    (5, "TAA"),
+                                    (6, "SMAA"),
+                                    (7, "FSR 3.1"),
+                                ] {
+                                    changed |= ui.selectable_value(&mut settings.antialiasing, mode, label).changed();
+                                }
+                            });
+                        changed |= widgets::switch_labeled(ui, p, &mut settings.specular_aa, "Specular anti-aliasing").changed();
+                        if settings.antialiasing == 7 {
+                            ui.label("FSR controls rendering resolution and provides its own sharpening.");
+                            ui.horizontal_wrapped(|ui| {
+                                for (quality, label) in [
+                                    (0, "Native"),
+                                    (1, "Quality"),
+                                    (2, "Balanced"),
+                                    (3, "Performance"),
+                                    (4, "Ultra"),
+                                ] {
+                                    changed |= ui.selectable_value(&mut settings.fsr_quality, quality, label).changed();
+                                }
+                            });
+                            changed |= ui
+                                .add(egui::Slider::new(&mut settings.fsr_sharpness, 0..=100).text("FSR sharpness (%)"))
+                                .changed();
+                        }
+                        changed |= ui
+                            .add_enabled(
+                                cas_sharpen_enabled(settings),
+                                egui::Slider::new(&mut settings.sharpen, 0.0..=1.0).text("CAS sharpening"),
+                            )
+                            .changed();
+                        if !settings.hdr_emissive {
+                            ui.small("Enable HDR / Emissive to adjust tonemapping and CAS sharpening.");
+                        }
+                    });
                     changed |= ui
-                        .add(egui::Slider::new(&mut settings.render_scale_percent, 50..=100).text("Render resolution (%)"))
+                        .add_enabled(
+                            manual_render_scale_enabled(settings),
+                            egui::Slider::new(&mut settings.render_scale_percent, 50..=100).text("Render resolution (%)"),
+                        )
                         .changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut settings.tonemap_mix, 0.0..=1.0).text("Tonemapping strength"))
+                        .add_enabled(
+                            settings.hdr_emissive,
+                            egui::Slider::new(&mut settings.tonemap_mix, 0.0..=1.0).text("Tonemapping strength"),
+                        )
                         .changed();
                 });
             }
@@ -191,6 +309,13 @@ pub fn show(
                     "Include in-world sounds and received voice (48 kHz stereo)",
                 )
                 .changed();
+                changed |= widgets::switch_labeled(
+                    ui,
+                    p,
+                    &mut settings.recording.capture_microphone,
+                    "Record my own microphone / narration (48 kHz, opt-in)",
+                )
+                .changed();
                 changed |= widgets::switch_labeled(ui, p, &mut settings.recording.capture_huds, "Include my HUD attachments").changed();
                 changed |= widgets::switch_labeled(
                     ui,
@@ -201,11 +326,13 @@ pub fn show(
                 .changed();
                 ui.label("Turn either option off for a clean cinematic capture. Changes apply when starting a new recording.");
                 ui.label("Recording other residents' conversations may require their consent.");
-                ui.label("Your microphone narration and unrelated desktop audio are not captured yet.");
+                ui.label("World sounds and your own microphone can be enabled independently. With both selected they are mixed into one AAC track.");
+                ui.label("Uses the selected microphone in Preferences > Sound and Voice. If it is unavailable, recording will not start.");
                 ui.label("Records H.264 video to a real MP4 file; optional in-world audio is encoded as AAC. Recording requires the bundled FFmpeg encoder.");
                 ui.label("MP4 finishing happens in the background after Stop. Wait for the Saved MP4 message before exiting.");
                 ui.label("Quick Record: press F9 to start or stop anywhere in-world, including Flycam. Change the key in Preferences > Shortcuts.");
-                ui.label("Voice chat and in-world audio may require consent. Microphone narration is not captured.");
+                ui.label("Your microphone is recorded locally only when its checkbox is enabled; other desktop applications are not captured.");
+                ui.label("If other residents' voices can be heard, obtain their consent before recording or sharing.");
                 ui.horizontal(|ui| {
                     if finalizing {
                         ui.strong("Finalizing H.264 video and AAC audio… keep the viewer open.");
@@ -241,6 +368,54 @@ pub fn show(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn machinima_shadow_slider_updates_the_actual_renderer_switch() {
+        let mut settings = Settings::default();
+        set_machinima_shadow_quality(&mut settings, 0);
+        assert_eq!(settings.shadow_quality, 0);
+        assert!(!settings.shadows);
+        set_machinima_shadow_quality(&mut settings, 3);
+        assert_eq!(settings.shadow_quality, 3);
+        assert!(settings.shadows);
+    }
+
+    #[test]
+    fn machinima_fsr_prevents_conflicting_scale_and_cas_controls() {
+        let mut settings = Settings {
+            antialiasing: 7,
+            hdr_emissive: true,
+            render_scale_percent: 82,
+            sharpen: 0.6,
+            ..Settings::default()
+        };
+        assert!(!manual_render_scale_enabled(&settings));
+        assert!(!cas_sharpen_enabled(&settings));
+        assert_eq!(settings.render_scale_percent, 82);
+        assert_eq!(settings.sharpen, 0.6);
+        settings.antialiasing = 6;
+        assert!(manual_render_scale_enabled(&settings));
+        assert!(cas_sharpen_enabled(&settings));
+        settings.hdr_emissive = false;
+        assert!(!cas_sharpen_enabled(&settings));
+        assert!(manual_render_scale_enabled(&settings));
+    }
+
+    #[test]
+    fn machinima_image_quality_settings_survive_restart() {
+        let settings = Settings {
+            antialiasing: 7,
+            fsr_quality: 2,
+            fsr_sharpness: 63,
+            specular_aa: true,
+            ..Settings::default()
+        };
+        let loaded: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(loaded.antialiasing, 7);
+        assert_eq!(loaded.fsr_quality, 2);
+        assert_eq!(loaded.fsr_sharpness, 63);
+        assert!(loaded.specular_aa);
+    }
+
     #[test]
     fn machinima_actions_are_explicit() {
         assert_eq!(Action::default(), Action::None);

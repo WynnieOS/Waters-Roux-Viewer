@@ -1089,50 +1089,45 @@ an "Open folder" button: quit Aurora, then delete them and the viewer.
 
 ## Build
 
-Requirements: Windows 10/11, [Rust](https://rustup.rs) (stable, selected
-automatically by `rust-toolchain.toml`), a GPU with Vulkan support. On Linux,
-see [Installing on Linux](docs/LINUX.md#building-from-source); on macOS,
+**Waters Roux developer source build — not an approved Beta 28 V3 tester download.**
+The current combined V3 development source is on the `waters-roux-v3-unified-review` branch.
+Public `main` is an Aurora-derived baseline and must **not** be repackaged or
+presented as a feature-complete Waters Roux Beta V3. Production builds remain
+blocked until the V3 master checklist and exact Windows-artifact verification pass.
+
+Requirements: Windows 10/11, [Git](https://git-scm.com/download/win),
+[Rust](https://rustup.rs) (stable, selected by `rust-toolchain.toml`),
+and a GPU with Vulkan support. Linux and macOS developers should see
+[Installing on Linux](docs/LINUX.md#building-from-source) and
 [Installing on macOS](docs/MACOS.md#building-from-source).
 
-**Development environment:** create a folder for the project, clone this
-repository into it, then double-click **`aurora-tools.cmd`**:
-
-```bat
-git clone https://github.com/Aurora-Viewer/Aurora-Viewer aurora-viewer
-```
-
-The tools check the environment and offer to **repair** it: they install
-whatever is missing (GitHub CLI, the Visual Studio C++ tools, Rust), clone
-the Legacy Viewer sources next to the repository, and download the Rust
-toolchain and the crates. Then, driven by the keyboard: release /
-dev / debug viewers, demo, agents' tasks, disk, logs, live pull requests with
-Windows notifications, releases (see
-[HUMANS.md](HUMANS.md)).
-
-Without Git yet, this command (in a command prompt, in the project folder)
-installs everything, Git included:
-
-```bat
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$f = Join-Path $env:TEMP 'aurora-setup.ps1'; irm https://raw.githubusercontent.com/Aurora-Viewer/Aurora-Viewer/main/scripts/setup.ps1 -OutFile $f; & $f"
-```
-
-Or by hand, to build the viewer only:
+Clone the **Waters Roux fork**, not the upstream Aurora repository:
 
 ```powershell
-git clone https://github.com/Aurora-Viewer/Aurora-Viewer aurora-viewer
-cd aurora-viewer
-cargo build --release -p aurora-viewer
-./target/release/aurora-viewer.exe
+git clone --branch waters-roux-v3-unified-review https://github.com/WynnieOS/Waters-Roux-Viewer.git Waters-Roux-Viewer
+cd Waters-Roux-Viewer
+./scripts/prepare-waters-roux-icon.ps1
+cargo build --release --locked -p aurora-viewer --features xr-static-loader
 ```
 
-Run the same checks as the CI with `./scripts/check.ps1` (rustfmt, clippy
-with warnings as errors, tests). Day-to-day development uses the default
-profile (`cargo run -p aurora-viewer`): it behaves like the release build
-without its slow link-time optimization. `./scripts/build-release.ps1`
-builds GitHub's latest `main` with `--release` into `..\RELEASE\`.
+The internal Rust crate and build output are still named `aurora-viewer` for
+upstream source compatibility. **Do not distribute** the raw binary or
+rename it and assume the package is complete: the protected V3 Windows
+packaging workflow adds the branded launch files, artwork, the pinned
+licensed FFmpeg/ffprobe encoders, and actual H.264/AAC recording tests.
+An unsigned development ZIP is not an official Beta V3 release.
 
-Every build carries the emoji font (Noto Color Emoji, 10.7 MB) inside the
-exe, so the exe works from any folder.
+Developers can run `./scripts/check.ps1` for formatting, Clippy, and tests.
+The historical `aurora-tools.cmd`, `scripts/setup.ps1` and
+`scripts/build-release.ps1` retain upstream-derived build conventions;
+do **not** use an Aurora Git clone or its remote setup one-liner to obtain
+Waters Roux, and do **not** use scripts that build public `main` to
+label an artifact as the protected Beta V3. Follow the V3 Actions
+workflows and [master acceptance gates](docs/WATERS_ROUX_BETA28_V3_ACCEPTANCE.md).
+
+Every build carries the emoji font (Noto Color Emoji, 10.7 MB) inside
+the executable. Preserve third-party attribution, licenses and vendor
+patches when building this fork.
 
 ### macOS
 

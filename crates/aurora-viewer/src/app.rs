@@ -1494,7 +1494,11 @@ impl App {
             Err(e) => log::warn!("logo decode failed: {e}"),
         });
 
-        let panels = Panels::from_settings(&settings);
+        let mut panels = Panels::from_settings(&settings);
+        // Restore the current Waters Roux workspace without changing user preferences.
+        if let Err(error) = ui::workspaces::restore_open_panels(settings.workspace_mode, &mut panels) {
+            log::warn!("Waters Roux workspace panel state could not be restored: {error}");
+        }
         let chat_ui = ChatUi::from_settings(&settings);
         let mut scene = Scene::new(cache, lib.clone());
         scene.jobs.execute(|| {
@@ -6095,6 +6099,9 @@ impl App {
             }
         }
         if self.capture.is_none() {
+            if let Err(error) = ui::workspaces::capture(&self.egui_ctx, self.settings.workspace_mode, &self.panels) {
+                log::warn!("Could not save the active Waters Roux workspace: {error}");
+            }
             ui::layout::save(&self.egui_ctx);
         }
         // LLFavoritesOrderStorage::destroyClass: the favourites as they are
@@ -9392,7 +9399,10 @@ impl App {
                 draw_distance: self.settings.draw_distance,
                 region_width: self.world.main().map_or(256.0, |r| r.heightmap.size_x as f32),
             };
-            if frame.edit_tracking.is_some() || self.camera.needs_animated_eyes(&self.world.agent, &self.settings.camera) {
+            if frame.edit_tracking.is_some()
+                || self.camera.needs_animated_eyes(&self.world.agent, &self.settings.camera)
+                || self.settings.camera.cinematic_target != crate::camera::CinematicTarget::Off
+            {
                 // Evaluate the focused edit selection after the local drag,
                 // and first-person eyes after this frame's animation.
                 late_camera_frame = Some(frame);
@@ -9954,6 +9964,15 @@ impl App {
             let camera_changed = late_camera_frame.is_some() || panned;
             if let Some(mut frame) = late_camera_frame {
                 frame.eye_offset = self.scene.eyes_offset(&self.world, &self.world.agent_id);
+                // Use the avatar's evaluated animation and skeleton positions,
+                // not guessed static body offsets; evaluate after update_poses.
+                let cinematic_joint = self
+                    .settings
+                    .camera
+                    .cinematic_target
+                    .joint_name()
+                    .and_then(|name| self.scene.joint_world(&self.world, &self.world.agent_id, name, now));
+                self.camera.set_cinematic_focus(cinematic_joint);
                 if self.camera.needs_animated_eyes(&self.world.agent, &self.settings.camera) {
                     frame.now = now;
                 }
@@ -13592,7 +13611,14 @@ impl App {
                 .system_message("Enter Second Life before starting the video recorder.".to_owned());
             return;
         }
-        match self.recorder.start(self.settings.recording, self.audio_engine.as_ref()) {
+        let microphone = self.voice.recording_microphone();
+        match self.recorder.start(
+            self.settings.recording,
+            self.audio_engine.as_ref(),
+            microphone,
+            &self.settings.audio.input_device,
+            self.settings.audio.mic_gain,
+        ) {
             Ok(path) => {
                 let before = self.settings.show_huds;
                 if before != self.settings.recording.capture_huds {
@@ -15099,7 +15125,14 @@ impl App {
         self.options_ui.joystick = self.joystick.snapshot.clone();
         self.options_ui.flycam_active = self.joystick.active;
         let before_camera = self.settings.camera.clone();
+        let before_workspace = self.settings.workspace_mode;
         let mut res = ui::options::show(ctx, p, &self.skin.icons, &mut self.settings, &mut self.options_ui, &mut open);
+        if before_workspace != self.settings.workspace_mode
+            && let Err(error) = ui::workspaces::switch(ctx, before_workspace, self.settings.workspace_mode, &mut self.panels)
+        {
+            log::warn!("Waters Roux workspace switch cancelled: {error}");
+            self.settings.workspace_mode = before_workspace;
+        }
         self.sync_appearance_camera();
         self.world.rlva.preserve_camera_settings(&mut self.settings.camera, &before_camera);
         if res.toggle_flycam {

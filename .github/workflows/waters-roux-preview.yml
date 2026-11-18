@@ -8,10 +8,12 @@ on:
   pull_request:
     paths:
       - '.github/workflows/waters-roux-preview.yml'
+      - '.github/workflows/waters-roux-v3-exact-artifact-security.yml'
       - 'crates/**'
       - 'assets/branding/**'
       - 'scripts/package*.ps1'
       - 'scripts/prepare-waters-roux-icon.ps1'
+      - 'scripts/bundle-waters-roux-ffmpeg.ps1'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -19,11 +21,15 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: waters-roux-preview-${{ github.ref }}
-  # The release dependency cache is established; supersede stale Beta 27 builds.
-  cancel-in-progress: ${{ github.ref == 'refs/heads/feat/waters-roux-beta27' }}
+  # Supersede obsolete V3 preview builds when the protected review branch or
+  # a V3 pull-request head moves, including the unified V3 head of PR #37.
+  # The exact-head CI and security gates still apply; this only avoids
+  # packaging known-outdated development commits.
+  cancel-in-progress: ${{ github.ref == 'refs/heads/feat/waters-roux-beta27' || github.ref == 'refs/heads/waters-roux-v3-unified-review' || (github.event_name == 'pull_request' && (github.head_ref == 'waters-roux-v3-unified-review' || github.base_ref == 'waters-roux-v3-unified-review')) }}
 
 jobs:
   preview:
@@ -49,16 +55,139 @@ jobs:
       - name: Build portable Windows application
         shell: pwsh
         run: cargo build --release --locked -p aurora-viewer --features xr-static-loader
-      - name: Assemble development preview
+      - name: Assemble accurately labeled development preview
         shell: pwsh
+        # Keep branch names in environment variables rather than interpolating
+        # untrusted pull-request text into executable PowerShell.
+        env:
+          WR_SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
+          WR_BASE_BRANCH: ${{ github.base_ref }}
+          WR_SOURCE_SHA: ${{ github.sha }}
         run: |
-          $folder = "Waters-Roux-Viewer-Beta-27-${{ github.sha }}"
-          ./scripts/package-waters-roux-preview.ps1 -Exe target/release/aurora-viewer.exe -Out $folder
-          Compress-Archive -LiteralPath $folder -DestinationPath Waters-Roux-Viewer-Beta-27-Windows.zip
-      - name: Upload portable preview
+          $ErrorActionPreference = 'Stop'
+          # A PR is built from its source branch or the merge branch. Never guess
+          # the product version from github.sha or the Actions run number.
+          $sourceBranch = $env:WR_SOURCE_BRANCH
+          $baseBranch = $env:WR_BASE_BRANCH
+          $isV3 = ($sourceBranch -match '(^|[-/])v3([-/]|$)') -or ($baseBranch -match '(^|[-/])v3([-/]|$)')
+          if ($isV3) {
+            $betaLabel = 'Beta 28 V3'
+            $slug = 'Beta-28-V3-DEVELOPMENT'
+          } else {
+            $betaLabel = 'Beta 27'
+            $slug = 'Beta-27'
+          }
+          $folder = "Waters-Roux-Viewer-$slug-$env:WR_SOURCE_SHA"
+          $zip = "Waters-Roux-Viewer-$slug-Windows.zip"
+          $artifact = "Waters-Roux-Viewer-$slug-Windows"
+          ./scripts/package-waters-roux-preview.ps1 -Exe target/release/aurora-viewer.exe -Out $folder -BetaLabel $betaLabel
+          if ($LASTEXITCODE -ne 0) { throw "Portable preview packaging failed" }
+          foreach ($required in @('waters-roux-viewer.exe', 'Launch Waters Roux.cmd', 'BUILD-INFO.txt', 'START-HERE.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $folder $required) -PathType Leaf)) {
+              throw "Missing packaged file: $required"
+            }
+          }
+          $buildInfo = Get-Content -LiteralPath (Join-Path $folder 'BUILD-INFO.txt') -Raw
+          if (-not $buildInfo.Contains($betaLabel)) { throw "Incorrect packaged beta identity: $betaLabel" }
+          if ($isV3) {
+            if (-not (Test-Path -LiteralPath (Join-Path $folder 'BETA-28-V3-ACCEPTANCE.md') -PathType Leaf)) {
+              throw 'V3 package is missing the master acceptance checklist.'
+            }
+            if (Test-Path -LiteralPath (Join-Path $folder 'MISSING-ARTWORK.txt')) {
+              throw 'V3 artwork/branding is incomplete. Do not upload this preview.'
+            }
+            # The recorder calls tools/ffmpeg.exe at runtime. A build without
+            # this executable compiles but cannot record MP4 on a clean PC.
+            # Stage the already pinned, SHA256-verified GPL encoder from the
+            # existing source-controlled vendor script. No runtime downloads.
+            ./scripts/bundle-waters-roux-ffmpeg.ps1 -Out $folder
+            if ($LASTEXITCODE -ne 0) { throw 'V3 pinned H.264/AAC encoder staging failed.' }
+            $ffmpeg = Join-Path $folder 'tools/ffmpeg.exe'
+            $ffprobe = Join-Path $folder 'tools/ffprobe.exe'
+            $licenseDir = Join-Path $folder 'third-party/ffmpeg'
+            foreach ($required in @('tools/ffmpeg.exe', 'tools/ffprobe.exe', 'THIRD-PARTY-FFMPEG.txt')) {
+              if (-not (Test-Path -LiteralPath (Join-Path $folder $required) -PathType Leaf)) {
+                throw "Cannot upload MP4-broken V3 package: missing $required"
+              }
+            }
+            $licenses = @(Get-ChildItem -LiteralPath $licenseDir -File -ErrorAction Stop | Where-Object { $_.Name -match '^LICENSE' })
+            if ($licenses.Count -lt 1) { throw 'FFmpeg third-party GPL license missing from V3 package.' }
+            # Exercise the real Waters Roux MP4 worker with the packaged binary;
+            # then independently inspect both codec and wall-clock duration.
+            $fixture = Join-Path $env:RUNNER_TEMP 'waters-roux-v3-actual-recorder.mp4'
+            $env:WATERS_ROUX_FFMPEG = (Resolve-Path -LiteralPath $ffmpeg).Path
+            $env:WATERS_ROUX_TEST_MP4 = '1'
+            $env:WATERS_ROUX_TEST_MP4_OUTPUT = $fixture
+            cargo test --locked -p aurora-viewer --bin aurora-viewer h264_mp4_has_valid_atoms_and_cfr_timeline -- --nocapture
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $fixture -PathType Leaf)) {
+              throw 'Actual Waters Roux H.264 recording worker fixture failed.'
+            }
+            # Exercise the same muxing code as the live recorder with synthetic
+            # 48kHz stereo world audio; verify independent AAC + H.264 streams,
+            # 1-second playback duration and that both streams decode.
+            cargo test --locked -p aurora-viewer --bin aurora-viewer h264_mp4_muxes_aac_world_audio_with_correct_duration -- --nocapture
+            if ($LASTEXITCODE -ne 0) { throw 'V3 AAC/H.264 mux regression failed. Do not package an audio-broken recorder.' }
+            # Release blocker: recording BOTH user's own microphone narration
+            # and world sound must produce two audible sources in one synced AAC.
+            cargo test --locked -p aurora-viewer --bin aurora-viewer h264_mp4_mixes_own_microphone_and_world_audio_into_decodable_aac -- --nocapture
+            if ($LASTEXITCODE -ne 0) { throw 'Own microphone + world AAC regression failed. Do not package a narration-broken recorder.' }
+            cargo test --locked -p aurora-viewer --bin aurora-viewer h264_mp4_recording_worker_captures_own_microphone_without_world_mix -- --nocapture
+            if ($LASTEXITCODE -ne 0) { throw 'Own microphone recorder-path regression failed. Do not package a mic-silent MP4.' }
+            $probeJson = & $ffprobe -v error -show_entries 'stream=codec_name,codec_type,width,height,r_frame_rate,nb_frames' -show_entries 'format=duration' -of json $fixture | Out-String
+            if ($LASTEXITCODE -ne 0) { throw 'Packaged ffprobe cannot inspect the actual recorder MP4.' }
+            $metadata = $probeJson | ConvertFrom-Json
+            $video = @($metadata.streams | Where-Object { $_.codec_type -eq 'video' })[0]
+            if ($null -eq $video -or $video.codec_name -ne 'h264' -or $video.width -ne 64 -or $video.height -ne 64 -or $video.r_frame_rate -ne '30/1') {
+              throw "V3 recorder generated wrong codec/dimensions/FPS: $probeJson"
+            }
+            if ($video.nb_frames -and [int]$video.nb_frames -ne 30) {
+              throw "V3 recorder expected 30 frames, received $($video.nb_frames)"
+            }
+            $duration = [double]$metadata.format.duration
+            if ($duration -lt 0.95 -or $duration -gt 1.1) {
+              throw "V3 MP4 duration drift: $duration instead of ~1.0 second"
+            }
+            & $ffmpeg -hide_banner -loglevel error -i $fixture -f null -
+            if ($LASTEXITCODE -ne 0) { throw 'Packaged FFmpeg cannot independently decode the actual recorder MP4.' }
+            $codecHash = (Get-FileHash -LiteralPath $ffmpeg -Algorithm SHA256).Hash.ToLowerInvariant()
+            "Verified bundled libx264/AAC encoder SHA256: $codecHash" | Add-Content -LiteralPath (Join-Path $folder 'BUILD-INFO.txt') -Encoding utf8
+            "Actual Rust recorder fixture: H.264 64x64, 30fps, 30 frames, $duration s; decoded successfully." | Add-Content -LiteralPath (Join-Path $folder 'BUILD-INFO.txt') -Encoding utf8
+            Remove-Item -LiteralPath $fixture -Force
+          }
+          @(
+            'UNRELEASED WATERS ROUX DEVELOPMENT PREVIEW'
+            "Requested code line: $betaLabel"
+            "Source branch: $sourceBranch"
+            "GitHub Actions commit: $env:WR_SOURCE_SHA"
+            'Do not install over the current viewer, distribute to residents, or claim this is the approved Beta 28 V3.'
+            'Automated compilation is not in-world QA. The 18-section acceptance gate remains open.'
+          ) | Set-Content -LiteralPath (Join-Path $folder 'DEVELOPMENT-NOT-FOR-RELEASE.txt') -Encoding utf8
+          Compress-Archive -LiteralPath $folder -DestinationPath $zip
+          $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $zip" | Set-Content -LiteralPath "$zip.sha256" -Encoding utf8
+          "WR_PREVIEW_ARTIFACT=$artifact" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "WR_PREVIEW_ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Built unreleased $betaLabel preview ($hash)."
+
+      - name: Upload portable preview (not an approved beta)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Waters-Roux-Viewer-Beta-27-Windows
-          path: Waters-Roux-Viewer-Beta-27-Windows.zip
+          name: ${{ env.WR_PREVIEW_ARTIFACT }}
+          path: |
+            ${{ env.WR_PREVIEW_ZIP }}
+            ${{ env.WR_PREVIEW_ZIP }}.sha256
           retention-days: 14
           compression-level: 6
+
+  v3_exact_windows_artifact_security:
+    name: Scan the exact packaged V3 Windows ZIP (blocking)
+    # The completed preview job has uploaded its archive and SHA256 sidecar.
+    # Scan this run's bytes, never a previous preview's historical artifact.
+    needs: preview
+    if: ${{ needs.preview.result == 'success' && (github.head_ref == 'waters-roux-v3-unified-review' || github.base_ref == 'waters-roux-v3-unified-review' || github.ref == 'refs/heads/waters-roux-v3-unified-review') }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/waters-roux-v3-exact-artifact-security.yml
+    with:
+      artifact_run_id: ${{ format('{0}', github.run_id) }}

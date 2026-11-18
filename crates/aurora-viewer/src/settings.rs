@@ -588,6 +588,12 @@ pub struct Settings {
     pub bloom: bool,
     /// The share of the light over the threshold it spreads (0.05 to 1).
     pub bloom_strength: f32,
+    /// Opt-in camera-panning motion blur (0 disables the screen-space effect).
+    /// The renderer excludes UI, HUDs, cutout photos and camera resets.
+    pub motion_blur_strength: f32,
+    /// Shadow-aware atmospheric sunlight shafts (0 disables the effect).
+    /// Requires sun visibility and shadow cascades; default OFF for FPS.
+    pub god_rays_strength: f32,
     /// GPU occlusion culling: objects hidden behind others are not drawn
     /// (Firestorm UseOcclusion, on by default). Renamed from `gpu_occlusion`
     /// (off while it cost more than it saved) so that saved settings take
@@ -1134,6 +1140,8 @@ pub struct Settings {
     /// colours of the interface (`crate::interface_colors`), each the
     /// skin's by default.
     pub interface_colors: crate::interface_colors::InterfaceColors,
+    /// Independent, saved Everyday / Studio / Creator workspace layouts.
+    pub workspace_mode: crate::ui::workspaces::Mode,
     /// Firestorm's camera and movement windows (floater_camera.xml,
     /// floater_moveview.xml) instead of `ui/controls.rs`.
     pub classic_controls: bool,
@@ -1564,6 +1572,19 @@ pub struct ColorSettings {
     pub tag_match: Rgba,
     /// Custom display name (NameTagMismatch).
     pub tag_mismatch: Rgba,
+    // Optional voice indicator colors. None retains the active skin's palette,
+    // including a resident's saved theme and accessibility choices.
+    pub voice_quiet: Option<Rgba>,
+    pub voice_medium: Option<Rgba>,
+    pub voice_loud: Option<Rgba>,
+    /// Idle microphone: participant is in voice but not speaking.
+    pub voice_idle: Option<Rgba>,
+    /// Microphone-off badge: participant is unavailable/not in voice.
+    /// Do not confuse this with proof the participant muted themselves.
+    pub voice_unavailable: Option<Rgba>,
+    /// Known moderator-muted participant (distinct from disconnected voice).
+    /// Never infer voluntary local microphone mute from an unavailable badge.
+    pub voice_muted: Option<Rgba>,
     // minimap
     pub map_me: Rgba,
     pub map_other: Rgba,
@@ -1614,6 +1635,12 @@ impl Default for ColorSettings {
             tag_linden: hex(0xF472B6),
             tag_match: hex(0xE8EDFB),
             tag_mismatch: hex(0xE8EDFB),
+            voice_quiet: None,
+            voice_medium: None,
+            voice_loud: None,
+            voice_idle: None,
+            voice_unavailable: None,
+            voice_muted: None,
             map_me: hex(0x8B5CF6),
             map_other: hex(0x4ADE80),
             map_friend: hex(0x818CF8),
@@ -1905,6 +1932,8 @@ impl Default for Settings {
             glow: true,
             bloom: false,
             bloom_strength: BLOOM_STRENGTH,
+            motion_blur_strength: 0.0,
+            god_rays_strength: 0.0,
             occlusion_culling: true,
             lod_factor: 2.0,
             tree_lod_factor: 0.5,
@@ -2109,6 +2138,7 @@ impl Default for Settings {
             color_blindness_strength: 1.0,
             high_contrast: false,
             interface_colors: Default::default(),
+            workspace_mode: crate::ui::workspaces::Mode::Everyday,
             classic_controls: false,
             camera_shots: Vec::new(),
             camera_views: Default::default(),
@@ -2922,6 +2952,16 @@ impl Settings {
         } else {
             BLOOM_STRENGTH
         };
+        self.motion_blur_strength = if self.motion_blur_strength.is_finite() {
+            self.motion_blur_strength.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        self.god_rays_strength = if self.god_rays_strength.is_finite() {
+            self.god_rays_strength.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         self.lod_factor = self.lod_factor.clamp(0.5, 4.0);
         let area = |v: f32, default: f32| if v.is_finite() { v.clamp(0.0, 1.0e6) } else { default };
         self.large_surface_prim_threshold = area(self.large_surface_prim_threshold, 75.0);
@@ -3205,6 +3245,8 @@ impl Settings {
                 Tonemapper::KhronosNeutral
             },
             hdr: self.hdr_emissive,
+            motion_blur_strength: self.motion_blur_strength,
+            god_rays_strength: self.god_rays_strength,
             shadow_resolution: self.shadow_params().0,
             projector_shadow_limit: if self.projector_shadows { self.projector_shadow_limit } else { 0 },
             ssao: self.ssao,
@@ -3513,6 +3555,40 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn waters_roux_volumetric_god_rays_default_off_and_bounded() {
+        let fresh = Settings::default();
+        assert_eq!(fresh.god_rays_strength, 0.0);
+        assert_eq!(fresh.render_settings().god_rays_strength, 0.0);
+        let mut custom = fresh;
+        custom.god_rays_strength = 99.0;
+        let custom = custom.sanitized();
+        assert_eq!(custom.god_rays_strength, 1.0);
+        assert_eq!(custom.render_settings().god_rays_strength, 1.0);
+        let bad = Settings {
+            god_rays_strength: f32::INFINITY,
+            ..Settings::default()
+        };
+        assert_eq!(bad.sanitized().god_rays_strength, 0.0);
+    }
+
+    #[test]
+    fn waters_roux_camera_motion_blur_is_opt_in_and_bounded() {
+        let fresh = Settings::default();
+        assert_eq!(fresh.motion_blur_strength, 0.0);
+        assert_eq!(fresh.render_settings().motion_blur_strength, 0.0);
+        let mut custom = fresh;
+        custom.motion_blur_strength = 1.5;
+        let custom = custom.sanitized();
+        assert_eq!(custom.motion_blur_strength, 1.0);
+        assert_eq!(custom.render_settings().motion_blur_strength, 1.0);
+        let broken = Settings {
+            motion_blur_strength: f32::NAN,
+            ..Settings::default()
+        };
+        assert_eq!(broken.sanitized().motion_blur_strength, 0.0);
     }
 
     #[test]

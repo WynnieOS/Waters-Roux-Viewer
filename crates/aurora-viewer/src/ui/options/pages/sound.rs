@@ -527,10 +527,69 @@ fn voice(cx: &mut Cx) {
         );
     });
     cx.group(tr!("voice-indicators"), |cx| {
+        // Color overrides share the existing saved color preferences while
+        // keeping all voice controls discoverable in one settings page.
+        cx.row(
+            "Quiet speaking color",
+            "Voice outlines, microphone badges, and nameplate glow. Keep Theme to match the active skin.",
+            &field!(colors.voice_quiet),
+            |ui, s| voice_color_swatch(ui, &p, "quiet", &mut s.colors.voice_quiet, p.success),
+        );
+        cx.row(
+            "Medium speaking color",
+            "Intermediate voice volume color. Keep Theme to match the active skin.",
+            &field!(colors.voice_medium),
+            |ui, s| voice_color_swatch(ui, &p, "medium", &mut s.colors.voice_medium, p.amber),
+        );
+        cx.row(
+            "Loud speaking color",
+            "Peak voice level color. Keep Theme to match the active skin.",
+            &field!(colors.voice_loud),
+            |ui, s| voice_color_swatch(ui, &p, "loud", &mut s.colors.voice_loud, p.danger),
+        );
+        cx.row(
+            "Idle microphone color",
+            "Resident connected to voice but not speaking. Theme uses the skin's microphone green.",
+            &field!(colors.voice_idle),
+            |ui, s| voice_color_swatch(ui, &p, "idle", &mut s.colors.voice_idle, p.success),
+        );
+        cx.row(
+            "Unavailable microphone color",
+            "Microphone-off badge for residents not connected to voice. This does not prove they muted their microphone.",
+            &field!(colors.voice_unavailable),
+            |ui, s| voice_color_swatch(ui, &p, "unavailable", &mut s.colors.voice_unavailable, p.danger),
+        );
+        cx.row(
+            "Moderator-muted microphone color",
+            "Used only when voice explicitly reports a moderator mute; cannot identify a resident's local microphone mute.",
+            &field!(colors.voice_muted),
+            |ui, s| voice_color_swatch(ui, &p, "moderator_muted", &mut s.colors.voice_muted, p.danger),
+        );
         cx.toggle(tr!("voice-show-visualizers"), "", &field!(audio.voice_visualizer));
         cx.toggle(tr!("voice-show-self"), "", &field!(audio.voice_visualizer_self));
         cx.toggle(tr!("voice-show-dot"), "", &field!(audio.voice_visualizer_dot));
         cx.toggle(tr!("voice-show-in-calls"), "", &field!(audio.voice_visualizers_in_calls));
         cx.toggle(tr!("voice-show-conversation"), "", &field!(audio.conversation_voice_indicator));
     });
+}
+
+/// A theme-aware voice color picker; old settings keep following the user's
+/// active palette until a custom swatch is chosen. Reset is per-indicator.
+fn voice_color_swatch(
+    ui: &mut egui::Ui,
+    p: &crate::theme::Palette,
+    key: &str,
+    selected: &mut Option<crate::settings::Rgba>,
+    theme: egui::Color32,
+) -> bool {
+    let mut value = (*selected).unwrap_or(theme.to_array());
+    let mut changed = crate::ui::widgets::color_button(ui, p, ui.scope_id().with(key), &mut value, false).changed();
+    if changed {
+        *selected = Some(value);
+    }
+    if selected.is_some() && widgets::flat_button(ui, p, "Theme").clicked() {
+        *selected = None;
+        changed = true;
+    }
+    changed
 }

@@ -1,12 +1,13 @@
-//! User-initiated H.264/MP4 recording with optional AAC in-world audio.
+//! User-initiated H.264/MP4 recording with independently opt-in AAC world and microphone audio.
 //!
 //! The AVI/MJPEG writer below is retained for legacy regression tests; real
 //! capture uses a live FFmpeg H.264 encoder and writes MP4.
 //!
 //! The resident can explicitly opt into recording the viewer's OWN 48 kHz
 //! stereo mix, including incoming WebRTC voice, sounds, parcel music and media.
-//! It does not monitor other desktop applications or record the local microphone.
-//! The opt-in audio stream is muxed as AAC when the recording is finalized.
+//! Local microphone narration is an independent explicit opt-in capture of the
+//! same input used for SL voice; unrelated desktop applications are excluded.
+//! The selected audio sources are mixed and muxed as AAC during finalization.
 //! Get consent before recording conversations. In-world validation is required
 //! before public release.
 
@@ -49,6 +50,9 @@ pub struct Options {
     pub fps: u32,
     pub jpeg_quality: u8,
     pub capture_world_audio: bool,
+    /// Record my own local microphone narration, even when not transmitting in SL.
+    /// Defaults to off for privacy; an unavailable mic prevents recording start.
+    pub capture_microphone: bool,
     /// Include the viewer's UI; otherwise capture only the rendered scene.
     pub capture_interface: bool,
     /// Include HUD attachments in the captured world view.
@@ -62,6 +66,7 @@ impl Default for Options {
             fps: 30,
             jpeg_quality: 95,
             capture_world_audio: false,
+            capture_microphone: false,
             capture_interface: false,
             capture_huds: true,
         }
@@ -147,7 +152,14 @@ impl Recorder {
         self.session.as_ref().map_or(Duration::ZERO, |s| s.started.elapsed())
     }
 
-    pub fn start(&mut self, mut options: Options, audio_engine: Option<&aurora_audio::AudioEngine>) -> Result<PathBuf, String> {
+    pub fn start(
+        &mut self,
+        mut options: Options,
+        audio_engine: Option<&aurora_audio::AudioEngine>,
+        existing_microphone: Option<aurora_audio::MicCapture>,
+        input_device: &str,
+        microphone_gain: f32,
+    ) -> Result<PathBuf, String> {
         options.sanitize();
         if self.active() || self.finalizing() {
             return Err("Finish saving the previous MP4 before starting another recording".into());
@@ -168,17 +180,39 @@ impl Recorder {
         let queued_frames = Arc::new(AtomicUsize::new(0));
         let encoder_backlog = Arc::clone(&queued_frames);
         let path = output.clone();
-        // A second, separate audio receiver: the microphone's echo-reference
-        // samples are NEVER consumed by the recorder.
+        // World mix and local microphone are two opt-in, separate receivers.
+        // The microphone tap never drains the WebRTC client's voice samples.
         let audio = if options.capture_world_audio {
             audio_engine.map(|engine| engine.recording_tap())
         } else {
             None
         };
-        let has_audio = audio.is_some();
+        let microphone_source = if options.capture_microphone {
+            match existing_microphone {
+                Some(active) => Some(active),
+                None => {
+                    let requested = (!input_device.trim().is_empty()).then(|| input_device.to_owned());
+                    let opened = aurora_audio::MicCapture::open(requested).map_err(|e| {
+                        format!("Cannot record your microphone: {e}. Check Windows microphone permissions and device selection.")
+                    })?;
+                    opened.set_gain(microphone_gain);
+                    Some(opened)
+                }
+            }
+        } else {
+            None
+        };
+        let microphone = microphone_source.as_ref().map(aurora_audio::MicCapture::recording_tap);
+        let has_world = audio.is_some();
+        let has_mic = microphone.is_some();
         let worker = thread::Builder::new()
             .name("waters-roux-video-encoder".into())
-            .spawn(move || mp4::encode(rx, path, options, audio, Some(encoder_backlog), ffmpeg))
+            .spawn(move || {
+                // Keep the device open if SL voice is off or changes while
+                // explicitly consented narration is being recorded.
+                let _microphone_owner = microphone_source;
+                mp4::encode(rx, path, options, audio, microphone, Some(encoder_backlog), ffmpeg)
+            })
             .map_err(|e| format!("Unable to start video encoder: {e}"))?;
         let now = Instant::now();
         self.session = Some(Session {
@@ -194,11 +228,12 @@ impl Recorder {
             queued_frames,
         });
         self.message = Some(format!(
-            "H.264 MP4 recording started: {} ({} • {} fps • AAC world audio {}); the file finalizes when you stop.",
+            "H.264 MP4 recording started: {} ({} • {} fps • world sound {} • own microphone {}); Stop finalizes AAC MP4.",
             output.display(),
             recording_label(options),
             options.fps,
-            if has_audio { "ON" } else { "OFF" },
+            if has_world { "ON" } else { "OFF" },
+            if has_mic { "ON" } else { "OFF" },
         ));
         Ok(output)
     }

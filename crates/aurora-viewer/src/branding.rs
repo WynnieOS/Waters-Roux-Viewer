@@ -4,7 +4,7 @@
 //! validates before decoding, preserves the exact source bytes, and never
 //! changes official assets, account settings or application icon resources.
 use egui::{Pos2, Rect, Vec2};
-use image::{DynamicImage, ImageFormat, ImageReader, Limits};
+use image::{AnimationDecoder, DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::io::{Cursor, Read};
@@ -13,6 +13,9 @@ use std::path::{Path, PathBuf};
 pub const MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
 pub const MAX_SIDE: u32 = 8192;
 pub const MAX_PIXELS: u64 = 16 * 1024 * 1024;
+/// Bound decoded GIF animation memory before publishing resident artwork.
+pub const MAX_GIF_FRAMES: usize = 96;
+pub const MAX_GIF_PIXELS: u64 = 24 * 1024 * 1024;
 const MAX_CONFIG_BYTES: u64 = 64 * 1024;
 const CONFIG: &str = "appearance.json";
 
@@ -271,7 +274,7 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let text = match self {
             Self::Unreadable => "The selected image could not be read.",
-            Self::Unsupported => "Choose a PNG or JPEG image.",
+            Self::Unsupported => "Choose PNG or JPEG artwork, or a GIF for the background.",
             Self::LogoFormat => "Choose a PNG image for the logo.",
             Self::TooLarge => "Choose an image file no larger than 16 MiB.",
             Self::Dimensions => "Image dimensions exceed 8192 pixels per side or 16 megapixels.",
@@ -347,7 +350,7 @@ fn safe_name(name: &str) -> bool {
     let Some((hash, suffix)) = rest.rsplit_once('.') else {
         return false;
     };
-    hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit()) && matches!(suffix, "png" | "jpg")
+    hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit()) && matches!(suffix, "png" | "jpg" | "gif")
 }
 
 pub fn custom_path(name: &str) -> Option<PathBuf> {
@@ -383,7 +386,7 @@ fn validate_bytes(bytes: &[u8], slot: Slot) -> Result<ImageFormat, Error> {
         return Err(Error::TooLarge);
     }
     let format = image::guess_format(bytes).map_err(|_| Error::Unsupported)?;
-    if !matches!(format, ImageFormat::Png | ImageFormat::Jpeg) {
+    if !matches!(format, ImageFormat::Png | ImageFormat::Jpeg | ImageFormat::Gif) {
         return Err(Error::Unsupported);
     }
     if slot.is_logo() && format != ImageFormat::Png {
@@ -398,8 +401,53 @@ fn validate_bytes(bytes: &[u8], slot: Slot) -> Result<ImageFormat, Error> {
     Ok(format)
 }
 
+/// One fully composited GIF frame and its sanitized time on screen.
+pub struct AnimatedFrame {
+    pub pixels: image::RgbaImage,
+    pub delay_ms: u64,
+}
+
+/// Decode off the UI thread. Bound both frame count and cumulative decoded
+/// canvas pixels: a tiny compressed GIF must never exhaust viewer memory.
+fn decode_gif_frames(bytes: &[u8], slot: Slot) -> Result<Vec<AnimatedFrame>, Error> {
+    if slot.is_logo() {
+        return Err(Error::LogoFormat);
+    }
+    if validate_bytes(bytes, slot)? != ImageFormat::Gif {
+        return Err(Error::Unsupported);
+    }
+    let decoder = image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).map_err(|_| Error::Decode)?;
+    let (width, height) = decoder.dimensions();
+    let pixels_per_frame = u64::from(width) * u64::from(height);
+    if pixels_per_frame == 0 || pixels_per_frame > MAX_GIF_PIXELS {
+        return Err(Error::Dimensions);
+    }
+    let mut frames = Vec::new();
+    for next in decoder.into_frames() {
+        if frames.len() >= MAX_GIF_FRAMES || (frames.len() as u64 + 1) * pixels_per_frame > MAX_GIF_PIXELS {
+            return Err(Error::TooLarge);
+        }
+        let frame = next.map_err(|_| Error::Decode)?;
+        let (numerator, denominator) = frame.delay().numer_denom_ms();
+        let delay_ms = (u64::from(numerator) / u64::from(denominator.max(1))).clamp(40, 2000);
+        let pixels = frame.into_buffer();
+        if pixels.width() != width || pixels.height() != height {
+            return Err(Error::Dimensions);
+        }
+        frames.push(AnimatedFrame { pixels, delay_ms });
+    }
+    if frames.is_empty() {
+        return Err(Error::Decode);
+    }
+    Ok(frames)
+}
+
 fn decode_bytes(bytes: &[u8], slot: Slot) -> Result<DynamicImage, Error> {
     let format = validate_bytes(bytes, slot)?;
+    if format == ImageFormat::Gif {
+        let frames = decode_gif_frames(bytes, slot)?;
+        return Ok(DynamicImage::ImageRgba8(frames.into_iter().next().ok_or(Error::Decode)?.pixels));
+    }
     let mut reader = ImageReader::with_format(Cursor::new(bytes), format);
     let mut limits = Limits::default();
     limits.max_image_width = Some(MAX_SIDE);
@@ -425,12 +473,30 @@ fn import_at(root: &Path, path: &Path, slot: Slot) -> Result<String, Error> {
     decode_bytes(&bytes, slot)?;
     let digest = Sha256::digest(&bytes);
     let hash: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
-    let suffix = if format == ImageFormat::Png { "png" } else { "jpg" };
+    let suffix = match format {
+        ImageFormat::Png => "png",
+        ImageFormat::Gif => "gif",
+        _ => "jpg",
+    };
     let name = format!("art-{hash}.{suffix}");
     let images = root.join("images");
     std::fs::create_dir_all(&images).map_err(|_| Error::Write)?;
     crate::atomic_file::write(&images.join(&name), &bytes).map_err(|_| Error::Write)?;
     Ok(name)
+}
+
+/// Animated GIF backgrounds are optional; all existing PNG/JPEG selections
+/// continue through the original static-image path without being redecoded.
+pub fn load_animation(value: &ImageSettings, slot: Slot) -> Option<Vec<AnimatedFrame>> {
+    if slot.is_logo() {
+        return None;
+    }
+    let path = resolve(value, slot)?;
+    if path.extension().and_then(|s| s.to_str()) != Some("gif") {
+        return None;
+    }
+    let bytes = read_bounded(&path, MAX_FILE_BYTES).ok()?;
+    decode_gif_frames(&bytes, slot).ok()
 }
 
 pub fn load_image(value: &ImageSettings, slot: Slot) -> Option<DynamicImage> {

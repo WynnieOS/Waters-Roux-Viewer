@@ -13527,3 +13527,11 @@ branding-error-name = La référence de l’image enregistrée est invalide. Res
 branding-error-config = Le fichier d’apparence est invalide ; une valeur sûre est utilisée.
 branding-error-write = Impossible d’enregistrer l’apparence. Vérifiez que le dossier du profil est accessible en écriture.
 branding-custom-unavailable = L’image personnelle sélectionnée est indisponible ; le fond de secours est affiché.
+
+# Modes d'espace de travail Waters Roux (Préférences > Disposition)
+waters-roux-workspaces = Espaces de travail Waters Roux
+waters-roux-workspace = Espace de travail actif
+waters-roux-workspace-help = Passez à une disposition enregistrée. Chaque mode conserve la position de ses fenêtres et ses panneaux ouverts.
+waters-roux-everyday = Quotidien
+waters-roux-studio = Studio
+waters-roux-creator = Création
