@@ -624,37 +624,37 @@ pub fn show(ctx: &Context, p: &Palette, open: &mut bool, settings: &mut Settings
             ui.painter().rect_stroke(plate, radius, egui::Stroke::new(1.0, border), egui::StrokeKind::Inside);
             ui.painter().text(plate.center(), egui::Align2::CENTER_CENTER, "Example Resident • Voice ◉", egui::FontId::proportional(16.0), p.ink);
         } else {
-        ui.painter().rect_filled(rect, style.corner_radius, style.color(1.0));
-        if let Some(texture) = texture(ctx, style, ui.input(|i| i.time)) {
-            let (dest, uv) = image_rect(&texture, rect, &style.image_fit);
-            ui.painter()
-                .image(texture.id(), dest, uv, widgets::PICTURE_TINT.gamma_multiply(style.image_opacity));
-        }
-        if style.border_width > 0.0 {
-            let [r, g, b, a] = style.border_color;
-            ui.painter().rect_stroke(
-                rect,
-                style.corner_radius,
-                egui::Stroke::new(style.border_width, Color32::from_rgba_unmultiplied(r, g, b, a)),
-                egui::StrokeKind::Inside,
+            ui.painter().rect_filled(rect, style.corner_radius, style.color(1.0));
+            if let Some(texture) = texture(ctx, style, ui.input(|i| i.time)) {
+                let (dest, uv) = image_rect(&texture, rect, &style.image_fit);
+                ui.painter()
+                    .image(texture.id(), dest, uv, widgets::PICTURE_TINT.gamma_multiply(style.image_opacity));
+            }
+            if style.border_width > 0.0 {
+                let [r, g, b, a] = style.border_color;
+                ui.painter().rect_stroke(
+                    rect,
+                    style.corner_radius,
+                    egui::Stroke::new(style.border_width, Color32::from_rgba_unmultiplied(r, g, b, a)),
+                    egui::StrokeKind::Inside,
+                );
+            }
+            let font = egui::FontId::new(
+                style.name_size,
+                if style.monospace {
+                    egui::FontFamily::Monospace
+                } else {
+                    egui::FontFamily::Proportional
+                },
             );
-        }
-        let font = egui::FontId::new(
-            style.name_size,
-            if style.monospace {
-                egui::FontFamily::Monospace
+            let [r, g, b, a] = style.name_color;
+            let text = if style.custom_text_colors {
+                Color32::from_rgba_unmultiplied(r, g, b, a)
             } else {
-                egui::FontFamily::Proportional
-            },
-        );
-        let [r, g, b, a] = style.name_color;
-        let text = if style.custom_text_colors {
-            Color32::from_rgba_unmultiplied(r, g, b, a)
-        } else {
-            p.ink
-        };
-        ui.painter()
-            .text(rect.center(), egui::Align2::CENTER_CENTER, "Example Resident", font, text);
+                p.ink
+            };
+            ui.painter()
+                .text(rect.center(), egui::Align2::CENTER_CENTER, "Example Resident", font, text);
         }
         if widgets::action_button(ui, p, "refresh", "Restore defaults", ActionKind::Flat, Vec2::new(0.0, 29.0)).clicked() {
             reset = true;
@@ -772,6 +772,35 @@ mod tests {
         assert_eq!(style.regular_detail_size, 24.0);
         assert_eq!(style.regular_opacity, 0.2);
         assert_eq!(style.name_size, 19.0);
+    }
+
+    #[test]
+    fn plate_styling_is_independent_of_classic_and_custom_settings() {
+        let previous: Style = serde_json::from_str("{}").expect("old style has defaults");
+        assert!(!previous.plate_style_enabled);
+        assert_eq!(previous.plate_surface_opacity, 1.0);
+        assert!(!previous.enabled);
+        let mut edited = previous.clone();
+        edited.plate_style_enabled = true;
+        edited.plate_tint = [70, 0, 0, 255];
+        edited.plate_border_color = [253, 181, 21, 255];
+        edited.plate_surface_opacity = 0.65;
+        let restored: Style = serde_json::from_str(&serde_json::to_string(&edited).unwrap()).unwrap();
+        assert_eq!(edited, restored);
+        assert!(!restored.enabled, "glass plate editing must not force custom classic name tags");
+    }
+
+    #[test]
+    fn plate_surface_opacity_is_safely_clamped() {
+        let mut style = Style { plate_style_enabled: true, plate_surface_opacity: f32::NAN, ..Style::default() };
+        style.sanitize();
+        assert_eq!(style.plate_surface_opacity, 1.0);
+        style.plate_surface_opacity = -10.0;
+        style.sanitize();
+        assert_eq!(style.plate_surface_opacity, 0.15);
+        style.plate_surface_opacity = 2.0;
+        style.sanitize();
+        assert_eq!(style.plate_surface_opacity, 1.0);
     }
 
     #[test]
