@@ -121,7 +121,7 @@ pub fn release_notes(version: &str) -> Option<String> {
 pub fn copy_text(sections: &[Section]) -> String {
     let version = aurora_version::version();
     let mut out = format!(
-        "Waters Roux Viewer — {}\\nTechnical version: {version}\\nSource revision: {}\\n",
+        "Waters Roux Viewer — {}\nTechnical version: {version}\nSource revision: {}\n",
         crate::cli::viewer_release_label(),
         aurora_version::commit()
     );
@@ -475,7 +475,12 @@ mod tests {
         ];
         let text = copy_text(&sections);
         let blocks: Vec<&str> = text.split("\n\n").collect();
-        assert!(blocks[0].starts_with(&format!("Waters Roux Viewer {}", aurora_version::version())));
+        assert!(blocks[0].starts_with(&format!(
+            "Waters Roux Viewer — {}\nTechnical version: {}\nSource revision: {}",
+            crate::cli::viewer_release_label(),
+            aurora_version::version(),
+            aurora_version::commit()
+        )));
         assert_eq!(
             blocks[1],
             format!(
