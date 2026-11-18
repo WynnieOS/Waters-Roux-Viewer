@@ -171,7 +171,11 @@ impl VideoEncoder {
         // End-of-stream is required: the MP4 index (moov) is written on exit.
         self.child.stdin.take();
         let status = self.child.wait().map_err(|e| format!("H.264 encoder exit: {e}"))?;
-        let details = self.stderr_reader.take().and_then(|handle| handle.join().ok()).unwrap_or_default();
+        let details = self
+            .stderr_reader
+            .take()
+            .and_then(|handle| handle.join().ok())
+            .unwrap_or_default();
         if !status.success() {
             return Err(format!(
                 "H.264 encoder failed ({status}): {}",
@@ -477,7 +481,7 @@ mod tests {
         // Simulates a chatty encoder over a long capture: 256 KiB exceeds
         // typical OS pipe buffers, while retained diagnostic memory stays bounded.
         let mut output = vec![b'X'; 256 * 1024];
-        output.extend_from_slice(b"\\nLATEST_FFMPEG_ERROR\\n");
+        output.extend_from_slice(b"\nLATEST_FFMPEG_ERROR\n");
         let details = drain_encoder_stderr(std::io::Cursor::new(output));
         assert!(details.len() <= MAX_FFMPEG_ERROR_BYTES, "diagnostic output must stay bounded");
         assert!(details.contains("LATEST_FFMPEG_ERROR"), "final errors must be preserved");
