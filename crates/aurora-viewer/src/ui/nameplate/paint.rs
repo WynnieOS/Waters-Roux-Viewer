@@ -231,7 +231,11 @@ fn face(env: &Env<'_>, level: Level, c: &Content, t: f32) -> Face {
         .nameplate_name
         .map(crate::ui::colors::set_color)
         .unwrap_or_else(|| c.role.name_color(p, &crate::ui::colors::get()));
-    let color = env.plate_tint_override.or_else(|| surface_tint(env, c)).map(|bg| readable_name(color, bg, p.ink)).unwrap_or(color);
+    let color = env
+        .plate_tint_override
+        .or_else(|| surface_tint(env, c))
+        .map(|bg| readable_name(color, bg, p.ink))
+        .unwrap_or(color);
     let mut format = match level {
         // the far pill's name is a regular weight
         Level::Far => TextFormat::simple(FontId::proportional(m.name_pt), color),
@@ -416,8 +420,12 @@ fn background(env: &Env<'_>, rect: Rect, st: &State, alpha: f32, far: f32, c: &C
     if st.glass > 0.0 {
         // inside the antialiased edge of the surface, which hides the blur's own
         let radius = rect.height() * 0.5 - 0.5;
-        env.painter
-            .add(aurora_render::glass_region(rect.shrink(0.5), radius, st.glass * alpha * env.plate_surface_opacity, GLASS_SHADE));
+        env.painter.add(aurora_render::glass_region(
+            rect.shrink(0.5),
+            radius,
+            st.glass * alpha * env.plate_surface_opacity,
+            GLASS_SHADE,
+        ));
     }
     let key = SurfaceKey {
         tint: env.plate_tint_override.or_else(|| surface_tint(env, c)).unwrap_or(env.tint),
