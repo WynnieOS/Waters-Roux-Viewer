@@ -77,10 +77,20 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
         egui::pos2(screen.right() - 440.0, screen.top() + 90.0),
         Vec2::new(400.0, 460.0),
     )
-    .auto_height()
+    // PhotoTools has expandable sections and two tabs. Auto-sizing its height
+    // on every frame causes repeated layout changes as the resident works.
+    // Keep an independently resizable, persistent floater instead.
+    .steady_size()
     .show(ctx, p, &mut open, |ui| {
         widgets::tabs(ui, p, &mut tab, &[("Photo & Light", true), ("Photo Camera", true)]);
         widgets::divider(ui, p);
+        // The content can be much taller than the floater when controls
+        // expand; scroll within its stable viewport rather than moving or
+        // growing the entire window each frame.
+        egui::ScrollArea::vertical()
+            .id_salt("waters-roux-phototools-content-scroll")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
         if tab == 0 {
             ui.label("Live world lighting and render adjustments");
             changed |= widgets::switch_labeled(ui, p, &mut settings.hdr_emissive, "HDR / Emissive").changed();
@@ -370,6 +380,7 @@ pub fn show(ctx: &Context, p: &Palette, panels: &mut Panels, settings: &mut Sett
                 }
             });
         }
+            });
     });
     ctx.data_mut(|d| d.insert_temp(preset_name_id, preset_name));
     panels.photo_tools = open;
