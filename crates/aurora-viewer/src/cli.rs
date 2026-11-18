@@ -205,6 +205,13 @@ pub fn window_title() -> String {
     title_with(get().title.as_deref(), env!("AURORA_BUILD_PROFILE"), aurora_version::version())
 }
 
+/// Human-readable product identity selected by the Waters Roux packaging job.
+/// The semver/Git revision stays separate for network protocols, updates and diagnostics.
+/// Unlabeled developer builds must never masquerade as an approved beta or release.
+pub fn viewer_release_label() -> &'static str {
+    option_env!("WATERS_ROUX_RELEASE_LABEL").unwrap_or("Development build")
+}
+
 /// The viewer's identity on the Linux desktop: Wayland app_id, X11
 /// WM_CLASS, and the name of `packaging/linux/aurora-viewer.desktop`, whose
 /// `StartupWMClass` repeats it. The panel and the dock match the window to
@@ -229,11 +236,17 @@ pub fn with_desktop_id(attrs: winit::window::WindowAttributes) -> winit::window:
 }
 
 fn title_with(title: Option<&str>, profile_dir: &str, version: &str) -> String {
+    // Keep the source version out of the primary window title: it may be a
+    // long Git identifier such as 0.0.0+1929.ged1ae753f.
+    let _ = version; // Retained for callers that still supply a diagnostic version.
+    let release = viewer_release_label();
     let base = match title {
-        Some(t) => format!("Waters Roux Viewer — Beta 27 {version} - {t}"),
-        None => format!("Waters Roux Viewer — Beta 27 {version}"),
+        Some(t) => format!("Waters Roux Viewer — {release} - {t}"),
+        None => format!("Waters Roux Viewer — {release}"),
     };
     match profile_label(profile_dir) {
+        // "release" is a compiler optimization profile, not official product status.
+        Some("Release") => format!("{base} (Optimized)"),
         Some(p) => format!("{base} ({p})"),
         None => base,
     }
@@ -296,18 +309,28 @@ mod tests {
     }
 
     #[test]
-    fn title_ends_with_the_build_profile() {
+    fn title_uses_packaged_product_label_without_raw_git_version() {
+        let label = viewer_release_label();
         assert_eq!(
             title_with(Some("Test ombres"), "debug", "0.2.0"),
-            "Waters Roux Viewer — Beta 27 0.2.0 - Test ombres (Dev)"
+            format!("Waters Roux Viewer — {label} - Test ombres (Dev)")
         );
-        assert_eq!(title_with(None, "release", "0.2.0"), "Waters Roux Viewer — Beta 27 0.2.0 (Release)");
-        assert_eq!(title_with(None, "debugging", "0.2.0"), "Waters Roux Viewer — Beta 27 0.2.0 (Debug)");
-        assert_eq!(title_with(Some("X"), "unknown", "0.2.0"), "Waters Roux Viewer — Beta 27 0.2.0 - X");
         assert_eq!(
-            title_with(None, "debug", "0.2.0+7.gabcdef123"),
-            "Waters Roux Viewer — Beta 27 0.2.0+7.gabcdef123 (Dev)"
+            title_with(None, "release", "0.2.0"),
+            format!("Waters Roux Viewer — {label} (Optimized)")
         );
+        assert_eq!(
+            title_with(None, "debugging", "0.2.0"),
+            format!("Waters Roux Viewer — {label} (Debug)")
+        );
+        assert_eq!(
+            title_with(Some("X"), "unknown", "0.2.0"),
+            format!("Waters Roux Viewer — {label} - X")
+        );
+        let title = title_with(None, "debug", "0.0.0+1929.ged1ae753f");
+        assert_eq!(title, format!("Waters Roux Viewer — {label} (Dev)"));
+        assert!(!title.contains("0.0.0+"));
+        assert!(!title.contains("Beta 27 0."));
     }
 
     #[test]
