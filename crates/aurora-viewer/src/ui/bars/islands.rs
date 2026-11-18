@@ -1114,11 +1114,11 @@ mod tests {
 
     #[test]
     fn glass_islands_menu_uses_the_embedded_waters_roux_fleur_de_lis() {
-        assert_eq!(super::WATERS_ROUX_MENU_ICON, "fleur-de-lis");
+        assert_eq!(super::super::WATERS_ROUX_MENU_ICON, "fleur-de-lis");
         let context = egui::Context::default();
         let icons = Icons::load(&context, None);
         assert!(
-            icons.get(super::WATERS_ROUX_MENU_ICON).is_some(),
+            icons.get(super::super::WATERS_ROUX_MENU_ICON).is_some(),
             "Both navigation layouts need a real embedded fleur-de-lis icon"
         );
     }
