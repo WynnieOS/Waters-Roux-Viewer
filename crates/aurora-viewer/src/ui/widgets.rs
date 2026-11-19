@@ -3217,8 +3217,8 @@ mod spinner_repeat_tests {
     #[test]
     fn a_held_step_button_continues_past_three_increments() {
         let ctx = egui::Context::default();
-        let mut total = 0_i32;
-        let mut frame = |time: f64, events: Vec<egui::Event>| {
+        let total = std::cell::Cell::new(0_i32);
+        let frame = |time: f64, events: Vec<egui::Event>| {
             let mut output = ctx.run_ui(
                 egui::RawInput {
                     time: Some(time),
@@ -3227,7 +3227,7 @@ mod spinner_repeat_tests {
                     ..Default::default()
                 },
                 |ui| {
-                    total += i32::from(step_buttons(ui, 26.0));
+                    total.set(total.get() + i32::from(step_buttons(ui, 26.0)));
                 },
             );
             output.textures_delta.clear();
@@ -3247,10 +3247,10 @@ mod spinner_repeat_tests {
         for count in 1..=100 {
             frame(0.10 + count as f64 / 60.0, vec![]);
         }
-        assert!(total >= 7, "hold must not stall after a few increments: {total}");
-        let while_held = total;
+        assert!(total.get() >= 7, "hold must not stall after a few increments: {}", total.get());
+        let while_held = total.get();
         frame(1.80, vec![press(false)]);
-        assert_eq!(total, while_held, "release after repeat must not double-step");
+        assert_eq!(total.get(), while_held, "release after repeat must not double-step");
     }
 }
 
