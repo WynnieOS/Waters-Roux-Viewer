@@ -21,6 +21,10 @@ if (-not (Test-Path -LiteralPath $oldBinary -PathType Leaf)) {
     throw 'Base package did not include the expected Linux executable'
 }
 Move-Item -LiteralPath $oldBinary -Destination $newBinary -ErrorAction Stop
+if ($IsLinux) {
+    & chmod +x $newBinary
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot preserve Linux executable permissions' }
+}
 
 # Do not distribute a contradictory Aurora desktop entry beside Waters Roux.
 foreach ($old in @('aurora-viewer.desktop', 'aurora-viewer.svg')) {
