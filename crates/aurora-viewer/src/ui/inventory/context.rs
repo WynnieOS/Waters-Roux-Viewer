@@ -682,7 +682,7 @@ mod tests {
             let pos = output
                 .shapes
                 .iter()
-                .find_map(|s| text_position(&s.shape, aurora_i18n::tr!("ui-inventory-context-show-in-a-new-window")))
+                .find_map(|s| text_position(&s.shape, aurora_i18n::tr!("ui-inventory-context-open-in-a-new-window")))
                 .expect("folder window option")
                 + egui::vec2(4.0, 4.0);
             for pressed in [true, false] {

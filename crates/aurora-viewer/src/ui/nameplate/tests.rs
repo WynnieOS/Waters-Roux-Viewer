@@ -115,7 +115,15 @@ fn frame(ctx: &egui::Context, plates: &mut Plates, tags: &[Tag<'_>], now: f64) -
         },
         |ui| {
             let painter = ui.ctx().layer_painter(egui::LayerId::background());
-            plates.paint(&painter, &p, &icons, tags, now, |id, rect, _| rects.push((id, rect)));
+            plates.paint(
+                &painter,
+                &p,
+                &icons,
+                tags,
+                now,
+                &crate::ui::name_tag_studio::Style::default(),
+                |id, rect, _| rects.push((id, rect)),
+            );
         },
     );
     output.textures_delta.clear();
@@ -926,16 +934,24 @@ fn a_plate_and_its_hit_rect_keep_the_world_anchor_through_pending_ui_zoom() {
                 };
                 let painter = crate::ui::hud::world_painter(ui.ctx());
                 let mut shown = false;
-                plates.paint(&painter, &p, &icons, &[current], 1.0, |_, rect, _| {
-                    shown = true;
-                    let anchor = rect.center_bottom() * ui.ctx().pixels_per_point();
-                    // Only the plate's intentional whole-pixel alignment may
-                    // offset its anchor, never the previous frame's zoom.
-                    assert!(
-                        anchor.distance(Pos2::new(600.0, 210.0)) < 0.75,
-                        "{native} DPI / {zoom} zoom: {anchor:?}"
-                    );
-                });
+                plates.paint(
+                    &painter,
+                    &p,
+                    &icons,
+                    &[current],
+                    1.0,
+                    &crate::ui::name_tag_studio::Style::default(),
+                    |_, rect, _| {
+                        shown = true;
+                        let anchor = rect.center_bottom() * ui.ctx().pixels_per_point();
+                        // Only the plate's intentional whole-pixel alignment may
+                        // offset its anchor, never the previous frame's zoom.
+                        assert!(
+                            anchor.distance(Pos2::new(600.0, 210.0)) < 0.75,
+                            "{native} DPI / {zoom} zoom: {anchor:?}"
+                        );
+                    },
+                );
                 assert!(shown, "the plate and its hit rectangle are drawn");
             });
             output.textures_delta.clear();

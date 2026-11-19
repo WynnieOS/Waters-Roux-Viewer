@@ -835,7 +835,7 @@ pub fn draw(
         } else {
             plate_tags.iter().map(|t| (t.id, t.fade)).collect()
         };
-        plates.paint(&painter, p, icons, &plate_tags, now_s, |id, rect, at| {
+        plates.paint(&painter, p, icons, &plate_tags, now_s, &settings.name_tag_style, |id, rect, at| {
             // right after its plate, before the nearer ones
             if let Some(b) = plate_bubbles.get(&id) {
                 let top = Pos2::new(rect.center().x, rect.bottom() + super::chat_bubbles::GAP);

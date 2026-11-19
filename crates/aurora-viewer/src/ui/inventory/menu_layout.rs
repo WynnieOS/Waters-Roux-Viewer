@@ -183,7 +183,6 @@ impl Default for Profile {
                             "reload",
                             "clean-broken-links",
                             "show-main",
-                            "show-window",
                             "open-window",
                             "open-current",
                             "separator:purge",
