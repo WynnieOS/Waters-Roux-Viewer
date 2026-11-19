@@ -267,6 +267,9 @@ pub(crate) fn step_buttons(ui: &mut egui::Ui, height: f32) -> i8 {
             (-1, "caret-down-filled", aurora_i18n::tr!("numeric-decrease")),
         ] {
             let (rect, response) = ui.allocate_exact_size(Vec2::new(13.0, height * 0.5), Sense::click());
+            #[cfg(test)]
+            ui.ctx()
+                .data_mut(|d| d.insert_temp(egui::Id::unique(("waters_roux_spinner_arrow_rect", direction)), rect));
             let visuals = ui.style().interact(&response);
             ui.painter().rect_filled(rect, visuals.corner_radius, visuals.bg_fill);
             if let Some(icon) = super::icons::global(name) {
@@ -3209,6 +3212,45 @@ mod spinner_repeat_tests {
         };
         assert!(!step_due(repeated, at + 0.40));
         assert!(step_due(repeated, at + SPINNER_HOLD_DELAY + SPINNER_REPEAT_INTERVAL + 0.01));
+    }
+
+    #[test]
+    fn a_held_step_button_continues_past_three_increments() {
+        let ctx = egui::Context::default();
+        let mut total = 0_i32;
+        let mut frame = |time: f64, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    time: Some(time),
+                    events,
+                    screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, Vec2::new(800.0, 600.0))),
+                    ..Default::default()
+                },
+                |ui| {
+                    total += i32::from(step_buttons(ui, 26.0));
+                },
+            );
+            output.textures_delta.clear();
+        };
+        frame(0.0, vec![]);
+        let arrow = ctx
+            .data(|d| d.get_temp::<egui::Rect>(egui::Id::unique(("waters_roux_spinner_arrow_rect", 1))))
+            .expect("up arrow rendered")
+            .center();
+        let press = |pressed| egui::Event::PointerButton {
+            pos: arrow,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Default::default(),
+        };
+        frame(0.10, vec![egui::Event::PointerMoved(arrow), press(true)]);
+        for count in 1..=100 {
+            frame(0.10 + count as f64 / 60.0, vec![]);
+        }
+        assert!(total >= 7, "hold must not stall after a few increments: {total}");
+        let while_held = total;
+        frame(1.80, vec![press(false)]);
+        assert_eq!(total, while_held, "release after repeat must not double-step");
     }
 }
 
