@@ -301,7 +301,7 @@ impl EnvironmentUi {
                     .size(11.5)
                     .color(p.muted),
             );
-            ui.separator();
+            widgets::divider(ui, p);
             egui::ScrollArea::vertical()
                 .id_salt("waters_roux_personal_lighting_controls")
                 .auto_shrink([false, false])
