@@ -4,7 +4,7 @@ name: Waters Roux V3 - branded Linux package QA
 # depends on the inherited macOS CI result.
 on:
   push:
-    branches: [fix/waters-roux-v3-linux-branded-package, integrate/waters-roux-v3-post-audit-with-linux]
+    branches: [fix/waters-roux-v3-linux-branded-package, integrate/waters-roux-v3-post-audit-with-linux, integrate/waters-roux-v3-linux-lighting-spinner]
   pull_request:
     branches: [waters-roux-v3-unified-review, integrate/waters-roux-v3-post-audit-77-78-79]
     paths:
@@ -36,8 +36,10 @@ jobs:
           fetch-depth: 0
       - name: Native Linux build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
+          # Ubuntu mirrors sometimes return transient HTTP 503 errors;
+          # retry failed downloads without hiding genuine dependency failures.
+          sudo apt-get -o Acquire::Retries=5 update
+          sudo apt-get -o Acquire::Retries=5 install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
       - name: Stable Rust
         run: |
           rustup update stable --no-self-update

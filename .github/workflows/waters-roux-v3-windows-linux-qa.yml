@@ -6,7 +6,7 @@ name: Waters Roux V3 - Windows and Linux source readiness
 # inherited Aurora CI workflows / third-party license notices.
 on:
   push:
-    branches: [fix/waters-roux-v3-windows-linux-qa]
+    branches: [fix/waters-roux-v3-windows-linux-qa, integrate/waters-roux-v3-linux-lighting-spinner]
   pull_request:
     branches: [waters-roux-v3-unified-review]
   workflow_dispatch:
@@ -56,8 +56,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Linux system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
+          # Ubuntu mirrors sometimes return transient HTTP 503 errors;
+          # retry failed downloads without hiding genuine dependency failures.
+          sudo apt-get -o Acquire::Retries=5 update
+          sudo apt-get -o Acquire::Retries=5 install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
       - name: Set up Rust
         run: |
           rustup update stable --no-self-update
