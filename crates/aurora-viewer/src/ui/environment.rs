@@ -308,129 +308,129 @@ impl EnvironmentUi {
                 .show(ui, |ui| {
                     match self.lighting_tab {
                         0 => {
-                    section(ui, p, aurora_i18n::tr!("ui-environment-sky"));
-                    egui::Grid::new("personal_lighting_colors")
-                        .num_columns(4)
-                        .spacing(Vec2::new(8.0, 4.0))
-                        .show(ui, |ui| {
-                            color(ui, p, aurora_i18n::tr!("common-ambient"), &mut s.ambient, SLIDER_SCALE_SUN_AMBIENT);
-                            color(
+                            section(ui, p, aurora_i18n::tr!("ui-environment-sky"));
+                            egui::Grid::new("personal_lighting_colors")
+                                .num_columns(4)
+                                .spacing(Vec2::new(8.0, 4.0))
+                                .show(ui, |ui| {
+                                    color(ui, p, aurora_i18n::tr!("common-ambient"), &mut s.ambient, SLIDER_SCALE_SUN_AMBIENT);
+                                    color(
+                                        ui,
+                                        p,
+                                        aurora_i18n::tr!("ui-environment-sun"),
+                                        &mut s.sunlight,
+                                        SLIDER_SCALE_SUN_AMBIENT,
+                                    );
+                                    ui.end_row();
+                                    color(
+                                        ui,
+                                        p,
+                                        aurora_i18n::tr!("ui-environment-blue-horizon"),
+                                        &mut s.blue_horizon,
+                                        SLIDER_SCALE_BLUE_HORIZON_DENSITY,
+                                    );
+                                    color(
+                                        ui,
+                                        p,
+                                        aurora_i18n::tr!("ui-environment-blue-density"),
+                                        &mut s.blue_density,
+                                        SLIDER_SCALE_BLUE_HORIZON_DENSITY,
+                                    );
+                                    ui.end_row();
+                                    color(ui, p, aurora_i18n::tr!("ui-environment-clouds"), &mut s.cloud_color, 1.0);
+                                    ui.end_row();
+                                });
+                            slider(
                                 ui,
                                 p,
-                                aurora_i18n::tr!("ui-environment-sun"),
-                                &mut s.sunlight,
-                                SLIDER_SCALE_SUN_AMBIENT,
+                                aurora_i18n::tr!("ui-environment-haze-horizon"),
+                                &mut s.haze_horizon,
+                                0.0..=5.0,
                             );
-                            ui.end_row();
-                            color(
+                            slider(
                                 ui,
                                 p,
-                                aurora_i18n::tr!("ui-environment-blue-horizon"),
-                                &mut s.blue_horizon,
-                                SLIDER_SCALE_BLUE_HORIZON_DENSITY,
+                                aurora_i18n::tr!("ui-environment-haze-density"),
+                                &mut s.haze_density,
+                                0.0..=5.0,
                             );
-                            color(
+                            slider(
                                 ui,
                                 p,
-                                aurora_i18n::tr!("ui-environment-blue-density"),
-                                &mut s.blue_density,
-                                SLIDER_SCALE_BLUE_HORIZON_DENSITY,
+                                aurora_i18n::tr!("ui-environment-cloud-coverage"),
+                                &mut s.cloud_shadow,
+                                0.0..=1.0,
                             );
-                            ui.end_row();
-                            color(ui, p, aurora_i18n::tr!("ui-environment-clouds"), &mut s.cloud_color, 1.0);
-                            ui.end_row();
-                        });
-                    slider(
-                        ui,
-                        p,
-                        aurora_i18n::tr!("ui-environment-haze-horizon"),
-                        &mut s.haze_horizon,
-                        0.0..=5.0,
-                    );
-                    slider(
-                        ui,
-                        p,
-                        aurora_i18n::tr!("ui-environment-haze-density"),
-                        &mut s.haze_density,
-                        0.0..=5.0,
-                    );
-                    slider(
-                        ui,
-                        p,
-                        aurora_i18n::tr!("ui-environment-cloud-coverage"),
-                        &mut s.cloud_shadow,
-                        0.0..=1.0,
-                    );
-                    slider(ui, p, aurora_i18n::tr!("ui-environment-cloud-size"), &mut s.cloud_scale, 0.01..=3.0);
-                    let mut ambiance = s.probe_ambiance;
-                    if slider(ui, p, aurora_i18n::tr!("ui-environment-probe-ambiance"), &mut ambiance, 0.0..=10.0)
-                        .on_hover_text(aurora_i18n::tr!(
-                            "ui-environment-intensity-of-indirect-environment-lighting-at-zero-hdr-scale"
-                        ))
-                        .changed()
-                    {
-                        // setReflectionProbeAmbiance: the sky is no longer "classic"
-                        s.probe_ambiance = ambiance;
-                        s.can_auto_adjust = false;
-                    }
-                    // updateGammaLabel
-                    let hdr = s.probe_ambiance != 0.0;
-                    let r = slider(
-                        ui,
-                        p,
-                        if hdr {
-                            aurora_i18n::tr!("ui-environment-hdr-scale")
-                        } else {
-                            aurora_i18n::tr!("common-brightness")
-                        },
-                        &mut s.gamma,
-                        0.0..=20.0,
-                    );
-                    if hdr {
-                        r.on_hover_text(aurora_i18n::tr!(
-                            "ui-environment-intensity-of-lighting-effects-such-as-realistic-bright-skies"
-                        ));
-                    }
+                            slider(ui, p, aurora_i18n::tr!("ui-environment-cloud-size"), &mut s.cloud_scale, 0.01..=3.0);
+                            let mut ambiance = s.probe_ambiance;
+                            if slider(ui, p, aurora_i18n::tr!("ui-environment-probe-ambiance"), &mut ambiance, 0.0..=10.0)
+                                .on_hover_text(aurora_i18n::tr!(
+                                    "ui-environment-intensity-of-indirect-environment-lighting-at-zero-hdr-scale"
+                                ))
+                                .changed()
+                            {
+                                // setReflectionProbeAmbiance: the sky is no longer "classic"
+                                s.probe_ambiance = ambiance;
+                                s.can_auto_adjust = false;
+                            }
+                            // updateGammaLabel
+                            let hdr = s.probe_ambiance != 0.0;
+                            let r = slider(
+                                ui,
+                                p,
+                                if hdr {
+                                    aurora_i18n::tr!("ui-environment-hdr-scale")
+                                } else {
+                                    aurora_i18n::tr!("common-brightness")
+                                },
+                                &mut s.gamma,
+                                0.0..=20.0,
+                            );
+                            if hdr {
+                                r.on_hover_text(aurora_i18n::tr!(
+                                    "ui-environment-intensity-of-lighting-effects-such-as-realistic-bright-skies"
+                                ));
+                            }
                         }
                         1 => {
-                    section(ui, p, aurora_i18n::tr!("ui-environment-sun"));
-                    // floater_adjust_environment's sunbeacon / moonbeacon
-                    widgets::checkbox(ui, p, &mut self.beacons[0], aurora_i18n::tr!("ui-env-editor-sun-beacon"));
-                    let (mut az, mut el) = azimuth_elevation(s.sun_rotation);
-                    let a = slider(ui, p, aurora_i18n::tr!("ui-environment-azimuth"), &mut az, 0.0..=359.99).changed();
-                    let e = slider(ui, p, aurora_i18n::tr!("ui-environment-elevation"), &mut el, -90.0..=90.0).changed();
-                    if a || e {
-                        s.sun_rotation = rotation_from(az, el);
-                    }
-                    slider(ui, p, aurora_i18n::tr!("common-scale"), &mut s.sun_scale, 0.25..=20.0);
-                    // glow: 40..0.2 shown as 0..1.99 (size), focus scaled by -5
-                    let mut focus = s.glow.z / SLIDER_SCALE_GLOW_B;
-                    let mut size = 2.0 - s.glow.x / SLIDER_SCALE_GLOW_R;
-                    let f = slider(ui, p, aurora_i18n::tr!("ui-environment-glare-sharpness"), &mut focus, -2.0..=2.0).changed();
-                    let z = slider(ui, p, aurora_i18n::tr!("ui-environment-glow-size"), &mut size, 0.0..=1.99).changed();
-                    if f || z {
-                        s.glow = Vec3::new((2.0 - size) * SLIDER_SCALE_GLOW_R, 0.0, focus * SLIDER_SCALE_GLOW_B);
-                    }
-                    slider(
-                        ui,
-                        p,
-                        aurora_i18n::tr!("ui-environment-star-brightness"),
-                        &mut s.star_brightness,
-                        0.0..=500.0,
-                    );
+                            section(ui, p, aurora_i18n::tr!("ui-environment-sun"));
+                            // floater_adjust_environment's sunbeacon / moonbeacon
+                            widgets::checkbox(ui, p, &mut self.beacons[0], aurora_i18n::tr!("ui-env-editor-sun-beacon"));
+                            let (mut az, mut el) = azimuth_elevation(s.sun_rotation);
+                            let a = slider(ui, p, aurora_i18n::tr!("ui-environment-azimuth"), &mut az, 0.0..=359.99).changed();
+                            let e = slider(ui, p, aurora_i18n::tr!("ui-environment-elevation"), &mut el, -90.0..=90.0).changed();
+                            if a || e {
+                                s.sun_rotation = rotation_from(az, el);
+                            }
+                            slider(ui, p, aurora_i18n::tr!("common-scale"), &mut s.sun_scale, 0.25..=20.0);
+                            // glow: 40..0.2 shown as 0..1.99 (size), focus scaled by -5
+                            let mut focus = s.glow.z / SLIDER_SCALE_GLOW_B;
+                            let mut size = 2.0 - s.glow.x / SLIDER_SCALE_GLOW_R;
+                            let f = slider(ui, p, aurora_i18n::tr!("ui-environment-glare-sharpness"), &mut focus, -2.0..=2.0).changed();
+                            let z = slider(ui, p, aurora_i18n::tr!("ui-environment-glow-size"), &mut size, 0.0..=1.99).changed();
+                            if f || z {
+                                s.glow = Vec3::new((2.0 - size) * SLIDER_SCALE_GLOW_R, 0.0, focus * SLIDER_SCALE_GLOW_B);
+                            }
+                            slider(
+                                ui,
+                                p,
+                                aurora_i18n::tr!("ui-environment-star-brightness"),
+                                &mut s.star_brightness,
+                                0.0..=500.0,
+                            );
                         }
                         _ => {
-                    section(ui, p, aurora_i18n::tr!("ui-environment-moon"));
-                    widgets::checkbox(ui, p, &mut self.beacons[1], aurora_i18n::tr!("ui-env-editor-moon-beacon"));
-                    let (mut az, mut el) = azimuth_elevation(s.moon_rotation);
-                    let a = slider(ui, p, aurora_i18n::tr!("ui-environment-azimuth"), &mut az, 0.0..=359.99).changed();
-                    let e = slider(ui, p, aurora_i18n::tr!("ui-environment-elevation"), &mut el, -90.0..=90.0).changed();
-                    if a || e {
-                        s.moon_rotation = rotation_from(az, el);
-                    }
-                    if let Some(night) = &mut self.night {
-                        night_sky_rows(ui, p, night);
-                    }
+                            section(ui, p, aurora_i18n::tr!("ui-environment-moon"));
+                            widgets::checkbox(ui, p, &mut self.beacons[1], aurora_i18n::tr!("ui-env-editor-moon-beacon"));
+                            let (mut az, mut el) = azimuth_elevation(s.moon_rotation);
+                            let a = slider(ui, p, aurora_i18n::tr!("ui-environment-azimuth"), &mut az, 0.0..=359.99).changed();
+                            let e = slider(ui, p, aurora_i18n::tr!("ui-environment-elevation"), &mut el, -90.0..=90.0).changed();
+                            if a || e {
+                                s.moon_rotation = rotation_from(az, el);
+                            }
+                            if let Some(night) = &mut self.night {
+                                night_sky_rows(ui, p, night);
+                            }
                         }
                     }
                 });
