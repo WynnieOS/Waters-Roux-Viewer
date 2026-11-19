@@ -6,7 +6,7 @@ name: Waters Roux V3 - Windows and Linux source readiness
 # inherited Aurora CI workflows / third-party license notices.
 on:
   push:
-    branches: [fix/waters-roux-v3-windows-linux-qa]
+    branches: [fix/waters-roux-v3-windows-linux-qa, integrate/waters-roux-v3-linux-lighting-spinner]
   pull_request:
     branches: [waters-roux-v3-unified-review]
   workflow_dispatch:
