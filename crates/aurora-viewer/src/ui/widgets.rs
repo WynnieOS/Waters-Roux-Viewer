@@ -284,8 +284,18 @@ pub(crate) fn step_buttons(ui: &mut egui::Ui, height: f32) -> i8 {
             let response = response.on_hover_text(label);
             let key = response.id.with("waters_roux_spinner_hold");
             let now = ui.input(|input| input.time);
-            let held = ui.is_enabled() && response.is_pointer_button_down_on();
             let previous = ui.data(|data| data.get_temp::<StepHold>(key));
+            // egui's response capture can stop reporting "button down on"
+            // during a long press, although the physical primary button stays
+            // down. Continue a press that began on this caret while the
+            // pointer remains over it; never start repeating a drag-in from
+            // another widget.
+            let still_pressed_here = ui.input(|input| {
+                input.pointer.primary_down()
+                    && input.pointer.latest_pos().is_some_and(|pos| rect.contains(pos))
+            });
+            let held = ui.is_enabled()
+                && (response.is_pointer_button_down_on() || (previous.is_some() && still_pressed_here));
             if held {
                 let mut state = previous.unwrap_or(StepHold {
                     started: now,
