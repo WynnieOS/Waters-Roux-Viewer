@@ -4,7 +4,7 @@ name: Waters Roux V3 - branded Linux package QA
 # depends on the inherited macOS CI result.
 on:
   push:
-    branches: [fix/waters-roux-v3-linux-branded-package, integrate/waters-roux-v3-post-audit-with-linux]
+    branches: [fix/waters-roux-v3-linux-branded-package, integrate/waters-roux-v3-post-audit-with-linux, integrate/waters-roux-v3-linux-lighting-spinner]
   pull_request:
     branches: [waters-roux-v3-unified-review, integrate/waters-roux-v3-post-audit-77-78-79]
     paths:
