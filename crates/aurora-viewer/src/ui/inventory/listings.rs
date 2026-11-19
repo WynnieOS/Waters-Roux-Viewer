@@ -47,7 +47,7 @@ pub(super) fn restrict(c: &mut context_catalog::Catalog, inv: &Inventory, id: Uu
                     | "replace-links"
                     | "protect-folder"
                     | "reload"
-                    | "show-window"
+                    | "open-window"
                     | "delete"
                     | "copy-name"
                     | "folder-uuid"
@@ -221,7 +221,7 @@ mod tests {
                     .any(|entry| ["share", "marketplace-copy", "marketplace-move"].contains(&entry.id.as_str()))
             );
             if inv.folders.contains_key(&id) {
-                for key in ["protect-folder", "reload", "show-window"] {
+                for key in ["protect-folder", "reload", "open-window"] {
                     assert!(catalog.entries.iter().any(|entry| entry.id == key && entry.enabled), "{id}: {key}");
                 }
                 assert_eq!(
@@ -304,7 +304,7 @@ mod tests {
             assert!(enabled(item, key), "{key}");
         }
         execute("protect-folder", demo::HOODIE, &inv, &mut state, &mut prefs);
-        execute("show-window", demo::HOODIE, &inv, &mut state, &mut prefs);
+        execute("open-window", demo::HOODIE, &inv, &mut state, &mut prefs);
         assert!(state.windows.iter().any(|window| window.root == demo::HOODIE && window.open));
         assert!(
             matches!(execute("reload", demo::HOODIE, &inv, &mut state, &mut prefs).as_slice(), [InvAction::Preview(id)] if *id == demo::HOODIE)
