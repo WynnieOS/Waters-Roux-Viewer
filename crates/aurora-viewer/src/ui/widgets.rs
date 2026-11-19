@@ -290,12 +290,9 @@ pub(crate) fn step_buttons(ui: &mut egui::Ui, height: f32) -> i8 {
             // down. Continue a press that began on this caret while the
             // pointer remains over it; never start repeating a drag-in from
             // another widget.
-            let still_pressed_here = ui.input(|input| {
-                input.pointer.primary_down()
-                    && input.pointer.latest_pos().is_some_and(|pos| rect.contains(pos))
-            });
-            let held = ui.is_enabled()
-                && (response.is_pointer_button_down_on() || (previous.is_some() && still_pressed_here));
+            let still_pressed_here =
+                ui.input(|input| input.pointer.primary_down() && input.pointer.latest_pos().is_some_and(|pos| rect.contains(pos)));
+            let held = ui.is_enabled() && (response.is_pointer_button_down_on() || (previous.is_some() && still_pressed_here));
             if held {
                 let mut state = previous.unwrap_or(StepHold {
                     started: now,
