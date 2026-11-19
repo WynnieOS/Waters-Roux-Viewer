@@ -1558,13 +1558,7 @@ mod tests {
         let root: Vec<_> = c.entries.iter().filter(|e| e.zone == TEXT).map(|e| e.id.as_str()).collect();
         assert_eq!(
             root,
-            [
-                "empty-trash",
-                "image",
-                "separator:folder-navigation",
-                "reload",
-                "open-window"
-            ]
+            ["empty-trash", "image", "separator:folder-navigation", "reload", "open-window"]
         );
         assert!(c.entries.iter().filter(|e| e.zone == "top").all(|e| e.id == "new" && !e.enabled));
         assert_eq!(
