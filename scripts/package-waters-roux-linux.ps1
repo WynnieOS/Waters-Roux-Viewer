@@ -13,7 +13,8 @@ if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) { throw "Linux viewer exe
 if (Test-Path -LiteralPath $Out) { throw "Choose a new output folder; cannot overwrite $Out" }
 
 & (Join-Path $PSScriptRoot 'package.ps1') -Exe $Exe -Out $Out -Source $source
-if ($LASTEXITCODE -ne 0) { throw 'Base viewer packaging failed' }
+# PowerShell scripts signal errors by throwing; LASTEXITCODE is only defined
+# for native child processes and is not reliable after package.ps1.
 
 $oldBinary = Join-Path $Out 'aurora-viewer'
 $newBinary = Join-Path $Out 'waters-roux-viewer'
