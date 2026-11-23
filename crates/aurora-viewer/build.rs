@@ -92,8 +92,8 @@ fn windows_resources() {
         Path::new(&manifest).join("../../assets/branding").display()
     );
 
-    let display = std::env::var("DEP_AURORA_VERSION_PRODUCT_DISPLAY")
-        .expect("aurora-version's build script supplies Waters Roux product version");
+    let display =
+        std::env::var("DEP_AURORA_VERSION_PRODUCT_DISPLAY").expect("aurora-version's build script supplies Waters Roux product version");
     let numeric = std::env::var("DEP_AURORA_VERSION_PRODUCT_NUMERIC")
         .expect("aurora-version's build script supplies Waters Roux numeric product version");
     // "major.minor.patch.distance" packed as four 16-bit fields

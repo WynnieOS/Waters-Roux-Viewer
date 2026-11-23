@@ -75,8 +75,8 @@ fn main() {
     // Waters Roux has its own public-facing version. Aurora's version/login
     // protocol remains unchanged until networking and updater migration are audited.
     // Only a dedicated Waters Roux release tag may identify a stable v1.0 build.
-    let waters_release = git(&root, &["tag", "--points-at", "HEAD"])
-        .is_some_and(|tags| tags.lines().any(|tag| tag == "waters-roux-v1.0.0"));
+    let waters_release =
+        git(&root, &["tag", "--points-at", "HEAD"]).is_some_and(|tags| tags.lines().any(|tag| tag == "waters-roux-v1.0.0"));
     let waters_display = if waters_release {
         "1.0.0".to_owned()
     } else {

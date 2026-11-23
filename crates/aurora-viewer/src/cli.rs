@@ -86,7 +86,10 @@ pub fn get() -> &'static Cli {
             std::process::exit(0);
         }
         if cli.version {
-            println!("{}", aurora_i18n::tr!("common-aurora-viewer", value0 = aurora_version::product_version()));
+            println!(
+                "{}",
+                aurora_i18n::tr!("common-aurora-viewer", value0 = aurora_version::product_version())
+            );
             std::process::exit(0);
         }
         cli
@@ -202,7 +205,11 @@ fn parse_fps_limit(value: &str) -> Option<u32> {
 /// The window title, ending with the build profile ("(Dev)", "(Release)",
 /// "(Debug)"): test windows of different builds can be told apart.
 pub fn window_title() -> String {
-    title_with(get().title.as_deref(), env!("AURORA_BUILD_PROFILE"), aurora_version::product_version())
+    title_with(
+        get().title.as_deref(),
+        env!("AURORA_BUILD_PROFILE"),
+        aurora_version::product_version(),
+    )
 }
 
 /// The viewer's identity on the Linux desktop: Wayland app_id, X11
