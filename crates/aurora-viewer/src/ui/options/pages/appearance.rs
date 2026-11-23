@@ -66,20 +66,25 @@ fn interface_colors(cx: &mut Cx) {
         // Presets use the same persisted colour overrides as the existing
         // custom swatches. Choosing one never edits the resident's skin files
         // or her independently saved login/background artwork.
-        cx.row("Waters Roux palettes", "Live preview; automatically saved with your interface settings", &Nothing, |ui, settings| {
-            let mut changed = false;
-            ui.horizontal_wrapped(|ui| {
-                for name in ["Bayou Glass", "Blood Moon", "Moss & Gold", "Creole Rose"] {
-                    let colors = waters_roux_preset(name);
-                    let selected = settings.interface_colors == colors;
-                    if ui.selectable_label(selected, name).clicked() && !selected {
-                        settings.interface_colors = colors;
-                        changed = true;
+        cx.row(
+            "Waters Roux palettes",
+            "Live preview; automatically saved with your interface settings",
+            &Nothing,
+            |ui, settings| {
+                let mut changed = false;
+                ui.horizontal_wrapped(|ui| {
+                    for name in ["Bayou Glass", "Blood Moon", "Moss & Gold", "Creole Rose"] {
+                        let colors = waters_roux_preset(name);
+                        let selected = settings.interface_colors == colors;
+                        if ui.selectable_label(selected, name).clicked() && !selected {
+                            settings.interface_colors = colors;
+                            changed = true;
+                        }
                     }
-                }
-            });
-            changed
-        });
+                });
+                changed
+            },
+        );
         cx.note("Choose a palette above or customize each color and glass opacity below.");
         base_color(
             cx,
@@ -150,7 +155,6 @@ fn interface_colors(cx: &mut Cx) {
         }
     });
 }
-
 
 /// Curated, readable Waters Roux palettes. Existing per-color preferences and
 /// WCAG contrast adjustment continue to apply after a preset is selected.

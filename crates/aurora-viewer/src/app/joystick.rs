@@ -25,7 +25,10 @@ impl App {
         if !self.joystick.active {
             return;
         }
-        let elapsed = self.joystick.flycam_started.map_or(std::time::Duration::ZERO, |started| started.elapsed());
+        let elapsed = self
+            .joystick
+            .flycam_started
+            .map_or(std::time::Duration::ZERO, |started| started.elapsed());
         if !self.settings.joystick.banner_mode().shown(elapsed) {
             return;
         }
