@@ -182,23 +182,33 @@ impl AboutUi {
             .id_salt("about_info")
             .auto_shrink([false, false])
             .show(&mut body, |ui| {
-                for (s, section) in sections.iter().enumerate() {
-                    let mut card = sheet::card_begin(ui);
-                    let c = &mut card.child;
-                    sheet::card_title(c, p, section.icon, aurora_i18n::text(section.title), None);
-                    c.add_space(4.0);
-                    for (r, row) in section.rows.iter().enumerate() {
-                        let copied = self
-                            .value_copied
-                            .is_some_and(|(cs, cr, at)| cs == s && cr == r && now.duration_since(at) < COPIED_FOR);
-                        if value_row(c, p, aurora_i18n::text(row.label), &row.value.shown(), copied) {
-                            c.ctx().copy_text(row.value.english());
-                            self.value_copied = Some((s, r, now));
+                ui.label(
+                    RichText::new("Waters Roux Viewer. Version, support and project links are shown above. Aurora and third-party credits remain in Credits & Licences.")
+                        .size(12.0)
+                        .color(p.muted),
+                );
+                ui.add_space(8.0);
+                egui::CollapsingHeader::new("System and diagnostic details")
+                    .default_open(false)
+                    .show(ui, |ui| {
+                    for (s, section) in sections.iter().enumerate() {
+                        let mut card = sheet::card_begin(ui);
+                        let c = &mut card.child;
+                        sheet::card_title(c, p, section.icon, aurora_i18n::text(section.title), None);
+                        c.add_space(4.0);
+                        for (r, row) in section.rows.iter().enumerate() {
+                            let copied = self
+                                .value_copied
+                                .is_some_and(|(cs, cr, at)| cs == s && cr == r && now.duration_since(at) < COPIED_FOR);
+                            if value_row(c, p, aurora_i18n::text(row.label), &row.value.shown(), copied) {
+                                c.ctx().copy_text(row.value.english());
+                                self.value_copied = Some((s, r, now));
+                            }
+                            c.add_space(5.0);
                         }
-                        c.add_space(5.0);
+                        sheet::card_end(ui, p, card);
                     }
-                    sheet::card_end(ui, p, card);
-                }
+                    });
                 if std::mem::take(&mut self.scroll_to_end) {
                     ui.scroll_to_cursor(Some(egui::Align::BOTTOM));
                 }
