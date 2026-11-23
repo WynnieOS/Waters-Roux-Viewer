@@ -111,7 +111,7 @@ pub struct AboutUi {
 /// The release page of this version, for a published version only (a
 /// build between two tags has none).
 pub fn release_notes(version: &str) -> Option<String> {
-    let published = !version.is_empty() && !version.contains('+') && version != "0.0.0";
+    let published = !version.is_empty() && !version.contains('+') && !version.contains('-') && version != "0.0.0";
     published.then(|| format!("{}/releases/tag/v{version}", crate::links::GITHUB))
 }
 
@@ -119,7 +119,7 @@ pub fn release_notes(version: &str) -> Option<String> {
 /// a block per card, a line per value (LLFloaterAbout::getInfo's order,
 /// its English labels).
 pub fn copy_text(sections: &[Section]) -> String {
-    let version = aurora_version::version();
+    let version = aurora_version::product_version();
     let mut out = format!("Waters Roux Viewer {version}\n");
     if let Some(url) = release_notes(version) {
         out.push_str(&format!("Release notes: {url}\n"));
@@ -275,14 +275,14 @@ fn hero(ui: &mut egui::Ui, p: &Palette, logo: Option<&egui::TextureHandle>) {
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
-                sheet::pill(ui, p, Tone::Group, "tag-filled", aurora_version::version());
+                sheet::pill(ui, p, Tone::Group, "tag-filled", aurora_version::product_version());
                 let build = aurora_i18n::tr!("about-build-pill", profile = build_label());
                 sheet::pill(ui, p, Tone::Neutral, "", &build);
             });
             ui.add_space(6.0);
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
-                if let Some(url) = release_notes(aurora_version::version()) {
+                if let Some(url) = release_notes(aurora_version::product_version()) {
                     link(ui, p, "file-text-filled", aurora_i18n::tr!("about-release-notes"), &url);
                 }
                 link(ui, p, "brand-github-filled", "GitHub", crate::links::GITHUB);
@@ -306,7 +306,11 @@ fn hero(ui: &mut egui::Ui, p: &Palette, logo: Option<&egui::TextureHandle>) {
 /// target folder.
 pub fn build_label() -> &'static str {
     let dir = env!("AURORA_BUILD_PROFILE");
-    crate::cli::profile_label(dir).unwrap_or(dir)
+    if dir == "release" && aurora_version::product_version().contains("-dev") {
+        "Preview"
+    } else {
+        crate::cli::profile_label(dir).unwrap_or(dir)
+    }
 }
 
 /// A link of the banner: a flat button that opens `url` in the browser.
@@ -442,6 +446,7 @@ mod tests {
             Some("https://github.com/WynnieOS/Waters-Roux-Viewer/releases/tag/v0.7.0")
         );
         assert_eq!(release_notes("0.7.0+3.gabcdef123"), None);
+        assert_eq!(release_notes("1.0.0-dev+gabcdef123"), None);
         assert_eq!(release_notes("0.0.0"), None);
     }
 
@@ -461,7 +466,7 @@ mod tests {
         ];
         let text = copy_text(&sections);
         let blocks: Vec<&str> = text.split("\n\n").collect();
-        assert!(blocks[0].starts_with(&format!("Waters Roux Viewer {}", aurora_version::version())));
+        assert!(blocks[0].starts_with(&format!("Waters Roux Viewer {}", aurora_version::product_version())));
         assert_eq!(
             blocks[1],
             format!(

@@ -72,6 +72,20 @@ fn main() {
     println!("cargo:rustc-env=AURORA_COMPILED_VERSION={}", version.display);
     println!("cargo:rustc-env=AURORA_LOGIN_VERSION={}", version.login);
     println!("cargo:rustc-env=AURORA_BUILD_COMMIT={}", commit.as_deref().unwrap_or("unknown"));
+    // Waters Roux has its own public-facing version. Aurora's version/login
+    // protocol remains unchanged until networking and updater migration are audited.
+    // Only a dedicated Waters Roux release tag may identify a stable v1.0 build.
+    let waters_release = git(&root, &["tag", "--points-at", "HEAD"])
+        .is_some_and(|tags| tags.lines().any(|tag| tag == "waters-roux-v1.0.0"));
+    let waters_display = if waters_release {
+        "1.0.0".to_owned()
+    } else {
+        format!("1.0.0-dev+g{}", commit.as_deref().unwrap_or("unknown"))
+    };
+    println!("cargo:rustc-env=WATERS_ROUX_PRODUCT_VERSION={waters_display}");
+    // Used by Windows resource metadata; a development build remains marked -dev.
+    println!("cargo:product_display={waters_display}");
+    println!("cargo:product_numeric=1.0.0.0");
     // `links` metadata, read by aurora-viewer's build script as
     // DEP_AURORA_VERSION_DISPLAY / _NUMERIC (version block of the exe).
     println!("cargo:display={}", version.display);
