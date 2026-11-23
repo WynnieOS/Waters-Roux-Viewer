@@ -1,0 +1,86 @@
+name: Waters Roux v1.0 - branded Linux package QA
+
+# Linux-only development artifact. Never creates a GitHub release and never
+# depends on the inherited macOS CI result.
+on:
+  push:
+    branches: [integrate/waters-roux-v1.0-aurora-0.9.12]
+  pull_request:
+    branches: [waters-roux-v3-unified-review]
+    paths:
+      - 'crates/**'
+      - 'scripts/package*.ps1'
+      - 'packaging/linux/**'
+      - 'assets/branding/**'
+      - '.github/workflows/waters-roux-v1-linux-package-qa.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: waters-roux-v1-linux-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-package:
+    name: Linux x86-64 branded portable archive
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Native Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
+      - name: Stable Rust
+        run: |
+          rustup update stable --no-self-update
+          rustup component add rustfmt clippy
+      - name: Formatting check
+        run: cargo fmt --all -- --check
+      - name: Strict Linux lints
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings -A dead-code
+      - name: Linux desktop identity test
+        run: cargo test --locked -p aurora-viewer --bin aurora-viewer linux_product_desktop_identity_is_branded
+      - name: Compile release Linux binary
+        run: cargo build --release --locked -p aurora-viewer
+      - name: Package Waters Roux-branded portable folder
+        shell: pwsh
+        run: |
+          ./scripts/package-waters-roux-linux.ps1 -Exe target/release/aurora-viewer -Out Waters-Roux-Viewer-V1-0-DEVELOPMENT-linux-x86_64
+          if ($LASTEXITCODE -ne 0) { throw 'Branded Linux packaging failed' }
+      - name: Verify archive, identity and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir='Waters-Roux-Viewer-V1-0-DEVELOPMENT-linux-x86_64'
+          test -x "$dir/waters-roux-viewer"
+          test -f "$dir/waters-roux-viewer.desktop"
+          test -f "$dir/waters-roux-viewer.svg"
+          test ! -e "$dir/aurora-viewer"
+          test ! -e "$dir/aurora-viewer.desktop"
+          test ! -e "$dir/aurora-viewer.svg"
+          test -f "$dir/LICENSE"
+          test -f "$dir/NOTICE.md"
+          "$dir/waters-roux-viewer" --version | grep -E '^Waters Roux Viewer 1[.]0[.]0-dev[+]g[0-9a-f]{9}'
+          archive="$dir.tar.gz"
+          tar -czf "$archive" "$dir"
+          sha256sum "$archive" > "$archive.sha256"
+          sha256sum -c "$archive.sha256"
+          tar -tzf "$archive" >/dev/null
+          echo 'Development archive verified; real Wayland/X11/Vulkan/audio/settings acceptance remains pending.'
+      - name: Upload engineering-only Linux archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Waters-Roux-V1-Linux-DEVELOPMENT-QA
+          path: |
+            Waters-Roux-Viewer-V1-0-DEVELOPMENT-linux-x86_64.tar.gz
+            Waters-Roux-Viewer-V1-0-DEVELOPMENT-linux-x86_64.tar.gz.sha256
+          retention-days: 7
+          compression-level: 0

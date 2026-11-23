@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Waters Roux Viewer
+GenericName=Second Life Viewer
+Comment=Explore Second Life with Waters Roux Viewer
+Exec=waters-roux-viewer
+Icon=waters-roux-viewer
+Terminal=false
+Categories=Game;Simulation;
+Keywords=Second Life;SL;metaverse;virtual world;
+StartupWMClass=waters-roux-viewer

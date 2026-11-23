@@ -212,15 +212,12 @@ pub fn window_title() -> String {
     )
 }
 
-/// The viewer's identity on the Linux desktop: Wayland app_id, X11
-/// WM_CLASS, and the name of `packaging/linux/aurora-viewer.desktop`, whose
-/// `StartupWMClass` repeats it. The panel and the dock match the window to
-/// that file (name, icon, pinning) only when the two agree. The executable's
-/// name, which X11 used by default: X11 desktops see no change. The Legacy
-/// Viewer's `com.secondlife.indra.viewer` is shared by every viewer of its
-/// family, so Aurora does not take it.
+/// The Waters Roux Linux desktop identity. Its Wayland app_id, X11
+/// WM_CLASS, launcher Exec, icon and .desktop filename must agree. Keep
+/// it distinct from Aurora's desktop identity so both viewers can coexist.
+/// Historical Aurora profile data and SLURL handlers are migrated separately.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-pub const DESKTOP_ID: &str = "aurora-viewer";
+pub const DESKTOP_ID: &str = "waters-roux-viewer";
 
 /// Window attributes with the [`DESKTOP_ID`] on Linux; elsewhere unchanged.
 pub fn with_desktop_id(attrs: winit::window::WindowAttributes) -> winit::window::WindowAttributes {
@@ -280,6 +277,12 @@ pub fn title_slug() -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_product_desktop_identity_is_branded() {
+        assert_eq!(DESKTOP_ID, "waters-roux-viewer");
+    }
 
     #[test]
     fn uninstall_is_a_flag_and_a_link_cannot_carry_it() {
