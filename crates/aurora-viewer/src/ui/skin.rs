@@ -264,7 +264,7 @@ mod tests {
         let new = dir.join(PRODUCT_SKIN);
         std::fs::create_dir_all(old.join("icons")).unwrap();
         std::fs::create_dir_all(&new).unwrap();
-        std::fs::write(old.join("theme.json"), r#"{"violet":"#815168"}"#).unwrap();
+        std::fs::write(old.join("theme.json"), r##"{"violet":"#815168"}"##).unwrap();
         std::fs::write(old.join("layout.json"), r#"{"chat_bar_fraction":0.25}"#).unwrap();
         std::fs::write(old.join("icons").join("my-icon.png"), b"png-fixture").unwrap();
         migrate_legacy_skin(&old, &new);
