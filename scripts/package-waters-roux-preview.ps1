@@ -1,17 +1,19 @@
-﻿<# Waters Roux portable development packaging for Beta 27 or Beta 28 V3; never a production release. #>
+﻿<# Waters Roux portable development packaging for Beta 27, Beta 28 V3, or v1.0; never a production release. #>
 param(
     [Parameter(Mandatory)][string]$Exe,
     [Parameter(Mandatory)][string]$Out,
-    [ValidateSet('Beta 27', 'Beta 28 V3')][string]$BetaLabel = 'Beta 27'
+    [ValidateSet('Beta 27', 'Beta 28 V3', 'v1.0 Development')][string]$BetaLabel = 'Beta 27'
 )
 $ErrorActionPreference = 'Stop'
-$previewFolderLabel = if ($BetaLabel -eq 'Beta 28 V3') { 'Beta-28-V3' } else { 'Beta-27' }
-$acceptanceSource = if ($BetaLabel -eq 'Beta 28 V3') {
+$previewFolderLabel = if ($BetaLabel -eq 'v1.0 Development') { 'V1-0' } elseif ($BetaLabel -eq 'Beta 28 V3') { 'Beta-28-V3' } else { 'Beta-27' }
+$acceptanceSource = if ($BetaLabel -eq 'v1.0 Development') {
+    'docs/WATERS_ROUX_V1_INTEGRATION_PLAN.md'
+} elseif ($BetaLabel -eq 'Beta 28 V3') {
     'docs/WATERS_ROUX_BETA28_V3_ACCEPTANCE.md'
 } else {
     'docs/WATERS_ROUX_BETA27.md'
 }
-$acceptanceLabel = if ($BetaLabel -eq 'Beta 28 V3') { 'BETA-28-V3-ACCEPTANCE.md' } else { 'BETA-27-ACCEPTANCE.md' }
+$acceptanceLabel = if ($BetaLabel -eq 'v1.0 Development') { 'V1-0-ACCEPTANCE.md' } elseif ($BetaLabel -eq 'Beta 28 V3') { 'BETA-28-V3-ACCEPTANCE.md' } else { 'BETA-27-ACCEPTANCE.md' }
 $source = Split-Path $PSScriptRoot -Parent
 $logo = Join-Path $source 'assets/branding/waters-roux-logo.png'
 $icon = Join-Path $source 'assets/branding/waters-roux.ico'
@@ -94,7 +96,7 @@ $commit = (git -C $source rev-parse HEAD | Out-String).Trim()
     $version
     "Source commit: $commit"
     'Development preview only; this is NOT a public beta release.'
-    'Master V3 acceptance and in-world QA must pass before any distribution.'
+    'The full feature checklist, in-world QA and owner approval are required before distribution.'
 ) | Set-Content -LiteralPath (Join-Path $Out 'BUILD-INFO.txt') -Encoding utf8
 $missingArtwork = [Collections.Generic.List[string]]::new()
 foreach ($name in @('waters-roux-logo.png', 'waters-roux-background.png', 'waters-roux-loading-background.png')) {
