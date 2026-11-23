@@ -23,6 +23,9 @@ use super::skin::Layout;
 use crate::theme::Palette;
 use egui::{Color32, RichText, Vec2};
 
+/// One branded navigation-menu icon for both full-width and glass-islands bars.
+const WATERS_ROUX_MENU_ICON: &str = "fleur-de-lis";
+
 #[derive(Default)]
 pub enum BarAction {
     ToggleVr,
@@ -1885,7 +1888,7 @@ pub fn top_bars(
                 ui.spacing_mut().item_spacing.x = 4.0;
                 ui.style_mut().visuals.button_frame = false;
                 // Waters Roux menu: original fleur-de-lis symbol, with all existing commands retained.
-                if let Some(t) = icons.get("fleur-de-lis") {
+                if let Some(t) = icons.get(WATERS_ROUX_MENU_ICON) {
                     let img = egui::Image::new(t).fit_to_exact_size(Vec2::new(18.0, 18.0)).tint(p.ink);
                     menu::button(ui, p, egui::Button::image(img), |ui| {
                         menu::searchable(ui, p, |ui| main_menus(ui, p, panels, st, &mut action, true));
