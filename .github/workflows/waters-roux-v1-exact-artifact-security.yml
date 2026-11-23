@@ -1,0 +1,199 @@
+name: Waters Roux v1 — independent exact Windows artifact security scan
+
+# This is a *separate* job: it never edits or executes the viewer binary,
+# changes an artifact's checksum, or declares Chrome Safe Browsing cleared.
+# Waters Roux v1.0 development distribution remains blocked pending actual resident approval.
+on:
+  # The Windows preview can call this only after its exact ZIP + sidecar
+  # have been uploaded. A passing build without a passing AV scan is blocked.
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        description: 'GitHub Actions run that built and uploaded the exact v1.0 development ZIP'
+        required: true
+        type: string
+      expected_zip_sha256:
+        description: 'Optional independently obtained SHA256 for the nested ZIP'
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        description: 'Exact GitHub Actions run ID of the v1.0 development Windows preview to scan'
+        type: string
+        required: true
+      expected_zip_sha256:
+        description: 'Optional independent expected 64-char SHA256 of the exact nested ZIP'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  exact-artifact-security:
+    name: Validate exact packaged ZIP and independent ClamAV scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Retrieve original GitHub Actions artifact (do not rebuild binaries)
+        uses: actions/download-artifact@v4
+        with:
+          name: Waters-Roux-Viewer-V1-0-DEVELOPMENT-Windows
+          run-id: ${{ inputs.artifact_run_id }}
+          repository: WynnieOS/Waters-Roux-Viewer
+          github-token: ${{ github.token }}
+          path: scan-input
+
+      - name: Validate nested ZIP checksum, safe paths and exact binaries without executing
+        shell: bash
+        env:
+          WR_ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
+          WR_EXPECTED_ZIP_SHA256: ${{ inputs.expected_zip_sha256 || '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p scan-evidence extracted
+          python3 - <<'PY'
+          from pathlib import Path, PurePosixPath
+          from zipfile import ZipFile
+          import hashlib
+          import os
+          import re
+
+          root = Path.cwd()
+          scan = root / 'scan-input'
+          archive = scan / 'Waters-Roux-Viewer-V1-0-DEVELOPMENT-Windows.zip'
+          sidecar = scan / (archive.name + '.sha256')
+          assert archive.is_file() and sidecar.is_file(), 'Original archive or sha256 sidecar missing from exact GitHub artifact'
+          sha = lambda b: hashlib.sha256(b).hexdigest()
+          with archive.open('rb') as stream:
+              observed = hashlib.file_digest(stream, 'sha256').hexdigest()
+          sidecar_text = sidecar.read_text(encoding='utf-8-sig')
+          match = re.match(r'^\s*([0-9a-fA-F]{64})\s+', sidecar_text)
+          assert match and observed == match.group(1).lower(), 'Exact nested ZIP SHA256 differs from published sidecar'
+          independent = os.environ.get('WR_EXPECTED_ZIP_SHA256', '').strip().lower()
+          if independent:
+              assert re.fullmatch('[0-9a-f]{64}', independent), 'Invalid independent expected SHA256 input'
+              assert independent == observed, 'Expected independently supplied ZIP SHA256 mismatch'
+
+          target_dir = root / 'extracted'
+          prefix = 'Waters-Roux-Viewer-V1-0-DEVELOPMENT-'
+          expected_executables = {'waters-roux-viewer.exe', 'tools/ffmpeg.exe', 'tools/ffprobe.exe'}
+          mandatory = expected_executables | {
+              'BUILD-INFO.txt',
+              'START-HERE.txt',
+              'V1-0-ACCEPTANCE.md',
+              'DEVELOPMENT-NOT-FOR-RELEASE.txt',
+              'THIRD-PARTY-FFMPEG.txt',
+              'assets/branding/waters-roux-logo.png',
+              'assets/branding/waters-roux.ico',
+          }
+          expected_vendor_executables = {
+              'tools/ffmpeg.exe': '3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec',
+              'tools/ffprobe.exe': 'f0d36ecbbdd3bcfac3efa078c96c7271c2e68b3810595552ac3b7f17e9a65c52',
+          }
+          seen = set()
+          names = []
+          size_sum = 0
+          with ZipFile(archive) as zipped:
+              assert zipped.testzip() is None, 'Corrupted ZIP entry'
+              for entry in zipped.infolist():
+                  name = entry.filename
+                  assert name and '\\' not in name and not name.startswith('/'), f'Unsafe ZIP path: {name}'
+                  assert not re.match(r'^[A-Za-z]:', name), f'Windows drive ZIP path: {name}'
+                  path = PurePosixPath(name)
+                  assert all(part not in ('.', '..') for part in name.rstrip('/').split('/')), f'ZIP path traversal: {name}'
+                  assert ((entry.external_attr >> 16) & 0o170000) != 0o120000, f'Symlink in ZIP: {name}'
+                  assert entry.file_size <= 1024 * 1024 * 1024, f'Unreasonably large ZIP member: {name}'
+                  size_sum += entry.file_size
+                  assert size_sum < 4 * 1024 * 1024 * 1024, 'Possible oversized ZIP archive'
+                  if entry.is_dir():
+                      continue
+                  normalized = path.as_posix()
+                  assert normalized.lower() not in seen, f'Duplicate or case-colliding ZIP filename: {normalized}'
+                  seen.add(normalized.lower())
+                  names.append(normalized)
+              assert names, 'ZIP contains no files'
+              roots = {PurePosixPath(n).parts[0] for n in names}
+              assert len(roots) == 1, f'Expected one Waters Roux product folder, found: {roots}'
+              product = roots.pop()
+              assert product.startswith(prefix), f'Unexpected v1 development product branding/folder: {product}'
+              relative = {n[len(product) + 1:] for n in names if n.startswith(product + '/')}
+              assert len(relative) == len(names), 'Files exist outside the Waters Roux product folder'
+              assert mandatory.issubset(relative), f'Critical v1 development assets missing: {sorted(mandatory - relative)}'
+              executable_names = {n for n in relative if n.lower().endswith('.exe')}
+              assert executable_names == expected_executables, f'Unexpected packaged executable set: {executable_names}'
+
+              hashes = {}
+              for rel in sorted(expected_executables):
+                  member = zipped.getinfo(product + '/' + rel)
+                  with zipped.open(member) as stream:
+                      hashes[rel] = hashlib.file_digest(stream, 'sha256').hexdigest()
+              for rel, expected in expected_vendor_executables.items():
+                  assert hashes[rel] == expected, f'{rel} differs from pinned upstream publisher SHA256'
+
+              info = zipped.read(product + '/BUILD-INFO.txt').decode('utf-8-sig')
+              assert 'Waters Roux Viewer' in info and 'v1.0 Development' in info and re.search(r'Waters Roux Viewer 1\.0\.0-dev\+g[0-9a-f]{9}', info), 'Product build info is unbranded'
+              assert 'Verified bundled libx264/AAC encoder SHA256' in info, 'Bundled encoder provenance missing'
+              assert hashes['tools/ffmpeg.exe'] in info.lower(), 'Manifest FFmpeg digest differs from archive'
+              assert 'NOT a public beta release' in info, 'Archive missing explicit development-only identity'
+              license_entries = [n for n in relative if n.startswith('third-party/ffmpeg/LICENSE')]
+              assert license_entries, 'FFmpeg license text missing'
+
+              # Paths were checked in their *original* form; now extract for the
+              # scanner without ever launching the Windows binaries.
+              zipped.extractall(target_dir)
+
+          evidence = [
+              f'Actions artifact run: {os.environ["WR_ARTIFACT_RUN_ID"]}',
+              f'Exact nested ZIP SHA256: {observed}',
+              'SHA sidecar: verified',
+              'Independent expected hash: ' + ('verified' if independent else 'not supplied'),
+              f'Packaged product folder: {product}',
+              f'Archive members: {len(names)}',
+              f'Uncompressed bytes: {size_sum}',
+              *[f'{k} SHA256: {v}' for k, v in sorted(hashes.items())],
+              'FFmpeg and FFprobe executables: independently match pinned publisher SHA256',
+              'ZIP paths, duplicates, branding, mandatory assets and license: verified',
+              'AV and Safe Browsing verdicts are separate from this structural verification.',
+          ]
+          (root / 'scan-evidence' / 'exact-artifact-manifest.txt').write_text('\n'.join(evidence) + '\n')
+          print('\n'.join(evidence))
+          PY
+
+      - name: Install ClamAV and obtain current antivirus signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clamav clamav-freshclam
+          sudo systemctl stop clamav-freshclam || true
+          sudo freshclam --stdout
+          clamscan --version | tee scan-evidence/clamav-version.txt
+
+      - name: Independently scan the exact ZIP and its extracted files
+        shell: bash
+        run: |
+          set -euo pipefail
+          clamscan --recursive --infected --scan-archive=yes --max-filesize=320M --max-scansize=1600M --max-recursion=30 --log=scan-evidence/clamav-scan.log scan-input extracted
+          grep -Fq 'Infected files: 0' scan-evidence/clamav-scan.log
+          if grep -Eiq 'ERROR:| FOUND' scan-evidence/clamav-scan.log; then
+            echo 'Malware detection or scanning error; do not distribute' >&2
+            exit 1
+          fi
+          {
+            echo '### Waters Roux v1.0 development exact-artifact independent scan'
+            echo 'The exact GitHub Actions ZIP was verified against its sidecar, safely extracted, and scanned without launching its executables.'
+            echo 'ClamAV reported zero infected files.'
+            echo 'This is not a Chrome Safe Browsing clearance, installer-signature audit, or resident in-world acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload exact source-specific security evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Waters-Roux-V1-Exact-Artifact-Independent-Security-Report
+          path: scan-evidence/
+          if-no-files-found: ignore
+          retention-days: 30
