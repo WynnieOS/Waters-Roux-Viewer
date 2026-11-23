@@ -997,14 +997,6 @@ fn navigation(c: &mut Catalog, inv: &Inventory, id: Uuid, single: bool) {
         Command::Reload(id),
     );
     c.add(
-        "show-window",
-        TEXT,
-        "external-link-filled",
-        aurora_i18n::tr!("ui-inventory-context-show-in-a-new-window"),
-        single,
-        Command::Window(id),
-    );
-    c.add(
         "open-window",
         TEXT,
         "folder-open-filled",
@@ -1543,6 +1535,21 @@ mod tests {
         );
     }
     #[test]
+    fn folder_navigation_has_exactly_one_open_window_command() {
+        let inv = inventory();
+        let folder = Uuid::from_u128(8000);
+        let c = build(&inv, folder, &InventoryUi::default(), &InventoryPreferences::default(), &facts());
+        let window_entries: Vec<_> = c
+            .entries
+            .iter()
+            .filter(|e| matches!(&e.kind, Kind::Action(idx) if matches!(c.commands.get(*idx), Some(Some(Command::Window(_))))))
+            .collect();
+        assert_eq!(window_entries.len(), 1, "only one command opens a folder in a separate window");
+        assert_eq!(window_entries[0].id, "open-window");
+        assert!(!c.entries.iter().any(|e| e.id == "show-window"));
+    }
+
+    #[test]
     fn trash_has_exactly_its_five_commands_and_the_separator_precedes_reload() {
         let mut inv = inventory();
         let trash = rules::system(&inv, 14).unwrap();
@@ -1551,14 +1558,7 @@ mod tests {
         let root: Vec<_> = c.entries.iter().filter(|e| e.zone == TEXT).map(|e| e.id.as_str()).collect();
         assert_eq!(
             root,
-            [
-                "empty-trash",
-                "image",
-                "separator:folder-navigation",
-                "reload",
-                "show-window",
-                "open-window"
-            ]
+            ["empty-trash", "image", "separator:folder-navigation", "reload", "open-window"]
         );
         assert!(c.entries.iter().filter(|e| e.zone == "top").all(|e| e.id == "new" && !e.enabled));
         assert_eq!(
