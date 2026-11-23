@@ -61,6 +61,18 @@ jobs:
           if test -f .git/MERGE_HEAD; then git merge --abort; fi
           git reset --hard HEAD
           git diff --quiet && git diff --cached --quiet  # untracked audit report is intentional
+          echo '--- Requested-feature source references ---'
+          for term in show_flycam_banner flycam_banner Skin::load dual_inventory autocorrect; do
+            echo "Feature lookup: $term"
+            git grep -n -F "$term" -- crates/aurora-viewer/src | head -40 || true
+          done
+          {
+            echo "## Requested-feature source locations"
+            for term in show_flycam_banner flycam_banner Skin::load dual_inventory autocorrect; do
+              echo "### $term"
+              git grep -n -F "$term" -- crates/aurora-viewer/src | head -40 || true
+            done
+          } > upstream-audit/feature-wiring.txt
       - name: Publish conflict evidence (not a product build)
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
