@@ -53,6 +53,34 @@ pub enum ZoomMode {
     HoldAxis,
 }
 
+/// What the Flycam status banner shows. Brief displays controls for the first
+/// three seconds after entering Flycam, then leaves the camera active.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FlycamBannerMode {
+    Visible,
+    Brief,
+    Hidden,
+}
+
+impl FlycamBannerMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Visible => "Visible",
+            Self::Brief => "Brief (3 seconds)",
+            Self::Hidden => "Hidden",
+        }
+    }
+
+    pub fn shown(self, elapsed: std::time::Duration) -> bool {
+        match self {
+            Self::Visible => true,
+            Self::Brief => elapsed < std::time::Duration::from_secs(3),
+            Self::Hidden => false,
+        }
+    }
+}
+
 /// Forward, left, up, roll, pitch, yaw, zoom, as in LLViewerJoystick.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -83,6 +111,9 @@ pub struct Settings {
     pub flycam_enabled: bool,
     /// V3: hide the on-screen Flycam banner without disabling camera control.
     pub show_flycam_banner: bool,
+    /// The new three-state display preference. None inherits the legacy
+    /// show_flycam_banner value, preserving installed Beta V3 profiles.
+    pub flycam_banner_mode: Option<FlycamBannerMode>,
     /// -1 disconnects a logical axis.
     pub mapping: [i8; CHANNELS],
     pub avatar: Tuning,
@@ -111,6 +142,7 @@ impl Default for Settings {
             avatar_enabled: true,
             flycam_enabled: true,
             show_flycam_banner: true,
+            flycam_banner_mode: None,
             mapping: [1, 0, 2, 4, 3, 5, -1],
             avatar: Tuning {
                 gain: [1.0, 1.0, 1.0, 0.0, 0.1, 0.1, 0.0],
@@ -136,6 +168,14 @@ impl Default for Settings {
 }
 
 impl Settings {
+    pub fn banner_mode(&self) -> FlycamBannerMode {
+        self.flycam_banner_mode.unwrap_or(if self.show_flycam_banner {
+            FlycamBannerMode::Visible
+        } else {
+            FlycamBannerMode::Hidden
+        })
+    }
+
     /// Reuse signed gains in saved profiles for one common axis direction.
     /// Roll and zoom have no Avatar input, so only their Camera sign matters.
     pub fn axis_inverted(&self, channel: usize) -> bool {
@@ -529,11 +569,17 @@ mod tests {
     #[test]
     fn flycam_banner_setting_is_opt_out_and_migrates_old_profiles() {
         let old: super::Settings = serde_json::from_str("{}").expect("older joystick profile");
-        assert!(old.show_flycam_banner);
+        assert_eq!(old.banner_mode(), super::FlycamBannerMode::Visible);
         let mut custom = old;
         custom.show_flycam_banner = false;
+        assert_eq!(custom.banner_mode(), super::FlycamBannerMode::Hidden);
+        custom.flycam_banner_mode = Some(super::FlycamBannerMode::Brief);
         let restored: super::Settings = serde_json::from_str(&serde_json::to_string(&custom).unwrap()).unwrap();
-        assert!(!restored.show_flycam_banner);
+        assert_eq!(restored.banner_mode(), super::FlycamBannerMode::Brief);
+        assert!(restored.banner_mode().shown(std::time::Duration::from_millis(2999)));
+        assert!(!restored.banner_mode().shown(std::time::Duration::from_secs(3)));
+        assert!(super::FlycamBannerMode::Visible.shown(std::time::Duration::from_secs(300)));
+        assert!(!super::FlycamBannerMode::Hidden.shown(std::time::Duration::ZERO));
     }
 
     use super::*;
