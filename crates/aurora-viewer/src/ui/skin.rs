@@ -84,6 +84,10 @@ impl Default for Layout {
     }
 }
 
+/// Independently branded resident skin folder. The old Aurora-named skin
+/// remains readable for compatibility until the owner approves migration.
+pub const PRODUCT_SKIN: &str = "waters-roux";
+
 pub struct Skin {
     pub name: String,
     pub dir: Option<PathBuf>,
@@ -94,8 +98,48 @@ pub struct Skin {
     last_check: Instant,
 }
 
+/// Copy just supported customization assets; never rename/remove source,
+/// follow user-supplied directories recursively, or overwrite a new skin.
+/// If the config folder is read-only the legacy folder is still a fallback.
+fn migrate_legacy_skin(legacy: &Path, dest: &Path) {
+    if !legacy.is_dir() {
+        return;
+    }
+    if std::fs::create_dir_all(dest).is_err() {
+        return;
+    }
+    for name in ["theme.json", "layout.json"] {
+        let source = legacy.join(name);
+        let target = dest.join(name);
+        if source.is_file() && !target.exists() {
+            let _ = std::fs::copy(&source, &target);
+        }
+    }
+    let old_icons = legacy.join("icons");
+    if old_icons.is_dir() && std::fs::create_dir_all(dest.join("icons")).is_ok()
+        && let Ok(entries) = std::fs::read_dir(old_icons)
+    {
+        for entry in entries.flatten() {
+            let source = entry.path();
+            if source.is_file() && source.extension().is_some_and(|e| e.eq_ignore_ascii_case("png")) {
+                let target = dest.join("icons").join(entry.file_name());
+                if !target.exists() {
+                    let _ = std::fs::copy(source, target);
+                }
+            }
+        }
+    }
+}
+
 fn skin_dirs(name: &str) -> Vec<PathBuf> {
-    let mut v = vec![crate::settings::config_dir().join("skins").join(name)];
+    let config = crate::settings::config_dir().join("skins");
+    if name == PRODUCT_SKIN {
+        migrate_legacy_skin(&config.join("aurora"), &config.join(name));
+    }
+    let mut v = vec![config.join(name)];
+    if name == PRODUCT_SKIN {
+        v.push(config.join("aurora")); // preserved if copy failed or old profile is read-only
+    }
     if let Some(exe) = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)) {
         v.push(exe.join("skins").join(name));
     }
@@ -105,7 +149,7 @@ fn skin_dirs(name: &str) -> Vec<PathBuf> {
 
 /// Read the theme before graphics startup so early crashes use the same skin.
 pub fn recovery_theme() -> Theme {
-    skin_dirs("aurora")
+    skin_dirs(PRODUCT_SKIN)
         .into_iter()
         .find_map(|dir| dir.join("theme.json").is_file().then(|| read_json(&dir.join("theme.json"))))
         .unwrap_or_else(Theme::waters_roux)
@@ -143,6 +187,9 @@ fn read_json<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> T {
 
 impl Skin {
     pub fn load(ctx: &egui::Context, name: &str, font_scale: f32) -> Skin {
+        // Older startup code requests "aurora"; the product displays and
+        // persists its own skin directory without rewriting resident files.
+        let name = if name == "aurora" { PRODUCT_SKIN } else { name };
         let dir = skin_dirs(name).into_iter().find(|d| d.is_dir());
         // First run: write the default skin as an editable template.
         let dir = dir.or_else(|| {
@@ -209,6 +256,27 @@ impl Skin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_skin_migration_copies_but_never_overwrites_or_deletes() {
+        let dir = std::env::temp_dir().join(format!("waters-roux-skin-migration-{}", uuid::Uuid::new_v4()));
+        let old = dir.join("aurora");
+        let new = dir.join(PRODUCT_SKIN);
+        std::fs::create_dir_all(old.join("icons")).unwrap();
+        std::fs::create_dir_all(&new).unwrap();
+        std::fs::write(old.join("theme.json"), r#"{"violet":"#815168"}"#).unwrap();
+        std::fs::write(old.join("layout.json"), r#"{"chat_bar_fraction":0.25}"#).unwrap();
+        std::fs::write(old.join("icons").join("my-icon.png"), b"png-fixture").unwrap();
+        migrate_legacy_skin(&old, &new);
+        assert_eq!(std::fs::read(new.join("theme.json")).unwrap(), std::fs::read(old.join("theme.json")).unwrap());
+        assert_eq!(std::fs::read(new.join("layout.json")).unwrap(), std::fs::read(old.join("layout.json")).unwrap());
+        assert_eq!(std::fs::read(new.join("icons/my-icon.png")).unwrap(), b"png-fixture");
+        std::fs::write(new.join("theme.json"), "my updated Waters Roux skin").unwrap();
+        migrate_legacy_skin(&old, &new);
+        assert_eq!(std::fs::read_to_string(new.join("theme.json")).unwrap(), "my updated Waters Roux skin");
+        assert!(old.join("theme.json").exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn a_theme_value_this_build_cannot_read_costs_only_that_value() {

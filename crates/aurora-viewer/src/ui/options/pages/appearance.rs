@@ -32,7 +32,7 @@ pub fn page(cx: &mut Cx, tab: usize) {
                 );
                 cx.note(tr!("ui-options-customize-colors-icons-and-the-toolbar-in"));
                 cx.below().row(tr!("ui-options-skin-folder"), "", &Nothing, |ui, _| {
-                    let dir = crate::settings::config_dir().join("skins").join("aurora");
+                    let dir = crate::settings::config_dir().join("skins").join(crate::ui::skin::PRODUCT_SKIN);
                     ui.vertical(|ui| {
                         ui.label(RichText::new(dir.display().to_string()).size(12.0).monospace().color(p.teal));
                         ui.label(
