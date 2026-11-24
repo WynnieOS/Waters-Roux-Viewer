@@ -50,16 +50,23 @@ impl App {
         }
         self.world.inventory.add_items(vec![item.clone()]);
         self.inventory_ui.show_original(&self.world.inventory, item.id);
-        let target = aurora_net::scripts::ScriptTarget { object: uuid::Uuid::nil(), item: item.id };
+        let target = aurora_net::scripts::ScriptTarget {
+            object: uuid::Uuid::nil(),
+            item: item.id,
+        };
         self.open_script(target);
         if !self.script_editors.documents.iter().any(|editor| editor.target == target) {
-            self.imports.lsl.failed(target, "New inventory script could not be opened for editing");
+            self.imports
+                .lsl
+                .failed(target, "New inventory script could not be opened for editing");
         }
         true
     }
 
     pub(super) fn lsl_loaded(&mut self, target: aurora_net::scripts::ScriptTarget) {
-        let Some(source) = self.imports.lsl.take_source(target) else { return };
+        let Some(source) = self.imports.lsl.take_source(target) else {
+            return;
+        };
         match self.script_editors.import_source(target, source) {
             Ok(action) => self.apply_script_action(action),
             Err(reason) => self.imports.lsl.failed(target, &reason),
