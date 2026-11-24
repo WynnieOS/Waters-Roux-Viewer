@@ -534,7 +534,9 @@ impl Editors {
         // Upload even when the imported file matches the new item's default
         // text: the simulator must acknowledge the correct source asset.
         editor.recompile_allowed = true;
-        editor.save().ok_or_else(|| "Script could not enter the normal save pipeline".into())
+        editor
+            .save()
+            .ok_or_else(|| "Script could not enter the normal save pipeline".into())
     }
 
     pub fn load_experiences(&mut self, target: ScriptTarget) -> Option<Action> {
