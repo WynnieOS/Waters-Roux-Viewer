@@ -17,6 +17,7 @@ pub mod permissions;
 pub mod persistence;
 pub mod preview;
 pub mod sound;
+pub mod script_import;
 mod stage;
 #[cfg(test)]
 mod tests;
@@ -505,6 +506,8 @@ struct Step {
 pub struct Imports {
     pub open: bool,
     pub launcher_open: bool,
+    /// User-chosen local LSL files, created and saved through the grid's real script protocol.
+    pub lsl: script_import::State,
     pub windows: [windows::Window; 6],
     window_scope: Option<Choice>,
     pub tab: ui::Tab,
@@ -566,6 +569,7 @@ impl Default for Imports {
         Self {
             open: false,
             launcher_open: false,
+            lsl: Default::default(),
             windows: std::array::from_fn(|_| Default::default()),
             window_scope: None,
             tab: Default::default(),
