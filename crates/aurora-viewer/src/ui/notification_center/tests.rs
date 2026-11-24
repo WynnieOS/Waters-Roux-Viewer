@@ -6,6 +6,33 @@ fn info(list: &mut Notifications, title: &str) -> u64 {
     list.push(Kind::Info, title, "", Data::None)
 }
 
+/// A confirmed Clear All uses the same Dismiss response as closing each
+/// notification; the request is not sent merely by opening the confirmation.
+#[test]
+fn clear_all_includes_pending_offers_without_silently_removing_them() {
+    let mut list = Notifications::default();
+    let informational = info(&mut list, "You earned L$50");
+    let invite = list.push(
+        Kind::Teleport,
+        "Teleport invitation",
+        "",
+        Data::Lure {
+            from: Uuid::from_u128(7),
+            invite: 1,
+            change_rating: false,
+        },
+    );
+    let requests = dismiss_all_requests(&list);
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests.iter().map(|(id, _)| *id).collect::<Vec<_>>(), vec![informational, invite]);
+    assert!(requests.iter().all(|(_, response)| matches!(response, Response::Dismiss)));
+    assert_eq!(
+        list.list.len(),
+        2,
+        "generating the requests must not dismiss anything before confirmation"
+    );
+}
+
 fn at(now: f64) -> Moment {
     Moment { now, ..Moment::default() }
 }

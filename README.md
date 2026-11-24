@@ -1,8 +1,8 @@
-# Waters Roux Viewer — Beta 28 V3 development
+# Waters Roux Viewer — v1.0.0 development
 
 Waters Roux is a custom Second Life viewer derived from Aurora's Rust/Vulkan source. The authors, upstream technical references and license obligations remain credited in [NOTICE.md](NOTICE.md). **The viewer is not provided or supported by Linden Lab.**
 
-**Release status:** Beta 28 V3 is under development and has **not** passed the full acceptance, security, or resident testing checklist. There is no approved official public v1.0.0 download yet. Do not distribute the previously labeled **UNVERIFIED** Windows archive as a public release.
+**Release status:** Waters Roux v1.0.0 is the **development target**, not an approved finished build. The Aurora 0.9.12 integration and full acceptance, security, Windows/Linux packaging and in-world testing are still pending. No final v1.0.0 download has been approved. Do not distribute previously labeled **UNVERIFIED** archives. [v1.0 integration plan](docs/WATERS_ROUX_V1_INTEGRATION_PLAN.md).
 
 Official project links:
 - **Website (temporary):** [Waters Roux GitHub](https://github.com/WynnieOS/Waters-Roux-Viewer)
@@ -23,7 +23,7 @@ The final installer will preserve the approved Waters Roux glass login, logo/bac
 # Waters Roux Viewer
 
 **A customizable Second Life viewer built on Rust and Vulkan.**<br>
-Beta 28 V3 development — official v1.0.0 release pending acceptance.
+v1.0.0 development — release pending full acceptance.
 
 [![Project website](docs/readme/button-website.svg)](https://github.com/WynnieOS/Waters-Roux-Viewer)&nbsp;
 [Report a Bug](https://github.com/WynnieOS/Waters-Roux-Viewer/issues/new/choose)&nbsp;

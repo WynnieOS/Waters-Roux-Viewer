@@ -13,6 +13,8 @@ pub struct State {
     controller: Controller,
     pub(super) motion: Motion,
     pub active: bool,
+    /// Starts when Flycam is engaged; transient banner modes use this clock.
+    pub(super) flycam_started: Option<Instant>,
     pub(super) running: bool,
     demo_started: bool,
 }
@@ -20,7 +22,14 @@ pub struct State {
 impl App {
     pub(super) fn joystick_status(&mut self, ctx: &egui::Context, p: &crate::theme::Palette) {
         // Hiding the banner changes only the overlay, never Flycam itself.
-        if !self.joystick.active || !self.settings.joystick.show_flycam_banner {
+        if !self.joystick.active {
+            return;
+        }
+        let elapsed = self
+            .joystick
+            .flycam_started
+            .map_or(std::time::Duration::ZERO, |started| started.elapsed());
+        if !self.settings.joystick.banner_mode().shown(elapsed) {
             return;
         }
         let room = crate::ui::layout::work_area(ctx);
@@ -70,6 +79,7 @@ impl App {
             self.camera.retain_flycam_view(&mut self.world.agent, &self.settings.camera);
         }
         self.joystick.active = !self.joystick.active;
+        self.joystick.flycam_started = self.joystick.active.then(Instant::now);
         // Off keeps the current point of view until movement or Reset camera,
         // as LLViewerJoystick::toggleFlycam does.
         self.last_input = Instant::now();

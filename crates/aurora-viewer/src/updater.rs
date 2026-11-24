@@ -161,7 +161,7 @@ pub struct Updater {
 pub fn checks_enabled() -> bool {
     std::env::var_os("AURORA_DEMO").is_none()
         && (aurora_updater::test_environment().is_some()
-            || (env!("AURORA_BUILD_PROFILE") == "release" && published_version(aurora_version::version())))
+            || (env!("AURORA_BUILD_PROFILE") == "release" && published_version(aurora_version::product_version())))
 }
 
 /// A version the Release workflow published: a stable one, or a beta. A
@@ -292,13 +292,18 @@ impl Updater {
         let channel = self.channel;
         let tx = self.tx.clone();
         runtime.spawn(async move {
-            let result =
-                async { tokio::time::timeout(std::time::Duration::from_secs(8), source.check(aurora_version::version(), channel)).await? }
-                    .await
-                    .map_err(|e: anyhow::Error| {
-                        log::warn!("release check: {e:#}");
-                        Failure::Network
-                    });
+            let result = async {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(8),
+                    source.check(aurora_version::product_version(), channel),
+                )
+                .await?
+            }
+            .await
+            .map_err(|e: anyhow::Error| {
+                log::warn!("release check: {e:#}");
+                Failure::Network
+            });
             let _ = tx.send(Event::Checked { result, generation });
         });
     }
@@ -601,6 +606,8 @@ mod tests {
             ("0.7.6+3.gabcdef123", false),
             ("0.7.7-beta.20261025.1+2.gabcdef123", false),
             ("0.0.0+0.gunknown", false),
+            ("1.0.0-dev+gabcdef123", false),
+            ("1.0.0", true),
         ] {
             assert_eq!(published_version(version), checks, "{version}");
         }

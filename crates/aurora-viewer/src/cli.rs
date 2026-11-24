@@ -86,7 +86,10 @@ pub fn get() -> &'static Cli {
             std::process::exit(0);
         }
         if cli.version {
-            println!("{}", aurora_i18n::tr!("common-aurora-viewer", value0 = aurora_version::version()));
+            println!(
+                "{}",
+                aurora_i18n::tr!("common-aurora-viewer", value0 = aurora_version::product_version())
+            );
             std::process::exit(0);
         }
         cli
@@ -202,18 +205,19 @@ fn parse_fps_limit(value: &str) -> Option<u32> {
 /// The window title, ending with the build profile ("(Dev)", "(Release)",
 /// "(Debug)"): test windows of different builds can be told apart.
 pub fn window_title() -> String {
-    title_with(get().title.as_deref(), env!("AURORA_BUILD_PROFILE"), aurora_version::version())
+    title_with(
+        get().title.as_deref(),
+        env!("AURORA_BUILD_PROFILE"),
+        aurora_version::product_version(),
+    )
 }
 
-/// The viewer's identity on the Linux desktop: Wayland app_id, X11
-/// WM_CLASS, and the name of `packaging/linux/aurora-viewer.desktop`, whose
-/// `StartupWMClass` repeats it. The panel and the dock match the window to
-/// that file (name, icon, pinning) only when the two agree. The executable's
-/// name, which X11 used by default: X11 desktops see no change. The Legacy
-/// Viewer's `com.secondlife.indra.viewer` is shared by every viewer of its
-/// family, so Aurora does not take it.
+/// The Waters Roux Linux desktop identity. Its Wayland app_id, X11
+/// WM_CLASS, launcher Exec, icon and .desktop filename must agree. Keep
+/// it distinct from Aurora's desktop identity so both viewers can coexist.
+/// Historical Aurora profile data and SLURL handlers are migrated separately.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-pub const DESKTOP_ID: &str = "aurora-viewer";
+pub const DESKTOP_ID: &str = "waters-roux-viewer";
 
 /// Window attributes with the [`DESKTOP_ID`] on Linux; elsewhere unchanged.
 pub fn with_desktop_id(attrs: winit::window::WindowAttributes) -> winit::window::WindowAttributes {
@@ -230,10 +234,15 @@ pub fn with_desktop_id(attrs: winit::window::WindowAttributes) -> winit::window:
 
 fn title_with(title: Option<&str>, profile_dir: &str, version: &str) -> String {
     let base = match title {
-        Some(t) => format!("Waters Roux Viewer — Beta 27 {version} - {t}"),
-        None => format!("Waters Roux Viewer — Beta 27 {version}"),
+        Some(t) => format!("Waters Roux Viewer {version} - {t}"),
+        None => format!("Waters Roux Viewer {version}"),
     };
-    match profile_label(profile_dir) {
+    let profile = if profile_dir == "release" && version.contains("-dev") {
+        Some("Preview")
+    } else {
+        profile_label(profile_dir)
+    };
+    match profile {
         Some(p) => format!("{base} ({p})"),
         None => base,
     }
@@ -269,6 +278,12 @@ pub fn title_slug() -> Option<String> {
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_product_desktop_identity_is_branded() {
+        assert_eq!(DESKTOP_ID, "waters-roux-viewer");
+    }
+
     #[test]
     fn uninstall_is_a_flag_and_a_link_cannot_carry_it() {
         assert!(parse(["--uninstall"].into_iter().map(String::from)).uninstall);
@@ -299,14 +314,18 @@ mod tests {
     fn title_ends_with_the_build_profile() {
         assert_eq!(
             title_with(Some("Test ombres"), "debug", "0.2.0"),
-            "Waters Roux Viewer — Beta 27 0.2.0 - Test ombres (Dev)"
+            "Waters Roux Viewer 0.2.0 - Test ombres (Dev)"
         );
-        assert_eq!(title_with(None, "release", "0.2.0"), "Waters Roux Viewer — Beta 27 0.2.0 (Release)");
-        assert_eq!(title_with(None, "debugging", "0.2.0"), "Waters Roux Viewer — Beta 27 0.2.0 (Debug)");
-        assert_eq!(title_with(Some("X"), "unknown", "0.2.0"), "Waters Roux Viewer — Beta 27 0.2.0 - X");
+        assert_eq!(title_with(None, "release", "0.2.0"), "Waters Roux Viewer 0.2.0 (Release)");
+        assert_eq!(
+            title_with(None, "release", "1.0.0-dev+gabcdef123"),
+            "Waters Roux Viewer 1.0.0-dev+gabcdef123 (Preview)"
+        );
+        assert_eq!(title_with(None, "debugging", "0.2.0"), "Waters Roux Viewer 0.2.0 (Debug)");
+        assert_eq!(title_with(Some("X"), "unknown", "0.2.0"), "Waters Roux Viewer 0.2.0 - X");
         assert_eq!(
             title_with(None, "debug", "0.2.0+7.gabcdef123"),
-            "Waters Roux Viewer — Beta 27 0.2.0+7.gabcdef123 (Dev)"
+            "Waters Roux Viewer 0.2.0+7.gabcdef123 (Dev)"
         );
     }
 

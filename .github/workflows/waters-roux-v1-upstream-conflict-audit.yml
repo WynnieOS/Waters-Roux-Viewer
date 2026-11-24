@@ -1,0 +1,83 @@
+name: Waters Roux v1 - Aurora 0.9.12 upstream conflict audit
+
+# Read-only integration planning. No merge, commit, push or release.
+on:
+  push:
+    branches: [integrate/waters-roux-v1.0-aurora-0.9.12]
+    paths: [.github/workflows/waters-roux-v1-upstream-conflict-audit.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upstream-conflicts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout the Waters Roux integration source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Perform isolated Aurora upstream merge feasibility audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p upstream-audit
+          {
+            echo "# Waters Roux v1.0 - Aurora 0.9.12 upstream conflict report"
+            echo ""
+            echo "Waters Roux source: $(git rev-parse HEAD)"
+            echo "Aurora release requested: v0.9.12"
+            echo "No source code is merged by this workflow."
+          } > upstream-audit/report.md
+          git remote add aurora https://github.com/Aurora-Viewer/Aurora-Viewer.git
+          git fetch --no-tags aurora refs/tags/v0.9.12:refs/tags/wr-audit-aurora-v0.9.12
+          upstream="$(git rev-parse refs/tags/wr-audit-aurora-v0.9.12^{commit})"
+          printf "\nAurora source SHA: %s\n" "$upstream" >> upstream-audit/report.md
+          base="$(git merge-base HEAD "$upstream" || true)"
+          echo "Common ancestor: ${base:-none}" >> upstream-audit/report.md
+          echo "" >> upstream-audit/report.md
+          set +e
+          GIT_MERGE_AUTOEDIT=no git -c user.name="Waters Roux CI" -c user.email="ci@users.noreply.github.com" merge --no-ff --no-commit "$upstream" > upstream-audit/merge-output.txt 2>&1
+          code="$?"
+          set -e
+          echo "Merge feasibility exit code: $code" >> upstream-audit/report.md
+          git diff --name-only --diff-filter=U > upstream-audit/conflicted-files.txt || true
+          git diff --name-only --cached > upstream-audit/upstream-staged-files.txt || true
+          git diff --stat --cached > upstream-audit/staged-stat.txt || true
+          echo "" >> upstream-audit/report.md
+          echo "Conflicted paths: $(wc -l < upstream-audit/conflicted-files.txt)" >> upstream-audit/report.md
+          echo "Staged paths: $(wc -l < upstream-audit/upstream-staged-files.txt)" >> upstream-audit/report.md
+          echo "" >> upstream-audit/report.md
+          echo "Conflicts and clean changes are *review candidates*, not safe-to-overwrite approvals." >> upstream-audit/report.md
+          echo "The original Waters Roux branch, the Aurora upstream repository and any installed viewers remain unchanged." >> upstream-audit/report.md
+          cat upstream-audit/report.md | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '--- First 100 conflicted paths ---'
+          head -100 upstream-audit/conflicted-files.txt
+          echo '--- First 80 staged change paths ---'
+          head -80 upstream-audit/upstream-staged-files.txt
+          if test -f .git/MERGE_HEAD; then git merge --abort; fi
+          git reset --hard HEAD
+          git diff --quiet && git diff --cached --quiet  # untracked audit report is intentional
+          echo '--- Requested-feature source references ---'
+          for term in show_flycam_banner flycam_banner Skin::load dual_inventory autocorrect; do
+            echo "Feature lookup: $term"
+            git grep -n -F "$term" -- crates/aurora-viewer/src | head -40 || true
+          done
+          {
+            echo "## Requested-feature source locations"
+            for term in show_flycam_banner flycam_banner Skin::load dual_inventory autocorrect; do
+              echo "### $term"
+              git grep -n -F "$term" -- crates/aurora-viewer/src | head -40 || true
+            done
+          } > upstream-audit/feature-wiring.txt
+      - name: Publish conflict evidence (not a product build)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Waters-Roux-v1-Aurora-0.9.12-Upstream-Conflict-Audit
+          path: upstream-audit/
+          retention-days: 14
+          if-no-files-found: warn

@@ -111,7 +111,7 @@ pub struct AboutUi {
 /// The release page of this version, for a published version only (a
 /// build between two tags has none).
 pub fn release_notes(version: &str) -> Option<String> {
-    let published = !version.is_empty() && !version.contains('+') && version != "0.0.0";
+    let published = !version.is_empty() && !version.contains('+') && !version.contains('-') && version != "0.0.0";
     published.then(|| format!("{}/releases/tag/v{version}", crate::links::GITHUB))
 }
 
@@ -119,7 +119,7 @@ pub fn release_notes(version: &str) -> Option<String> {
 /// a block per card, a line per value (LLFloaterAbout::getInfo's order,
 /// its English labels).
 pub fn copy_text(sections: &[Section]) -> String {
-    let version = aurora_version::version();
+    let version = aurora_version::product_version();
     let mut out = format!("Waters Roux Viewer {version}\n");
     if let Some(url) = release_notes(version) {
         out.push_str(&format!("Release notes: {url}\n"));
@@ -149,9 +149,10 @@ impl AboutUi {
             WINDOW,
             aurora_i18n::tr!("ui-bars-about"),
             egui::pos2(360.0, 110.0),
-            Vec2::new(600.0, 720.0),
+            // Keep everyday About short; advanced details stay optional below.
+            Vec2::new(580.0, 500.0),
         );
-        floater.min_size = Vec2::new(440.0, 420.0);
+        floater.min_size = Vec2::new(440.0, 350.0);
         floater.show(ctx, p, open, |ui| {
             hero(ui, p, view.logo);
             ui.add_space(10.0);
@@ -182,23 +183,37 @@ impl AboutUi {
             .id_salt("about_info")
             .auto_shrink([false, false])
             .show(&mut body, |ui| {
-                for (s, section) in sections.iter().enumerate() {
-                    let mut card = sheet::card_begin(ui);
-                    let c = &mut card.child;
-                    sheet::card_title(c, p, section.icon, aurora_i18n::text(section.title), None);
-                    c.add_space(4.0);
-                    for (r, row) in section.rows.iter().enumerate() {
-                        let copied = self
-                            .value_copied
-                            .is_some_and(|(cs, cr, at)| cs == s && cr == r && now.duration_since(at) < COPIED_FOR);
-                        if value_row(c, p, aurora_i18n::text(row.label), &row.value.shown(), copied) {
-                            c.ctx().copy_text(row.value.english());
-                            self.value_copied = Some((s, r, now));
+                ui.label(
+                    RichText::new("Version, build and support links appear above. For upstream and third-party notices, open Licenses. Expand diagnostics only if troubleshooting.")
+                        .size(12.0)
+                        .color(p.muted),
+                );
+                ui.add_space(8.0);
+                widgets::collapsing(
+                    ui,
+                    p,
+                    "waters-roux-about-diagnostics",
+                    "System and diagnostic details",
+                    false,
+                    |ui| {
+                    for (s, section) in sections.iter().enumerate() {
+                        let mut card = sheet::card_begin(ui);
+                        let c = &mut card.child;
+                        sheet::card_title(c, p, section.icon, aurora_i18n::text(section.title), None);
+                        c.add_space(4.0);
+                        for (r, row) in section.rows.iter().enumerate() {
+                            let copied = self
+                                .value_copied
+                                .is_some_and(|(cs, cr, at)| cs == s && cr == r && now.duration_since(at) < COPIED_FOR);
+                            if value_row(c, p, aurora_i18n::text(row.label), &row.value.shown(), copied) {
+                                c.ctx().copy_text(row.value.english());
+                                self.value_copied = Some((s, r, now));
+                            }
+                            c.add_space(5.0);
                         }
-                        c.add_space(5.0);
+                        sheet::card_end(ui, p, card);
                     }
-                    sheet::card_end(ui, p, card);
-                }
+                    });
                 if std::mem::take(&mut self.scroll_to_end) {
                     ui.scroll_to_cursor(Some(egui::Align::BOTTOM));
                 }
@@ -275,14 +290,14 @@ fn hero(ui: &mut egui::Ui, p: &Palette, logo: Option<&egui::TextureHandle>) {
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
-                sheet::pill(ui, p, Tone::Group, "tag-filled", aurora_version::version());
+                sheet::pill(ui, p, Tone::Group, "tag-filled", aurora_version::product_version());
                 let build = aurora_i18n::tr!("about-build-pill", profile = build_label());
                 sheet::pill(ui, p, Tone::Neutral, "", &build);
             });
             ui.add_space(6.0);
             ui.horizontal_wrapped(|ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
-                if let Some(url) = release_notes(aurora_version::version()) {
+                if let Some(url) = release_notes(aurora_version::product_version()) {
                     link(ui, p, "file-text-filled", aurora_i18n::tr!("about-release-notes"), &url);
                 }
                 link(ui, p, "brand-github-filled", "GitHub", crate::links::GITHUB);
@@ -306,7 +321,11 @@ fn hero(ui: &mut egui::Ui, p: &Palette, logo: Option<&egui::TextureHandle>) {
 /// target folder.
 pub fn build_label() -> &'static str {
     let dir = env!("AURORA_BUILD_PROFILE");
-    crate::cli::profile_label(dir).unwrap_or(dir)
+    if dir == "release" && aurora_version::product_version().contains("-dev") {
+        "Preview"
+    } else {
+        crate::cli::profile_label(dir).unwrap_or(dir)
+    }
 }
 
 /// A link of the banner: a flat button that opens `url` in the browser.
@@ -442,6 +461,7 @@ mod tests {
             Some("https://github.com/WynnieOS/Waters-Roux-Viewer/releases/tag/v0.7.0")
         );
         assert_eq!(release_notes("0.7.0+3.gabcdef123"), None);
+        assert_eq!(release_notes("1.0.0-dev+gabcdef123"), None);
         assert_eq!(release_notes("0.0.0"), None);
     }
 
@@ -461,7 +481,7 @@ mod tests {
         ];
         let text = copy_text(&sections);
         let blocks: Vec<&str> = text.split("\n\n").collect();
-        assert!(blocks[0].starts_with(&format!("Waters Roux Viewer {}", aurora_version::version())));
+        assert!(blocks[0].starts_with(&format!("Waters Roux Viewer {}", aurora_version::product_version())));
         assert_eq!(
             blocks[1],
             format!(

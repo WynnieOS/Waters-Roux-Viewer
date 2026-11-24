@@ -9,6 +9,7 @@ on:
     paths:
       - '.github/workflows/waters-roux-preview.yml'
       - '.github/workflows/waters-roux-v3-exact-artifact-security.yml'
+      - '.github/workflows/waters-roux-v1-exact-artifact-security.yml'
       - 'crates/**'
       - 'assets/branding/**'
       - 'scripts/package*.ps1'
@@ -69,8 +70,12 @@ jobs:
           # the product version from github.sha or the Actions run number.
           $sourceBranch = $env:WR_SOURCE_BRANCH
           $baseBranch = $env:WR_BASE_BRANCH
-          $isV3 = ($sourceBranch -match '(^|[-/])v3([-/]|$)') -or ($baseBranch -match '(^|[-/])v3([-/]|$)')
-          if ($isV3) {
+          $isV1 = $sourceBranch -match 'waters-roux-v1[.]0-'
+          $isV3 = (-not $isV1) -and (($sourceBranch -match '(^|[-/])v3([-/]|$)') -or ($baseBranch -match '(^|[-/])v3([-/]|$)'))
+          if ($isV1) {
+            $betaLabel = 'v1.0 Development'
+            $slug = 'V1-0-DEVELOPMENT'
+          } elseif ($isV3) {
             $betaLabel = 'Beta 28 V3'
             $slug = 'Beta-28-V3-DEVELOPMENT'
           } else {
@@ -89,12 +94,16 @@ jobs:
           }
           $buildInfo = Get-Content -LiteralPath (Join-Path $folder 'BUILD-INFO.txt') -Raw
           if (-not $buildInfo.Contains($betaLabel)) { throw "Incorrect packaged beta identity: $betaLabel" }
-          if ($isV3) {
-            if (-not (Test-Path -LiteralPath (Join-Path $folder 'BETA-28-V3-ACCEPTANCE.md') -PathType Leaf)) {
-              throw 'V3 package is missing the master acceptance checklist.'
+          if ($isV3 -or $isV1) {
+            $acceptance = if ($isV1) { 'V1-0-ACCEPTANCE.md' } else { 'BETA-28-V3-ACCEPTANCE.md' }
+            if (-not (Test-Path -LiteralPath (Join-Path $folder $acceptance) -PathType Leaf)) {
+              throw 'Development package is missing the applicable acceptance checklist.'
             }
             if (Test-Path -LiteralPath (Join-Path $folder 'MISSING-ARTWORK.txt')) {
-              throw 'V3 artwork/branding is incomplete. Do not upload this preview.'
+              throw 'Official artwork/branding is incomplete. Do not upload this preview.'
+            }
+            if ($isV1 -and $buildInfo -notmatch 'Waters Roux Viewer 1\.0\.0-dev\+g[0-9a-f]{9}') {
+              throw 'v1.0 preview executable does not report its unique unreleased product version.'
             }
             # The recorder calls tools/ffmpeg.exe at runtime. A build without
             # this executable compiles but cannot record MP4 on a clean PC.
@@ -159,7 +168,7 @@ jobs:
             "Requested code line: $betaLabel"
             "Source branch: $sourceBranch"
             "GitHub Actions commit: $env:WR_SOURCE_SHA"
-            'Do not install over the current viewer, distribute to residents, or claim this is the approved Beta 28 V3.'
+            'Do not install over the current viewer, distribute to residents, or claim this is an approved release.'
             'Automated compilation is not in-world QA. The 18-section acceptance gate remains open.'
           ) | Set-Content -LiteralPath (Join-Path $folder 'DEVELOPMENT-NOT-FOR-RELEASE.txt') -Encoding utf8
           Compress-Archive -LiteralPath $folder -DestinationPath $zip
@@ -184,10 +193,21 @@ jobs:
     # The completed preview job has uploaded its archive and SHA256 sidecar.
     # Scan this run's bytes, never a previous preview's historical artifact.
     needs: preview
-    if: ${{ needs.preview.result == 'success' && (github.head_ref == 'waters-roux-v3-unified-review' || github.base_ref == 'waters-roux-v3-unified-review' || github.ref == 'refs/heads/waters-roux-v3-unified-review') }}
+    if: ${{ needs.preview.result == 'success' && !startsWith(github.head_ref, 'integrate/waters-roux-v1.0-') && (github.head_ref == 'waters-roux-v3-unified-review' || github.base_ref == 'waters-roux-v3-unified-review' || github.ref == 'refs/heads/waters-roux-v3-unified-review') }}
     permissions:
       contents: read
       actions: read
     uses: ./.github/workflows/waters-roux-v3-exact-artifact-security.yml
+    with:
+      artifact_run_id: ${{ format('{0}', github.run_id) }}
+
+  v1_exact_windows_artifact_security:
+    name: Scan the exact packaged v1.0 development ZIP (blocking)
+    needs: preview
+    if: ${{ needs.preview.result == 'success' && (startsWith(github.head_ref, 'integrate/waters-roux-v1.0-') || startsWith(github.ref, 'refs/heads/integrate/waters-roux-v1.0-')) }}
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/waters-roux-v1-exact-artifact-security.yml
     with:
       artifact_run_id: ${{ format('{0}', github.run_id) }}

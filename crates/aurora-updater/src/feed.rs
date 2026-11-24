@@ -195,7 +195,11 @@ impl Source {
                 let v = version(&r.tag_name)?;
                 // GitHub's pre-release flag must agree with the version: a
                 // stable number marked pre-release (or the reverse) is skipped.
-                (r.tag_name.starts_with('v') && !r.draft && r.prerelease == !v.pre.is_empty() && channel.accepts(&v)).then_some((v, r))
+                ((r.tag_name.starts_with("waters-roux-v") || r.tag_name.starts_with('v'))
+                    && !r.draft
+                    && r.prerelease == !v.pre.is_empty()
+                    && channel.accepts(&v))
+                .then_some((v, r))
             })
             .max_by(|a, b| a.0.cmp_precedence(&b.0))
         else {
@@ -205,7 +209,10 @@ impl Source {
             return Ok(None);
         }
         self.validate_url(&r.html_url)?;
-        let expected = format!("Aurora-Viewer-{}-windows-x64.zip", r.tag_name);
+        // Release assets belong to Waters Roux, not Aurora's original viewer.
+        // The versioned filename stays consistent even with our namespaced
+        // release tag (waters-roux-v1.0.0).
+        let expected = format!("Waters-Roux-Viewer-v{v}-windows-x64.zip");
         let archive = r
             .assets
             .iter()
@@ -254,7 +261,11 @@ impl Source {
 }
 
 pub fn version(value: &str) -> Option<Version> {
-    Version::parse(value.strip_prefix('v').unwrap_or(value)).ok()
+    let untagged = value
+        .strip_prefix("waters-roux-v")
+        .or_else(|| value.strip_prefix('v'))
+        .unwrap_or(value);
+    Version::parse(untagged).ok()
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -334,6 +345,12 @@ mod tests {
     }
     #[test]
     fn strict_semver_and_provenance() {
+        assert_eq!(version("waters-roux-v1.0.0").unwrap().to_string(), "1.0.0");
+        assert_eq!(version("v1.0.0").unwrap().to_string(), "1.0.0");
+        assert_eq!(
+            format!("Waters-Roux-Viewer-v{}-windows-x64.zip", version("waters-roux-v1.0.0").unwrap()),
+            "Waters-Roux-Viewer-v1.0.0-windows-x64.zip"
+        );
         assert!(crate::is_newer("v0.3.0", "0.2.0+8.gabc123"));
         assert!(!crate::is_newer("v0.2.0", "0.2.0+8.gabc123"));
         assert!(crate::is_newer("v1.0.0", "1.0.0-rc.1"));

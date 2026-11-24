@@ -914,10 +914,18 @@ impl Plates {
         icons: &super::icons::Icons,
         tags: &[Tag<'_>],
         now: f64,
+        style: &crate::ui::name_tag_studio::Style,
         mut placed: impl FnMut(Uuid, Rect, glam::Vec3),
     ) {
         let mut env = paint::Env::new(painter, p, icons, now);
         env.friend = self.friend_tint.then(|| crate::ui::colors::c(crate::ui::colors::get().tag_friend));
+        if style.plate_style_enabled {
+            let [r, g, b, a] = style.plate_tint;
+            env.plate_tint_override = Some(egui::Color32::from_rgba_unmultiplied(r, g, b, a));
+            let [r, g, b, a] = style.plate_border_color;
+            env.plate_border_override = Some(egui::Color32::from_rgba_unmultiplied(r, g, b, a));
+            env.plate_surface_opacity = style.plate_surface_opacity.clamp(0.15, 1.0);
+        }
         // nearest first (`tags` ends with them): the level of each plate,
         // the complete ones limited in number, and the blur for the first ones
         let mut glass_left = if p.panel_alpha < 255 { MAX_GLASS } else { 0 };

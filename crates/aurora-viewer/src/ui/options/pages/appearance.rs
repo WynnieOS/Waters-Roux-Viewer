@@ -32,7 +32,7 @@ pub fn page(cx: &mut Cx, tab: usize) {
                 );
                 cx.note(tr!("ui-options-customize-colors-icons-and-the-toolbar-in"));
                 cx.below().row(tr!("ui-options-skin-folder"), "", &Nothing, |ui, _| {
-                    let dir = crate::settings::config_dir().join("skins").join("aurora");
+                    let dir = crate::settings::config_dir().join("skins").join(crate::ui::skin::PRODUCT_SKIN);
                     ui.vertical(|ui| {
                         ui.label(RichText::new(dir.display().to_string()).size(12.0).monospace().color(p.teal));
                         ui.label(
@@ -63,6 +63,29 @@ fn interface_colors(cx: &mut Cx) {
             tr!("ui-options-interface-colors-help")
         });
         cx.greyed(high_contrast);
+        // Presets use the same persisted colour overrides as the existing
+        // custom swatches. Choosing one never edits the resident's skin files
+        // or her independently saved login/background artwork.
+        cx.row(
+            "Waters Roux palettes",
+            "Live preview; automatically saved with your interface settings",
+            &Nothing,
+            |ui, settings| {
+                let mut changed = false;
+                ui.horizontal_wrapped(|ui| {
+                    for name in ["Bayou Glass", "Blood Moon", "Moss & Gold", "Creole Rose"] {
+                        let colors = waters_roux_preset(name);
+                        let selected = settings.interface_colors == colors;
+                        if ui.selectable_label(selected, name).clicked() && !selected {
+                            settings.interface_colors = colors;
+                            changed = true;
+                        }
+                    }
+                });
+                changed
+            },
+        );
+        cx.note("Choose a palette above or customize each color and glass opacity below.");
         base_color(
             cx,
             tr!("ui-options-accent-color"),
@@ -131,6 +154,33 @@ fn interface_colors(cx: &mut Cx) {
             }
         }
     });
+}
+
+/// Curated, readable Waters Roux palettes. Existing per-color preferences and
+/// WCAG contrast adjustment continue to apply after a preset is selected.
+fn waters_roux_preset(name: &str) -> crate::interface_colors::InterfaceColors {
+    use crate::interface_colors::InterfaceColors;
+    match name {
+        "Blood Moon" => InterfaceColors {
+            accent: Some([183, 159, 43, 255]),
+            surface: Some([30, 8, 12, 255]),
+            text: Some([230, 224, 216, 255]),
+            glass_alpha: Some(228),
+        },
+        "Moss & Gold" => InterfaceColors {
+            accent: Some([253, 181, 21, 255]),
+            surface: Some([29, 45, 34, 255]),
+            text: Some([230, 224, 216, 255]),
+            glass_alpha: Some(228),
+        },
+        "Creole Rose" => InterfaceColors {
+            accent: Some([112, 62, 94, 255]),
+            surface: Some([244, 244, 244, 255]),
+            text: Some([38, 36, 33, 255]),
+            glass_alpha: Some(210),
+        },
+        _ => InterfaceColors::default(), // The approved Bayou Glass base theme.
+    }
 }
 
 /// One base colour: its swatch shows the colour in use (a demo run's
@@ -456,6 +506,18 @@ fn system_font_search(ui: &mut egui::Ui, filter: &mut String, opening: bool) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn waters_roux_palettes_are_distinct_saveable_and_reversible() {
+        let saved = ["Bayou Glass", "Blood Moon", "Moss & Gold", "Creole Rose"];
+        let list: Vec<_> = saved.iter().map(|name| waters_roux_preset(name)).collect();
+        assert_eq!(list[0], crate::interface_colors::InterfaceColors::default());
+        for (index, colors) in list.iter().enumerate() {
+            assert_eq!(*colors, serde_json::from_str(&serde_json::to_string(colors).unwrap()).unwrap());
+            assert!(list.iter().enumerate().all(|(other, value)| other == index || value != colors));
+        }
+        assert!(list.iter().skip(1).all(|c| c.glass_alpha.unwrap_or(0) >= 200));
+    }
 
     /// One frame of the System fonts list, open, with a search field and a
     /// font row; returns their rectangles and whether the list is open.

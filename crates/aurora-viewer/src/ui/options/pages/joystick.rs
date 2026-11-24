@@ -552,10 +552,31 @@ pub fn page(cx: &mut Cx) {
         );
         cx.toggle(tr!("joystick-avatar-enabled"), "", &field!(joystick.avatar_enabled));
         cx.toggle(tr!("joystick-flycam-enabled"), "", &field!(joystick.flycam_enabled));
-        cx.toggle(
-            "Show Flycam status banner",
-            "Uncheck to hide the Flycam Mode Is On bar; Flycam and its keyboard shortcut remain active.",
-            &field!(joystick.show_flycam_banner),
+        cx.row(
+            "Flycam status banner",
+            "Visible, briefly show it for three seconds, or hide it without ending Flycam",
+            &Nothing,
+            |ui, s| {
+                let current = s.joystick.banner_mode();
+                let mut chosen = current;
+                egui::ComboBox::from_id_salt("waters-roux-flycam-banner-mode")
+                    .selected_text(current.label())
+                    .show_ui(ui, |ui| {
+                        for mode in [
+                            crate::joystick::FlycamBannerMode::Visible,
+                            crate::joystick::FlycamBannerMode::Brief,
+                            crate::joystick::FlycamBannerMode::Hidden,
+                        ] {
+                            ui.selectable_value(&mut chosen, mode, mode.label());
+                        }
+                    });
+                if chosen != current {
+                    s.joystick.flycam_banner_mode = Some(chosen);
+                    true
+                } else {
+                    false
+                }
+            },
         );
         cx.row_with(tr!("joystick-flycam"), tr!("joystick-flycam-hint"), &Nothing, |ui, s, st, r| {
             let available = s.joystick.enabled && s.joystick.flycam_enabled && st.joystick.selected(&s.joystick).is_some();
