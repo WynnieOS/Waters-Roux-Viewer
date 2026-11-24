@@ -378,6 +378,12 @@ impl ClipVoice {
         }
     }
 
+    /// Plays from sample `pos` (a rotated clip's start).
+    pub(crate) fn starting_at(mut self, pos: usize) -> Self {
+        self.pos = pos.min(self.data.len()) & !1;
+        self
+    }
+
     fn mix_into(&mut self, bus: &mut [f32]) -> bool {
         let remaining = &self.data[self.pos.min(self.data.len())..];
         let n = remaining.len().min(bus.len());
@@ -561,6 +567,12 @@ impl WorldVoice {
             send: 0.0,
             send_target: 0.0,
         }
+    }
+
+    /// Plays from sample `pos` (a rotated clip's start).
+    pub(crate) fn starting_at(mut self, pos: usize) -> Self {
+        self.pos = pos.min(self.data.len()) & !1;
+        self
     }
 
     /// New send factor to the reverb: glided to over a buffer, at once
