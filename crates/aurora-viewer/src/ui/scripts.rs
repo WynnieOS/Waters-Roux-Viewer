@@ -870,6 +870,28 @@ impl Editors {
 mod tests {
     use super::*;
 
+    #[test]
+    fn windows_lsl_import_reuses_inventory_script_save_without_preprocessing() {
+        let target = ScriptTarget { object: Uuid::nil(), item: Uuid::from_u128(42) };
+        let mut editors = Editors::default();
+        let load = editors.open(target, "Imported".into(), true, true).expect("load request");
+        editors.loaded(load, target, Ok("default {}".into()));
+        // Direct file import must upload the selected source verbatim, even
+        // when a resident's global editor has preprocessing enabled.
+        editors.documents[0].processor_settings.preprocessor = true;
+        let script = "default { state_entry() { llSay(0, \"imported\"); } }";
+        let action = editors.import_source(target, script.into()).expect("real SaveScript action");
+        match action {
+            Action::Save { target: requested, source, .. } => {
+                assert_eq!(requested, target);
+                assert_eq!(source, script);
+            }
+            _ => panic!("Import must use the existing network save path"),
+        }
+        assert!(editors.documents[0].saving.is_some());
+        assert!(!editors.documents[0].processor_settings.preprocessor);
+    }
+
     fn window(target: ScriptTarget) -> String {
         format!("script_editor_{}_{}", target.object, target.item)
     }
