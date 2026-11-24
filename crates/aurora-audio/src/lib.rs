@@ -240,10 +240,9 @@ impl AudioEngine {
     /// the same id): mono, looped or not, with (left, right) gains updated
     /// by [`AudioEngine::world_gain`] as the listener or the source moves.
     pub fn play_world(&self, id: u64, ch: Channel, clip: &SoundClip, looped: bool, gain: (f32, f32)) {
-        let _ = self
-            .inner
-            .cmd_tx
-            .try_send(Command::PlayWorld(WorldVoice::new(id, ch, clip.samples.clone(), looped, gain).starting_at(clip.start)));
+        let _ = self.inner.cmd_tx.try_send(Command::PlayWorld(
+            WorldVoice::new(id, ch, clip.samples.clone(), looped, gain).starting_at(clip.start),
+        ));
     }
 
     /// Like [`AudioEngine::play_world`], rendered binaurally (3D sound for
@@ -305,10 +304,9 @@ impl AudioEngine {
 
     /// Plays a one-shot sound on `ch` with an extra per-sound `gain` (0..=1).
     pub fn play_clip(&self, ch: Channel, clip: &SoundClip, gain: f32) {
-        let _ = self
-            .inner
-            .cmd_tx
-            .try_send(Command::PlayClip(ClipVoice::new(ch, clip.samples.clone(), gain).starting_at(clip.start)));
+        let _ = self.inner.cmd_tx.try_send(Command::PlayClip(
+            ClipVoice::new(ch, clip.samples.clone(), gain).starting_at(clip.start),
+        ));
     }
 }
 
