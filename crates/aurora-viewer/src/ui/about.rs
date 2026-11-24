@@ -149,9 +149,10 @@ impl AboutUi {
             WINDOW,
             aurora_i18n::tr!("ui-bars-about"),
             egui::pos2(360.0, 110.0),
-            Vec2::new(600.0, 720.0),
+            // Keep everyday About short; advanced details stay optional below.
+            Vec2::new(580.0, 500.0),
         );
-        floater.min_size = Vec2::new(440.0, 420.0);
+        floater.min_size = Vec2::new(440.0, 350.0);
         floater.show(ctx, p, open, |ui| {
             hero(ui, p, view.logo);
             ui.add_space(10.0);
@@ -183,7 +184,7 @@ impl AboutUi {
             .auto_shrink([false, false])
             .show(&mut body, |ui| {
                 ui.label(
-                    RichText::new("Waters Roux Viewer. Version, support and project links are shown above. Aurora and third-party credits remain in Credits & Licences.")
+                    RichText::new("Version, build and support links appear above. For upstream and third-party notices, open Licenses. Expand diagnostics only if troubleshooting.")
                         .size(12.0)
                         .color(p.muted),
                 );
