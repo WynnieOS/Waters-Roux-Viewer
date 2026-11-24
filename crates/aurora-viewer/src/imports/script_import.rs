@@ -33,6 +33,7 @@ struct Pending {
 #[derive(Default)]
 pub struct State {
     reader: Option<Receiver<Selection>>,
+    cancel_requested: bool,
     files: VecDeque<Source>,
     pending: Option<Pending>,
     pub message: String,
@@ -102,6 +103,7 @@ impl State {
         }
         let (tx, rx) = unbounded();
         self.reader = Some(rx);
+        self.cancel_requested = false;
         self.message = "Choose .lsl / .txt source files".into();
         std::thread::spawn(move || {
             let mut selection = Selection::default();
@@ -123,6 +125,10 @@ impl State {
         match rx.try_recv() {
             Ok(selection) => {
                 self.reader = None;
+                if std::mem::take(&mut self.cancel_requested) {
+                    self.message = "Script file selection cancelled; no inventory items created".into();
+                    return;
+                }
                 self.errors += selection.errors.len();
                 if selection.files.is_empty() {
                     self.message = selection
@@ -229,6 +235,7 @@ impl State {
     }
 
     pub fn cancel_queue(&mut self) {
+        self.cancel_requested = self.reader.is_some();
         self.files.clear();
         // An in-flight creation/save cannot be cancelled safely. Keep its
         // source and wait for the simulator response rather than losing it.
