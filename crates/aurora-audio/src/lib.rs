@@ -243,7 +243,7 @@ impl AudioEngine {
         let _ = self
             .inner
             .cmd_tx
-            .try_send(Command::PlayWorld(WorldVoice::new(id, ch, clip.samples.clone(), looped, gain)));
+            .try_send(Command::PlayWorld(WorldVoice::new(id, ch, clip.samples.clone(), looped, gain).starting_at(clip.start)));
     }
 
     /// Like [`AudioEngine::play_world`], rendered binaurally (3D sound for
@@ -251,7 +251,7 @@ impl AudioEngine {
     /// direction in the listener's frame (x to the right, y ahead, z up),
     /// updated by [`AudioEngine::world_binaural`].
     pub fn play_world_binaural(&self, id: u64, ch: Channel, clip: &SoundClip, looped: bool, gain: f32, direction: [f32; 3]) {
-        let voice = WorldVoice::new_binaural(id, ch, clip.samples.clone(), looped, gain, direction);
+        let voice = WorldVoice::new_binaural(id, ch, clip.samples.clone(), looped, gain, direction).starting_at(clip.start);
         let _ = self.inner.cmd_tx.try_send(Command::PlayWorld(voice));
     }
 
@@ -308,7 +308,7 @@ impl AudioEngine {
         let _ = self
             .inner
             .cmd_tx
-            .try_send(Command::PlayClip(ClipVoice::new(ch, clip.samples.clone(), gain)));
+            .try_send(Command::PlayClip(ClipVoice::new(ch, clip.samples.clone(), gain).starting_at(clip.start)));
     }
 }
 
