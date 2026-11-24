@@ -858,6 +858,8 @@ pub mod particle_flags {
     pub const AXIS: u32 = 4;
     /// Velocity-oriented billboard: project its axis onto the viewing plane.
     pub const FOLLOW_VELOCITY: u32 = 8;
+    /// Weather lightning ribbon with soft width and continuous length.
+    pub const LINE: u32 = 16;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1294,6 +1296,117 @@ pub struct MirrorParams {
 pub struct OverlayEffect {
     pub color: [f32; 4],
     pub texture: [u32; 4],
+}
+
+/// Rain prototype: the weather settings the wet ground follows.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RainLook {
+    /// Puddles gather on level ground; in snow, the snow settles.
+    pub puddles: bool,
+    /// How far the wet ground and its puddles are drawn (m); in snow, the
+    /// snow lying.
+    pub distance: f32,
+    /// The wind now (m/s): the drops' slant.
+    pub wind: [f32; 2],
+    /// How far the wind has carried the drops so far (m).
+    pub drift: [f32; 2],
+    /// How much of the weather is drawn: 0 low, 1 medium, 2 high (the
+    /// drops and splashes, the distant rain's layers, the puddles' ring
+    /// layers and their reflections).
+    pub quality: u32,
+    /// What falls is snow, with the flakes' size scale (0.5 to 2; 0: rain):
+    /// flakes instead of drops, nothing wets.
+    pub snow: f32,
+    /// The lying snow's detail texture (normal and height): its bindless
+    /// slot, 0 for none.
+    pub snow_detail: u32,
+    /// How far the weather lying on the ground is drawn at most (m): the
+    /// farther of the puddles' and the snow's distances. The wetness
+    /// memory's square covers it (128, 256 or 512 m).
+    pub memory_reach: f32,
+    /// How far the snow lying on the ground is drawn (m), whatever falls
+    /// now: while it snows and while it melts after (it was twice the
+    /// puddles' distance then, past what the memory covers: the snow
+    /// stopped in a line). `memory_reach` covers it while it settles.
+    pub snow_distance: f32,
+    /// Deep snow's reach around my avatar at High weather quality (m, 10 to
+    /// 40); Low and Medium keep their share of it (two thirds, 13/15).
+    pub deep_reach: f32,
+    /// How deep snow lies in the open at least (0..1): `AURORA_SNOW_LYING`'s
+    /// floor for demo captures, else 0.
+    pub snow_lying: f32,
+    /// Snow lying on the ground is drawn ("Snow settles"), whatever falls
+    /// now: off, none at once, nor while what lay melts after the weather
+    /// turned to rain or cleared (the memory keeps it, unseen).
+    pub snow_settles: bool,
+    /// Footprints are kept in the lying snow.
+    pub footprints: bool,
+    /// Their map: how wide (m, 32 to 64: the wider, the coarser) and where
+    /// its centre is (my avatar: a camera zoomed out keeps them).
+    pub trail_extent: f32,
+    pub trail_centre: [f32; 2],
+    /// Puddles freeze while it snows or snow lies (they neither drain nor
+    /// dry while frozen).
+    pub ice: bool,
+    /// Deep snow (experimental): the lying snow's surface traced with
+    /// parallax, its lumps and footprints standing up from what it lies on.
+    pub deep_snow: bool,
+    /// The lightning lighting the sky from where it struck: x, y the way to
+    /// it (unit), z the sine of the glow's height in the sky, w how bright
+    /// (0: none).
+    pub lightning: [f32; 4],
+    /// The aurora in the night sky (env.wgsl `aurora_sky`): x how bright
+    /// (0: none, 1 a strong display), y the way it stands (rad, clockwise
+    /// from north), z the height of its foot (0 on the horizon, 1 overhead),
+    /// w its colours (0 green, 1 green under violet, 2 green under red).
+    pub aurora: [f32; 4],
+    /// Feet set down this frame: x, y (m), the foot's heading (rad), its half
+    /// length (m); the first `snow_stamp_count`.
+    pub snow_stamps: [[f32; 4]; SNOW_STAMPS],
+    pub snow_stamp_count: u32,
+    /// The soles' heights (m), the stamps' order: a foot presses only
+    /// where it stands on the snow (a flying avatar's feet press nothing).
+    pub snow_stamp_z: [f32; SNOW_STAMPS],
+    /// This frame starts the weather's memory again: no snow lying, the
+    /// ground dry, no puddles (the Weather window's clean-up button).
+    pub clean: bool,
+    /// This frame starts it again full of snow: lying everywhere as deep as
+    /// a long snowfall leaves it (the snow-fill button).
+    pub fill: bool,
+}
+
+/// The most feet set down in the snow in one frame.
+pub const SNOW_STAMPS: usize = 16;
+
+impl Default for RainLook {
+    fn default() -> Self {
+        Self {
+            puddles: true,
+            distance: 38.0,
+            wind: [0.0; 2],
+            drift: [0.0; 2],
+            quality: 2,
+            snow: 0.0,
+            snow_detail: 0,
+            memory_reach: 60.0,
+            snow_distance: 60.0,
+            deep_reach: 15.0,
+            snow_lying: 0.0,
+            snow_settles: true,
+            footprints: false,
+            trail_extent: 32.0,
+            trail_centre: [0.0; 2],
+            ice: false,
+            deep_snow: false,
+            lightning: [0.0; 4],
+            aurora: [0.0; 4],
+            snow_stamps: [[0.0; 4]; SNOW_STAMPS],
+            snow_stamp_count: 0,
+            snow_stamp_z: [0.0; SNOW_STAMPS],
+            clean: false,
+            fill: false,
+        }
+    }
 }
 
 /// A photo drawn in tiles reads GTAO's depth of the whole photo beyond
