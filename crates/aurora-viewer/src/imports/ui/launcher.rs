@@ -83,6 +83,13 @@ pub(super) fn show(ctx: &egui::Context, p: &Palette, imports: &mut Imports, acti
                         .on_hover_text("Clear queued script files; an in-flight inventory item will finish safely.")
                         .clicked();
                 }
+                if !imports.lsl.message.is_empty() {
+                    ui.add_sized(
+                        Vec2::new(170.0, 32.0),
+                        egui::Label::new(egui::RichText::new(&imports.lsl.message).size(11.0).color(p.muted)).truncate(),
+                    )
+                    .on_hover_text(&imports.lsl.message);
+                }
                 ui.add_space(6.0);
                 let kind = if visible && imports.tab == Tab::Permissions {
                     ActionKind::Primary
