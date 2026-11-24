@@ -276,7 +276,10 @@ impl SoundClip {
             return Err(AudioError::Decode("no audio decoded".into()));
         }
         fade_clip_edges(&mut out);
-        Ok(SoundClip { samples: out.into(), start: 0 })
+        Ok(SoundClip {
+            samples: out.into(),
+            start: 0,
+        })
     }
 
     /// Builds a clip from raw interleaved f32 PCM (`channels` >= 1).
