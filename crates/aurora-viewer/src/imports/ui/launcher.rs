@@ -22,6 +22,8 @@ pub(super) fn show(ctx: &egui::Context, p: &Palette, imports: &mut Imports, acti
     }
     let mut open = imports.launcher_open;
     let mut picked = None;
+    let mut import_scripts = false;
+    let mut cancel_scripts = false;
     let mut settings = false;
     let work = crate::ui::layout::work_area(ctx);
     let room = crate::ui::layout::move_area(ctx);
@@ -73,6 +75,15 @@ pub(super) fn show(ctx: &egui::Context, p: &Palette, imports: &mut Imports, acti
                     }
                 }
                 ui.add_space(6.0);
+                import_scripts = button(ui, p, "code", "Import LSL scripts", ActionKind::Flat, !imports.lsl.busy())
+                    .on_hover_text("Import .lsl / .txt files as Second Life inventory scripts; no asset-upload fee. Uses the real grid script save/compile service.")
+                    .clicked();
+                if imports.lsl.busy() {
+                    cancel_scripts = button(ui, p, "x", "Clear pending LSL scripts", ActionKind::Flat, true)
+                        .on_hover_text("Clear queued script files; an in-flight inventory item will finish safely.")
+                        .clicked();
+                }
+                ui.add_space(6.0);
                 let kind = if visible && imports.tab == Tab::Permissions {
                     ActionKind::Primary
                 } else {
@@ -91,6 +102,12 @@ pub(super) fn show(ctx: &egui::Context, p: &Palette, imports: &mut Imports, acti
         });
     });
     imports.launcher_open = open;
+    if import_scripts {
+        actions.push(Action::ImportScripts);
+    }
+    if cancel_scripts {
+        actions.push(Action::CancelScripts);
+    }
     if let Some(choice) = picked {
         if choice == Choice::Bulk {
             imports.select_type(Choice::Bulk);
