@@ -68,6 +68,8 @@ pub struct CenterUi {
     pub peek: Vec<Peek>,
     pub tab: Tab,
     pub query: String,
+    /// An intentional second click is required before dismissing offers or scripts.
+    confirm_clear: bool,
     last_seen: u64,
     last_time: Option<f64>,
     /// The panel's rectangle last frame (hovering it pauses the cards).
@@ -540,6 +542,13 @@ fn rolled_out(
     }
 }
 
+/// Dismissal requests go through the normal notification response path,
+/// including the correct network replies for interactive invitations and
+/// scripted objects. Never remove pending offers silently.
+fn dismiss_all_requests(list: &Notifications) -> Vec<(u64, Response)> {
+    list.list.iter().map(|n| (n.id, Response::Dismiss)).collect()
+}
+
 /// The full list: "To do" and "History" tabs, "Mark all read", the paused
 /// bell's banner.
 #[allow(clippy::too_many_arguments)]
@@ -644,6 +653,34 @@ fn full_list(
     ui.add_space(4.0);
     tabs(ui, p, &mut nui.center.tab);
     ui.add_space(4.0);
+    if nui.center.tab == Tab::ToDo {
+        if ui
+            .add_enabled(!list.list.is_empty(), egui::Button::new("Clear all notifications"))
+            .on_hover_text("Dismiss all notices, including pending invitations and script dialogs, only after confirmation.")
+            .clicked()
+        {
+            nui.center.confirm_clear = true;
+        }
+        if nui.center.confirm_clear {
+            super::widgets::surface(ui, p, |ui| {
+                ui.label(RichText::new("Dismiss every notification? Pending offers, invitations and script prompts will be closed or declined. Your history will remain available.").size(12.0).color(p.ink));
+                ui.horizontal(|ui| {
+                    if ui.button("Dismiss all").clicked() {
+                        answers.extend(dismiss_all_requests(list));
+                        nui.center.peek.clear();
+                        nui.center.presence.clear();
+                        nui.center.confirm_clear = false;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        nui.center.confirm_clear = false;
+                    }
+                });
+            });
+        }
+        ui.add_space(4.0);
+    } else {
+        nui.center.confirm_clear = false;
+    }
     let max_h = ui.ctx().content_rect().height() * 0.65;
     match nui.center.tab {
         Tab::ToDo => {
