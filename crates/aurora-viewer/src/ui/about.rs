@@ -188,9 +188,13 @@ impl AboutUi {
                         .color(p.muted),
                 );
                 ui.add_space(8.0);
-                egui::CollapsingHeader::new("System and diagnostic details")
-                    .default_open(false)
-                    .show(ui, |ui| {
+                widgets::collapsing(
+                    ui,
+                    p,
+                    "waters-roux-about-diagnostics",
+                    "System and diagnostic details",
+                    false,
+                    |ui| {
                     for (s, section) in sections.iter().enumerate() {
                         let mut card = sheet::card_begin(ui);
                         let c = &mut card.child;
