@@ -261,7 +261,10 @@ impl Source {
 }
 
 pub fn version(value: &str) -> Option<Version> {
-    let untagged = value.strip_prefix("waters-roux-v").or_else(|| value.strip_prefix('v')).unwrap_or(value);
+    let untagged = value
+        .strip_prefix("waters-roux-v")
+        .or_else(|| value.strip_prefix('v'))
+        .unwrap_or(value);
     Version::parse(untagged).ok()
 }
 
@@ -344,7 +347,10 @@ mod tests {
     fn strict_semver_and_provenance() {
         assert_eq!(version("waters-roux-v1.0.0").unwrap().to_string(), "1.0.0");
         assert_eq!(version("v1.0.0").unwrap().to_string(), "1.0.0");
-        assert_eq!(format!("Waters-Roux-Viewer-v{}-windows-x64.zip", version("waters-roux-v1.0.0").unwrap()), "Waters-Roux-Viewer-v1.0.0-windows-x64.zip");
+        assert_eq!(
+            format!("Waters-Roux-Viewer-v{}-windows-x64.zip", version("waters-roux-v1.0.0").unwrap()),
+            "Waters-Roux-Viewer-v1.0.0-windows-x64.zip"
+        );
         assert!(crate::is_newer("v0.3.0", "0.2.0+8.gabc123"));
         assert!(!crate::is_newer("v0.2.0", "0.2.0+8.gabc123"));
         assert!(crate::is_newer("v1.0.0", "1.0.0-rc.1"));

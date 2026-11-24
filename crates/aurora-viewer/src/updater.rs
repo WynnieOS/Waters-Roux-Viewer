@@ -292,13 +292,18 @@ impl Updater {
         let channel = self.channel;
         let tx = self.tx.clone();
         runtime.spawn(async move {
-            let result =
-                async { tokio::time::timeout(std::time::Duration::from_secs(8), source.check(aurora_version::product_version(), channel)).await? }
-                    .await
-                    .map_err(|e: anyhow::Error| {
-                        log::warn!("release check: {e:#}");
-                        Failure::Network
-                    });
+            let result = async {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(8),
+                    source.check(aurora_version::product_version(), channel),
+                )
+                .await?
+            }
+            .await
+            .map_err(|e: anyhow::Error| {
+                log::warn!("release check: {e:#}");
+                Failure::Network
+            });
             let _ = tx.send(Event::Checked { result, generation });
         });
     }
