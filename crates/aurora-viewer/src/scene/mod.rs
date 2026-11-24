@@ -61,6 +61,12 @@ mod skin_binds;
 pub mod sound_occlusion;
 pub mod sound_reverb;
 pub mod sounds;
+// Weather audio processors have matching licensed OGG assets and are compiled
+// independently before the in-world weather loop is connected.
+#[allow(dead_code)]
+pub mod rain_sound;
+#[allow(dead_code)]
+pub mod thunder;
 pub mod still_check;
 pub mod surface_area;
 mod sync_check;
