@@ -3310,6 +3310,9 @@ impl App {
             let Some(item) = self.particle_script_created(item) else {
                 return;
             };
+            if self.lsl_created(&item) {
+                return;
+            }
             let gesture = item.asset_type == 21;
             let id = item.id;
             if self.create_landmark_ui.created(id, item.parent, item.asset_type) {
@@ -3577,7 +3580,14 @@ impl App {
             return;
         }
         if let NetEvent::ScriptLoaded { request, target, result } = ev {
+            let loaded = result.is_ok();
+            let reason = result.as_ref().err().cloned();
             self.script_editors.loaded(request, target, result);
+            if loaded {
+                self.lsl_loaded(target);
+            } else if let Some(reason) = reason {
+                self.imports.lsl.failed(target, &reason);
+            }
             return;
         }
         if let NetEvent::ScriptExperiences { request, target, result } = ev {
@@ -3589,7 +3599,12 @@ impl App {
                 self.particle_script_uploaded(request, result);
                 return;
             }
-            self.script_saved(request, target, result);
+            if self.imports.lsl.is_target(target) {
+                self.script_saved(request, target, result.clone());
+                self.imports.lsl.finished(target, &result);
+            } else {
+                self.script_saved(request, target, result);
+            }
             return;
         }
         if let NetEvent::InventoryThumbnailSource {
