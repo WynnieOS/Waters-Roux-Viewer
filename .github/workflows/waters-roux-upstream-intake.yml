@@ -1,0 +1,77 @@
+name: Waters Roux — Aurora stable upstream intake
+
+# Detection and review only. Never merges Aurora into Waters Roux or publishes builds.
+# GitHub schedules only run from the repository default branch; this workflow remains
+# inactive on the v1 development branch until approved and integrated.
+on:
+  schedule:
+    - cron: '17 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  latest-stable:
+    name: Compare Aurora's latest stable release with Waters Roux's reviewed base
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out the reviewed version pin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Alert once per newly published Aurora stable release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WR_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          pinned="$(tr -d '\r\n' < docs/AURORA_UPSTREAM_PIN.txt)"
+          if [[ ! "$pinned" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid reviewed Aurora stable pin: $pinned" >&2
+            exit 1
+          fi
+          latest="$(gh api repos/Aurora-Viewer/Aurora-Viewer/releases/latest --jq '.tag_name')"
+          if [[ ! "$latest" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Upstream latest release is not a stable semver tag: $latest" >&2
+            exit 1
+          fi
+          if [[ "$latest" == "$pinned" ]]; then
+            echo "Aurora stable is already at the reviewed pin: $pinned"
+            exit 0
+          fi
+
+          title="Aurora stable intake: $latest"
+          export WR_INTAKE_TITLE="$title"
+          existing="$(gh issue list --repo "$WR_REPOSITORY" --state all --limit 100               --search "in:title Aurora stable intake: $latest"               --json title --jq '.[] | select(.title == env.WR_INTAKE_TITLE) | .title')"
+          if [[ -n "$existing" ]]; then
+            echo "Already tracked: $title"
+            exit 0
+          fi
+
+          body="$RUNNER_TEMP/aurora-intake.md"
+          cat > "$body" <<EOF
+          ## New upstream Aurora stable release: $latest
+          Reviewed Waters Roux source base: $pinned
+
+          - Aurora release: https://github.com/Aurora-Viewer/Aurora-Viewer/releases/tag/$latest
+          - Aurora stable comparison: https://github.com/Aurora-Viewer/Aurora-Viewer/compare/$pinned...$latest
+          - Waters Roux integration policy: #34
+
+          **Review required before adopting code:** protocol/authentication, voice, RLVa,
+          environment/weather, graphics/PBR, camera, inventory, packaging and security.
+          Protect the approved Waters Roux identity and the nine working V3 enhancements.
+          Do not overwrite the four-part login manager, workspaces, Name Tag Studio,
+          Machinima Bar, selection beam, population display, PhotoTools, voice indicators
+          or MP4 recorder. Preserve license notices and owner acceptance gates.
+
+          This issue is a notification, NOT a merge, a release, a green build, or proof
+          that Waters Roux is running Aurora $latest. A reviewed integration PR must
+          pin each adopted upstream commit, pass full Windows/Linux/feature tests, and
+          await owner acceptance.
+          EOF
+          gh issue create --repo "$WR_REPOSITORY" --title "$title" --body-file "$body"
