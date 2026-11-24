@@ -872,7 +872,10 @@ mod tests {
 
     #[test]
     fn windows_lsl_import_reuses_inventory_script_save_without_preprocessing() {
-        let target = ScriptTarget { object: Uuid::nil(), item: Uuid::from_u128(42) };
+        let target = ScriptTarget {
+            object: Uuid::nil(),
+            item: Uuid::from_u128(42),
+        };
         let mut editors = Editors::default();
         let load = editors.open(target, "Imported".into(), true, true).expect("load request");
         editors.loaded(load, target, Ok("default {}".into()));
@@ -882,7 +885,9 @@ mod tests {
         let script = "default { state_entry() { llSay(0, \"imported\"); } }";
         let action = editors.import_source(target, script.into()).expect("real SaveScript action");
         match action {
-            Action::Save { target: requested, source, .. } => {
+            Action::Save {
+                target: requested, source, ..
+            } => {
                 assert_eq!(requested, target);
                 assert_eq!(source, script);
             }
