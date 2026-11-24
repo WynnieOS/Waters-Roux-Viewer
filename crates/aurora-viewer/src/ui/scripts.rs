@@ -531,6 +531,10 @@ impl Editors {
         }
         editor.source = source;
         editor.tools.reset_history = true;
+        // A direct import preserves the file's original bytes as LSL source.
+        // Do not silently run the user's optional script preprocessor here:
+        // preprocessor jobs can yield no immediate Save action.
+        editor.processor_settings.preprocessor = false;
         // Upload even when the imported file matches the new item's default
         // text: the simulator must acknowledge the correct source asset.
         editor.recompile_allowed = true;
