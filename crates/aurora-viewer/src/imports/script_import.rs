@@ -75,7 +75,10 @@ fn source_from_bytes(path: &Path, bytes: &[u8]) -> Result<Source, String> {
     if text.trim().is_empty() {
         return Err(format!("{name}: source file is empty"));
     }
-    Ok(Source { name, text: text.to_owned() })
+    Ok(Source {
+        name,
+        text: text.to_owned(),
+    })
 }
 
 fn read(path: &Path) -> Result<Source, String> {
@@ -122,14 +125,22 @@ impl State {
                 self.reader = None;
                 self.errors += selection.errors.len();
                 if selection.files.is_empty() {
-                    self.message = selection.errors.first().cloned().unwrap_or_else(|| "Script import cancelled".into());
+                    self.message = selection
+                        .errors
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| "Script import cancelled".into());
                 } else {
                     let count = selection.files.len();
                     self.files.extend(selection.files);
                     self.message = if selection.errors.is_empty() {
                         format!("{count} script file(s) ready to create in inventory")
                     } else {
-                        format!("{count} script file(s) ready; {} file(s) rejected: {}", selection.errors.len(), selection.errors[0])
+                        format!(
+                            "{count} script file(s) ready; {} file(s) rejected: {}",
+                            selection.errors.len(),
+                            selection.errors[0]
+                        )
                     };
                 }
             }
@@ -151,18 +162,19 @@ impl State {
         let source = self.files.pop_front()?;
         let name = source.name.clone();
         self.message = format!("Creating {name} in inventory…");
-        self.pending = Some(Pending { source, folder, item: None, injected: false });
+        self.pending = Some(Pending {
+            source,
+            folder,
+            item: None,
+            injected: false,
+        });
         Some(name)
     }
 
     /// Only the exact matching new inventory-script item belongs to this job.
     pub fn created(&mut self, item: &InvItem) -> bool {
         let Some(pending) = &mut self.pending else { return false };
-        if pending.item.is_some()
-            || item.asset_type != 10
-            || item.name != pending.source.name
-            || item.parent != pending.folder
-        {
+        if pending.item.is_some() || item.asset_type != 10 || item.name != pending.source.name || item.parent != pending.folder {
             return false;
         }
         pending.item = Some(item.id);
@@ -233,7 +245,10 @@ mod tests {
     use super::*;
 
     fn script(name: &str, text: &str) -> Source {
-        Source { name: name.into(), text: text.into() }
+        Source {
+            name: name.into(),
+            text: text.into(),
+        }
     }
 
     #[test]
@@ -256,7 +271,13 @@ mod tests {
         let mut state = State::default();
         state.files.push_back(script("Hello", "default { state_entry() {} }"));
         assert_eq!(state.next(folder).as_deref(), Some("Hello"));
-        let mut created = InvItem { id: item, parent: folder, name: "Hello".into(), asset_type: 10, ..Default::default() };
+        let mut created = InvItem {
+            id: item,
+            parent: folder,
+            name: "Hello".into(),
+            asset_type: 10,
+            ..Default::default()
+        };
         created.parent = Uuid::from_u128(300);
         assert!(!state.created(&created));
         created.parent = folder;
@@ -265,7 +286,15 @@ mod tests {
         let target = ScriptTarget { object: Uuid::nil(), item };
         assert_eq!(state.take_source(target).as_deref(), Some("default { state_entry() {} }"));
         assert!(state.take_source(target).is_none());
-        state.finished(target, &Ok(ScriptSaved { asset: Uuid::from_u128(400), compiled: true, checked: true, errors: vec![] }));
+        state.finished(
+            target,
+            &Ok(ScriptSaved {
+                asset: Uuid::from_u128(400),
+                compiled: true,
+                checked: true,
+                errors: vec![],
+            }),
+        );
         assert_eq!(state.saved, 1);
         assert!(!state.busy());
     }
