@@ -16,8 +16,8 @@ pub mod mesh;
 pub mod permissions;
 pub mod persistence;
 pub mod preview;
-pub mod sound;
 pub mod script_import;
+pub mod sound;
 mod stage;
 #[cfg(test)]
 mod tests;
