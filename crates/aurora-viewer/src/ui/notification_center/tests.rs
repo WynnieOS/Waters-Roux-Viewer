@@ -26,7 +26,11 @@ fn clear_all_includes_pending_offers_without_silently_removing_them() {
     assert_eq!(requests.len(), 2);
     assert_eq!(requests.iter().map(|(id, _)| *id).collect::<Vec<_>>(), vec![informational, invite]);
     assert!(requests.iter().all(|(_, response)| matches!(response, Response::Dismiss)));
-    assert_eq!(list.list.len(), 2, "generating the requests must not dismiss anything before confirmation");
+    assert_eq!(
+        list.list.len(),
+        2,
+        "generating the requests must not dismiss anything before confirmation"
+    );
 }
 
 fn at(now: f64) -> Moment {
