@@ -116,7 +116,8 @@ fn migrate_legacy_skin(legacy: &Path, dest: &Path) {
         }
     }
     let old_icons = legacy.join("icons");
-    if old_icons.is_dir() && std::fs::create_dir_all(dest.join("icons")).is_ok()
+    if old_icons.is_dir()
+        && std::fs::create_dir_all(dest.join("icons")).is_ok()
         && let Ok(entries) = std::fs::read_dir(old_icons)
     {
         for entry in entries.flatten() {
@@ -268,12 +269,21 @@ mod tests {
         std::fs::write(old.join("layout.json"), r#"{"chat_bar_fraction":0.25}"#).unwrap();
         std::fs::write(old.join("icons").join("my-icon.png"), b"png-fixture").unwrap();
         migrate_legacy_skin(&old, &new);
-        assert_eq!(std::fs::read(new.join("theme.json")).unwrap(), std::fs::read(old.join("theme.json")).unwrap());
-        assert_eq!(std::fs::read(new.join("layout.json")).unwrap(), std::fs::read(old.join("layout.json")).unwrap());
+        assert_eq!(
+            std::fs::read(new.join("theme.json")).unwrap(),
+            std::fs::read(old.join("theme.json")).unwrap()
+        );
+        assert_eq!(
+            std::fs::read(new.join("layout.json")).unwrap(),
+            std::fs::read(old.join("layout.json")).unwrap()
+        );
         assert_eq!(std::fs::read(new.join("icons/my-icon.png")).unwrap(), b"png-fixture");
         std::fs::write(new.join("theme.json"), "my updated Waters Roux skin").unwrap();
         migrate_legacy_skin(&old, &new);
-        assert_eq!(std::fs::read_to_string(new.join("theme.json")).unwrap(), "my updated Waters Roux skin");
+        assert_eq!(
+            std::fs::read_to_string(new.join("theme.json")).unwrap(),
+            "my updated Waters Roux skin"
+        );
         assert!(old.join("theme.json").exists());
         std::fs::remove_dir_all(dir).unwrap();
     }
