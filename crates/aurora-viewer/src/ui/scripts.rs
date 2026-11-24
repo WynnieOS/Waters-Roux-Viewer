@@ -516,6 +516,27 @@ impl Editors {
         }
     }
 
+    /// Replace a newly loaded, editable inventory script with local source,
+    /// then use exactly the existing script upload/compile command. This is
+    /// never called on object scripts or arbitrary existing inventory items.
+    pub fn import_source(&mut self, target: ScriptTarget, source: String) -> Result<Action, String> {
+        let Some(editor) = self.documents.iter_mut().find(|e| e.target == target) else {
+            return Err("Script editor did not open".into());
+        };
+        if !target.object.is_nil() || !editor.can_edit || !editor.loaded || editor.loading.is_some() || editor.saving.is_some() {
+            return Err("Inventory script is not ready for writing".into());
+        }
+        if source.len() > MAX_SOURCE {
+            return Err("Script exceeds the Second Life source size limit".into());
+        }
+        editor.source = source;
+        editor.tools.reset_history = true;
+        // Upload even when the imported file matches the new item's default
+        // text: the simulator must acknowledge the correct source asset.
+        editor.recompile_allowed = true;
+        editor.save().ok_or_else(|| "Script could not enter the normal save pipeline".into())
+    }
+
     pub fn load_experiences(&mut self, target: ScriptTarget) -> Option<Action> {
         let e = self
             .documents
