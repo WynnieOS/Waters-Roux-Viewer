@@ -196,6 +196,9 @@ impl Sky {
         surface: 0.0,
     };
 
+    // Pending scene integration: kept from Aurora for the weather sound-exposure path.
+    // Remove this allowance when the scene calls Sky::of for live weather.
+    #[allow(dead_code)]
     pub fn of(hits: &[Option<f32>; RAYS]) -> Sky {
         let sides = [glam::Vec2::X, glam::Vec2::Y, glam::Vec2::NEG_X, glam::Vec2::NEG_Y];
         let (mut open, mut count) = ([0.0f32; 4], [0.0f32; 4]);
