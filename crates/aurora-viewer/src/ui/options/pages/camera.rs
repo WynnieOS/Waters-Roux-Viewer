@@ -112,6 +112,22 @@ pub fn page(cx: &mut Cx, tab: usize) {
             });
             cx.group(tr!("common-camera-movement"), |cx| {
                 let p = cx.p;
+                // These are genuinely wired to the mouse and keyboard camera code,
+                // persisted with CameraSettings, and independent of mouselook aim.
+                cx.slider(
+                    "Orbit speed",
+                    "Adjust camera orbit from precise slow movement to quick turns. 1x is the original speed.",
+                    &field!(camera.orbit_speed),
+                    0.1..=4.0,
+                    "×",
+                );
+                cx.slider(
+                    "Pan speed",
+                    "Adjust how quickly the camera slides left, right, up and down. 1x is the original speed.",
+                    &field!(camera.pan_speed),
+                    0.1..=4.0,
+                    "×",
+                );
                 cx.row(
                     tr!("ui-options-camera-viewing-angle"),
                     tr!("ui-options-camera-vertical-field-of-view-60-by-default-as-with"),

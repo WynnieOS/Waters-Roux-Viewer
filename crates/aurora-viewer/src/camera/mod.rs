@@ -1420,7 +1420,7 @@ impl Camera {
 
     /// Mouse motion during a camera drag (LLToolCamera::handleHover), in
     /// window pixels (y down). A full window width turns 360°.
-    pub fn drag(&mut self, mode: ToolMode, dx: f32, dy: f32, width: f32, agent: &mut AgentState) {
+    pub fn drag(&mut self, mode: ToolMode, dx: f32, dy: f32, width: f32, agent: &mut AgentState, s: &CameraSettings) {
         let Some(t) = &mut self.tool else {
             return;
         };
@@ -1438,7 +1438,7 @@ impl Camera {
             self.fold_orbit(agent);
         }
         let width = width.max(1.0);
-        let k = TAU / width;
+        let k = TAU / width * s.orbit_speed;
         match mode {
             ToolMode::Orbit => {
                 if dx != 0.0 {
@@ -1449,7 +1449,7 @@ impl Camera {
                 }
             }
             ToolMode::Pan => {
-                let meters_per_pixel = 3.0 * self.position.distance(self.target) / width;
+                let meters_per_pixel = 3.0 * self.position.distance(self.target) / width * s.pan_speed;
                 if dx != 0.0 {
                     self.pan_left(dx * meters_per_pixel);
                 }
@@ -1507,11 +1507,11 @@ impl Camera {
         self.unlock_view(agent, s);
         let over = keys.orbit_up - keys.orbit_down;
         if over != 0.0 {
-            self.orbit_over(over * ORBIT_RATE * dt);
+            self.orbit_over(over * ORBIT_RATE * s.orbit_speed * dt);
         }
         let around = keys.orbit_left - keys.orbit_right;
         if around != 0.0 {
-            self.orbit_around(around * ORBIT_RATE * dt, agent);
+            self.orbit_around(around * ORBIT_RATE * s.orbit_speed * dt, agent);
         }
         let inward = keys.zoom_in - keys.zoom_out;
         if inward != 0.0 {
@@ -1521,11 +1521,11 @@ impl Camera {
         }
         let pan_x = keys.pan_right - keys.pan_left;
         if pan_x != 0.0 {
-            self.pan_left(pan_x * -PAN_RATE * dt);
+            self.pan_left(pan_x * -PAN_RATE * s.pan_speed * dt);
         }
         let pan_y = keys.pan_up - keys.pan_down;
         if pan_y != 0.0 {
-            self.pan_up(pan_y * PAN_RATE * dt);
+            self.pan_up(pan_y * PAN_RATE * s.pan_speed * dt);
         }
     }
 
