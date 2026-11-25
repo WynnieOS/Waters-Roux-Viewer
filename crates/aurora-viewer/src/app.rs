@@ -4230,7 +4230,9 @@ impl App {
             match self.camera.free_mut() {
                 // the free camera looks around instead of orbiting
                 Some(free) => free.drag(dx, dy, s),
-                None => self.camera.orbit_drag(dx, dy, s * self.settings.camera.orbit_speed, &mut self.world.agent),
+                None => self
+                    .camera
+                    .orbit_drag(dx, dy, s * self.settings.camera.orbit_speed, &mut self.world.agent),
             }
         }
     }
