@@ -5699,7 +5699,7 @@ impl App {
         let input = crate::scene::wind_sound::WindInput {
             region_wind,
             velocity: agent.velocity,
-            rotation: agent.body_rotation(),
+            camera_view: self.camera.view(),
             audible: matches!(self.screen, Screen::World)
                 && !demo_silent
                 && agent.flying
