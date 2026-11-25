@@ -8,6 +8,71 @@ use aurora_net::inventory::upload::{Prices, Receipt};
 const SOUND_PREVIEW: u64 = u64::MAX - 10;
 
 impl App {
+    /// Advance one local LSL source at a time through Second Life's actual
+    /// CreateInventoryItem -> LoadScript -> SaveScript protocol.
+    pub(super) fn poll_lsl_import(&mut self, ctx: &egui::Context) {
+        self.imports.lsl.poll();
+        if self.world.rlva.has("viewscript") {
+            if self.imports.lsl.busy() {
+                self.imports.lsl.message = "Scripts cannot be imported while RLVa blocks script viewing".into();
+            }
+            return;
+        }
+        let selected = self.settings.imports.batch_folder;
+        let folder = if crate::world::inventory::actions::destination(&self.world.inventory, selected) {
+            selected
+        } else {
+            self.world.inventory.root
+        };
+        if folder.is_nil() {
+            if self.imports.lsl.busy() {
+                self.imports.lsl.message = "Wait for inventory folders before importing LSL".into();
+            }
+            return;
+        }
+        if let Some(name) = self.imports.lsl.next(folder) {
+            self.send(NetCommand::CreateInventoryItem {
+                parent: folder,
+                kind: aurora_net::inventory::operations::NewItem::Script,
+                name,
+                permissions: None,
+            });
+        }
+        if self.imports.lsl.busy() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        }
+    }
+
+    /// Return true only for the item currently expected by this importer.
+    pub(super) fn lsl_created(&mut self, item: &aurora_net::inventory::InvItem) -> bool {
+        if !self.imports.lsl.created(item) {
+            return false;
+        }
+        self.world.inventory.add_items(vec![item.clone()]);
+        self.inventory_ui.show_original(&self.world.inventory, item.id);
+        let target = aurora_net::scripts::ScriptTarget {
+            object: uuid::Uuid::nil(),
+            item: item.id,
+        };
+        self.open_script(target);
+        if !self.script_editors.documents.iter().any(|editor| editor.target == target) {
+            self.imports
+                .lsl
+                .failed(target, "New inventory script could not be opened for editing");
+        }
+        true
+    }
+
+    pub(super) fn lsl_loaded(&mut self, target: aurora_net::scripts::ScriptTarget) {
+        let Some(source) = self.imports.lsl.take_source(target) else {
+            return;
+        };
+        match self.script_editors.import_source(target, source) {
+            Ok(action) => self.apply_script_action(action),
+            Err(reason) => self.imports.lsl.failed(target, &reason),
+        }
+    }
+
     pub(super) fn show_imports(&mut self, ctx: &egui::Context, palette: &Palette) {
         if self.demo && !self.imports.demo_started {
             // keep a scenario's own balance (AURORA_DEMO_ACTIONS sets one)
@@ -343,6 +408,9 @@ impl App {
                 }
             }
         }
+        // The file picker and inventory script queue progress without
+        // blocking the renderer or interfering with paid asset uploads.
+        self.poll_lsl_import(ctx);
         let was_open = self.imports.any_window_open();
         let mut actions = crate::imports::ui::show(
             ctx,
@@ -411,6 +479,8 @@ impl App {
         }
         for action in actions {
             match action {
+                Action::ImportScripts => self.imports.lsl.choose(),
+                Action::CancelScripts => self.imports.lsl.cancel_queue(),
                 Action::Files => self.imports.choose_files(&self.scene.jobs, ctx, self.settings.imports.texture()),
                 Action::Choose(choice) => self
                     .imports

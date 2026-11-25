@@ -516,6 +516,33 @@ impl Editors {
         }
     }
 
+    /// Replace a newly loaded, editable inventory script with local source,
+    /// then use exactly the existing script upload/compile command. This is
+    /// never called on object scripts or arbitrary existing inventory items.
+    pub fn import_source(&mut self, target: ScriptTarget, source: String) -> Result<Action, String> {
+        let Some(editor) = self.documents.iter_mut().find(|e| e.target == target) else {
+            return Err("Script editor did not open".into());
+        };
+        if !target.object.is_nil() || !editor.can_edit || !editor.loaded || editor.loading.is_some() || editor.saving.is_some() {
+            return Err("Inventory script is not ready for writing".into());
+        }
+        if source.len() > MAX_SOURCE {
+            return Err("Script exceeds the Second Life source size limit".into());
+        }
+        editor.source = source;
+        editor.tools.reset_history = true;
+        // A direct import preserves the file's original bytes as LSL source.
+        // Do not silently run the user's optional script preprocessor here:
+        // preprocessor jobs can yield no immediate Save action.
+        editor.processor_settings.preprocessor = false;
+        // Upload even when the imported file matches the new item's default
+        // text: the simulator must acknowledge the correct source asset.
+        editor.recompile_allowed = true;
+        editor
+            .save()
+            .ok_or_else(|| "Script could not enter the normal save pipeline".into())
+    }
+
     pub fn load_experiences(&mut self, target: ScriptTarget) -> Option<Action> {
         let e = self
             .documents
@@ -842,6 +869,33 @@ impl Editors {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn windows_lsl_import_reuses_inventory_script_save_without_preprocessing() {
+        let target = ScriptTarget {
+            object: Uuid::nil(),
+            item: Uuid::from_u128(42),
+        };
+        let mut editors = Editors::default();
+        let load = editors.open(target, "Imported".into(), true, true).expect("load request");
+        editors.loaded(load, target, Ok("default {}".into()));
+        // Direct file import must upload the selected source verbatim, even
+        // when a resident's global editor has preprocessing enabled.
+        editors.documents[0].processor_settings.preprocessor = true;
+        let script = "default { state_entry() { llSay(0, \"imported\"); } }";
+        let action = editors.import_source(target, script.into()).expect("real SaveScript action");
+        match action {
+            Action::Save {
+                target: requested, source, ..
+            } => {
+                assert_eq!(requested, target);
+                assert_eq!(source, script);
+            }
+            _ => panic!("Import must use the existing network save path"),
+        }
+        assert!(editors.documents[0].saving.is_some());
+        assert!(!editors.documents[0].processor_settings.preprocessor);
+    }
 
     fn window(target: ScriptTarget) -> String {
         format!("script_editor_{}_{}", target.object, target.item)

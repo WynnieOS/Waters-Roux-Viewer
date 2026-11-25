@@ -70,7 +70,8 @@ jobs:
           # the product version from github.sha or the Actions run number.
           $sourceBranch = $env:WR_SOURCE_BRANCH
           $baseBranch = $env:WR_BASE_BRANCH
-          $isV1 = $sourceBranch -match 'waters-roux-v1[.]0-'
+          # Development work can be a direct v1 branch or a feature PR targeting the v1 integration branch.
+          $isV1 = ($sourceBranch -match 'waters-roux-v1([.]0)?-' -or $baseBranch -match 'waters-roux-v1([.]0)?-')
           $isV3 = (-not $isV1) -and (($sourceBranch -match '(^|[-/])v3([-/]|$)') -or ($baseBranch -match '(^|[-/])v3([-/]|$)'))
           if ($isV1) {
             $betaLabel = 'v1.0 Development'
@@ -193,7 +194,7 @@ jobs:
     # The completed preview job has uploaded its archive and SHA256 sidecar.
     # Scan this run's bytes, never a previous preview's historical artifact.
     needs: preview
-    if: ${{ needs.preview.result == 'success' && !startsWith(github.head_ref, 'integrate/waters-roux-v1.0-') && (github.head_ref == 'waters-roux-v3-unified-review' || github.base_ref == 'waters-roux-v3-unified-review' || github.ref == 'refs/heads/waters-roux-v3-unified-review') }}
+    if: ${{ needs.preview.result == 'success' && !contains(github.head_ref, 'waters-roux-v1') && !contains(github.base_ref, 'waters-roux-v1') && !contains(github.ref, 'waters-roux-v1') && (github.head_ref == 'waters-roux-v3-unified-review' || github.base_ref == 'waters-roux-v3-unified-review' || github.ref == 'refs/heads/waters-roux-v3-unified-review') }}
     permissions:
       contents: read
       actions: read
@@ -204,7 +205,9 @@ jobs:
   v1_exact_windows_artifact_security:
     name: Scan the exact packaged v1.0 development ZIP (blocking)
     needs: preview
-    if: ${{ needs.preview.result == 'success' && (startsWith(github.head_ref, 'integrate/waters-roux-v1.0-') || startsWith(github.ref, 'refs/heads/integrate/waters-roux-v1.0-')) }}
+    # Include feature PRs targeting v1; otherwise they were incorrectly labeled Beta 27,
+    # and the exact-artifact security gate was silently skipped.
+    if: ${{ needs.preview.result == 'success' && (contains(github.head_ref, 'waters-roux-v1') || contains(github.base_ref, 'waters-roux-v1') || contains(github.ref, 'waters-roux-v1')) }}
     permissions:
       contents: read
       actions: read

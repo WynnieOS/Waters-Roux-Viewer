@@ -114,6 +114,9 @@ pub(crate) fn factor_swatch(ui: &mut egui::Ui, p: &Palette, id_salt: impl egui::
 
 pub enum Action {
     Files,
+    /// Create real inventory scripts from local LSL/TXT sources.
+    ImportScripts,
+    CancelScripts,
     Choose(Choice),
     Folder,
     Start,
