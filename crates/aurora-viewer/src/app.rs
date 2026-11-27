@@ -709,6 +709,14 @@ pub struct App {
     /// Last tracker beacon sound (FIRE-16969).
     beacon_sound_at: Option<Instant>,
     wind_sound: crate::scene::wind_sound::WindSound,
+    /// Personal-only weather, driven by settings each frame.
+    weather_now: crate::weather::WeatherSettings,
+    /// The settings last saved after the weather sliders were released.
+    weather_saved: crate::weather::WeatherSettings,
+    weather_wind: crate::weather::Wind,
+    rain_sound: crate::scene::rain_sound::RainSound,
+    thunder: crate::scene::thunder::Thunder,
+    weather_started: Instant,
     /// Movement keys held since, and the server position then (stuck agent).
     stuck_watch: Option<(Instant, Vec3)>,
     stuck_logged: Option<Instant>,
@@ -1685,6 +1693,12 @@ impl App {
             script_dialogs_were: 0,
             beacon_sound_at: None,
             wind_sound: Default::default(),
+            weather_now: Default::default(),
+            weather_saved: Default::default(),
+            weather_wind: Default::default(),
+            rain_sound: Default::default(),
+            thunder: Default::default(),
+            weather_started: Instant::now(),
             stuck_watch: None,
             stuck_logged: None,
             attachments_logged: 0,
@@ -5692,23 +5706,63 @@ impl App {
     /// the water.
     fn update_wind_sound(&mut self, dt: f32) {
         let agent = &self.world.agent;
-        let region_wind = self
+        let mut region_wind = self
             .world
             .main()
             .map_or(Vec3::ZERO, |r| r.wind.velocity(agent.position, r.heightmap.size_x as f32));
+        // Personal wind follows the region or the local direction chosen
+        // by the resident. Never send this wind to the simulator.
+        let range = self.weather_now.wind_range();
+        self.weather_wind.advance(
+            Instant::now(),
+            range,
+            self.weather_now.wind_heading(),
+            region_wind.truncate(),
+        );
+        let personal_wind = range.1 > 0.0;
+        if personal_wind {
+            let openness = self.scene.sound_reverb.sky.map_or(1.0, |s| s.exposure.clamp(0.0, 1.0));
+            region_wind = self.weather_wind.now.extend(0.0) * (0.15 + 0.85 * openness);
+        }
         // demo runs stay silent unless AURORA_DEMO_SOUND or AURORA_DEMO_WIND
         let demo_silent = self.demo && std::env::var_os("AURORA_DEMO_SOUND").is_none() && crate::scene::wind_sound::demo_spec().is_none();
         let input = crate::scene::wind_sound::WindInput {
             region_wind,
-            velocity: agent.velocity,
+            velocity: if agent.flying { agent.velocity } else { Vec3::ZERO },
             camera_view: self.camera.view(),
             audible: matches!(self.screen, Screen::World)
                 && !demo_silent
-                && agent.flying
+                && (agent.flying || personal_wind)
                 && !agent.seated
                 && agent.position.z >= self.world.main_water_height(),
         };
         self.wind_sound.update(self.audio_engine.as_ref(), &input, dt);
+    }
+
+    /// Personal local precipitation, thunder and lightning. Independent of
+    /// the region's EEP environment and never sent to the simulator.
+    fn update_personal_weather_audio(&mut self, dt: f32) {
+        let audible = self.in_world()
+            && !(self.demo && std::env::var_os("AURORA_DEMO_SOUND").is_none());
+        let forward = (self.camera.target - self.camera.position).normalize_or(Vec3::X);
+        let rain_input = crate::scene::rain_sound::RainSoundInput {
+            rain: self.weather_now.rain(),
+            sky: self.scene.sound_reverb.sky,
+            forward,
+            underwater: (self.world.main_water_height() - self.camera.position.z).max(0.0),
+            audible,
+        };
+        self.rain_sound.update(self.audio_engine.as_ref(), &rain_input, dt);
+        let thunder_input = crate::scene::thunder::ThunderInput {
+            enabled: self.weather_now.thunder,
+            rain: self.weather_now.rain(),
+            frequency: self.weather_now.thunder_frequency,
+            forward,
+            sky: self.scene.sound_reverb.sky,
+            underwater: self.camera.position.z < self.world.main_water_height(),
+            audible,
+        };
+        self.thunder.update(self.audio_engine.as_ref(), &thunder_input, Instant::now());
     }
 
     /// The media filter's question while one waits (the alerts of
@@ -9340,6 +9394,8 @@ impl App {
         }
         self.update_native_movelock();
         self.update_movement();
+        // The user's switches are applied before every visual/audio frame.
+        self.weather_now = self.settings.weather.in_effect();
         self.update_audio();
         self.update_wind_sound(dt);
         let mut late_camera_frame = None;
@@ -9348,6 +9404,9 @@ impl App {
             self.update_sounds();
             self.update_attention();
         }
+        // Reverb/shelter measurements from update_sounds are ready now.
+        // Also process disabling while outside the world to stop the loops.
+        self.update_personal_weather_audio(dt);
         if self.in_world() {
             let ml = self.camera.mouselook();
             // the clocks the other avatars and the objects move along
@@ -10554,6 +10613,22 @@ impl App {
             if self.settings.world_overlays.hide_particles {
                 self.scene.lists.particles.clear();
             }
+            // Local 3D rain/snow: separate from SL object particles and
+            // rendered in the normal world-depth particle pass.
+            crate::scene::personal_weather::append(
+                &mut self.scene.lists.particles,
+                &self.weather_now,
+                self.camera.position,
+                self.weather_started.elapsed().as_secs_f32(),
+                self.weather_wind.now,
+            );
+            self.thunder.bolts(
+                Instant::now(),
+                self.camera.position,
+                self.world.main_water_height(),
+                self.settings.draw_distance,
+                &mut self.scene.lists.particles,
+            );
             t_part = Instant::now();
         }
         let (lights, spot_shadows) = if in_world {
@@ -10711,6 +10786,17 @@ impl App {
             cutout: self.world.photo_isolation.empty_background(),
             look: None,
         };
+        // Local lightning also lights the 3D scene and the sky, not just
+        // its visible bolt. No region EEP or light settings are modified.
+        if self.weather_now.thunder && self.thunder.flash > 0.001 {
+            let k = self.thunder.flash.clamp(0.0, 1.25);
+            let white = Vec3::new(0.8, 0.85, 1.0);
+            fp.sun_color += white * (k * 1.7);
+            fp.sky_zenith += white * (k * 0.32);
+            fp.sky_horizon += white * (k * 0.24);
+            fp.ground_color += white * (k * 0.15);
+            fp.fog_color += white * (k * 0.15);
+        }
         // a photo's look, or the live view's in the photo mode
         let focus = fp.dof.as_ref().map(|d| d.focus);
         self.snapshots.look_focus = focus;
@@ -17962,8 +18048,14 @@ impl App {
                     self.panels.time_of_day,
                     &mut open,
                     &mut lighting,
+                    &mut self.settings.weather,
                 );
                 self.panels.environment = open;
+                // Save after the drag, not on every slider tick.
+                if self.settings.weather != self.weather_saved && !ctx.input(|i| i.pointer.any_down()) {
+                    self.weather_saved = self.settings.weather.clone();
+                    self.settings.save();
+                }
                 // Quick preferences' environment block shares the window's
                 // lists and "Personal lighting"
                 let quick_actions = self.quick_prefs_window(&ctx, &p, &mut lighting);

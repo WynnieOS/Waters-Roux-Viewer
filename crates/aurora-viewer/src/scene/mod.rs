@@ -65,6 +65,7 @@ pub mod sounds;
 // independently before the in-world weather loop is connected.
 #[allow(dead_code)]
 pub mod rain_sound;
+pub mod personal_weather;
 pub mod still_check;
 pub mod surface_area;
 mod sync_check;

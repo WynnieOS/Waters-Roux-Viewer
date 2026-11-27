@@ -45,6 +45,10 @@ const LIST_H: f32 = 420.0;
 
 #[derive(Default)]
 pub struct EnvironmentUi {
+    /// Independent personal-only weather settings panel, never shared with the region.
+    pub weather_open: bool,
+    pub weather_clean: bool,
+    pub weather_fill: bool,
     catalog: SettingsCatalog,
     /// Inventory generation the lists were built from, and when.
     built: Option<(u64, super::inventory::view::Sort)>,
@@ -96,11 +100,13 @@ impl EnvironmentUi {
         time_of_day: u8,
         open: &mut bool,
         lighting: &mut bool,
+        weather: &mut crate::weather::WeatherSettings,
     ) -> Vec<EnvAction> {
         let mut out = Vec::new();
         let screen = ctx.content_rect();
         // left of the notification toasts (top right)
         let pos = egui::pos2(screen.right() - 740.0, screen.top() + 90.0);
+        let mut weather_open = self.weather_open;
         Floater::new(
             "environment_selector",
             aurora_i18n::tr!("common-environment"),
@@ -111,7 +117,32 @@ impl EnvironmentUi {
         .help(aurora_i18n::tr!("ui-environment-choose-a-sky-water-or-day-cycle-from-your"))
         .show(ctx, p, open, |ui| {
             self.selector_body(ui, p, view, loading, Some(time_of_day), LABEL_W, lighting, &mut out);
+            ui.add_space(6.0);
+            if ui.button("Personal weather…").on_hover_text("Only visible and audible in your viewer; does not modify the region's environment").clicked() {
+                weather_open = true;
+            }
         });
+        self.weather_open = weather_open;
+        if self.weather_open {
+            let mut shown = self.weather_open;
+            let left = (ctx.content_rect().right() - 750.0 - super::weather_window::WINDOW_W)
+                .max(ctx.content_rect().left() + 10.0);
+            let pos = egui::pos2(left, ctx.content_rect().top() + 90.0);
+            let actions = Floater::new(
+                "waters_roux_personal_weather",
+                "Waters Roux — Personal Weather",
+                pos,
+                Vec2::new(super::weather_window::WINDOW_W, 300.0),
+            )
+            .auto_height()
+            .help("Personal-only rain, snow, wind and storm effects; never written to shared Second Life environments.")
+            .show(ctx, p, &mut shown, |ui| super::weather_window::body(ui, p, weather));
+            if let Some(actions) = actions {
+                self.weather_clean |= actions.clean;
+                self.weather_fill |= actions.fill;
+            }
+            self.weather_open = shown;
+        }
         out
     }
 
