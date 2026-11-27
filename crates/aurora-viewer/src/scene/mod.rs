@@ -1331,6 +1331,12 @@ fn tex_anim_targets(anim_face: i8, fi: usize) -> bool {
 }
 
 impl Scene {
+    /// Latest measured sky exposure, read-only for local rain and thunder audio.
+    /// Do not expose the scene's mutable reverb state to the application.
+    pub fn weather_sky(&self) -> Option<sound_reverb::Sky> {
+        self.sound_reverb.sky
+    }
+
     /// LLViewHighlightTransparent / LLPipeline::rebuildDrawInfo: invisible
     /// faces need temporary records while the transparency overlay is on.
     /// See indra/newview/llviewermenu.cpp and pipeline.cpp (LGPL 2.1).

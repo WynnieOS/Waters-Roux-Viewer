@@ -5717,7 +5717,7 @@ impl App {
             .advance(Instant::now(), range, self.weather_now.wind_heading(), region_wind.truncate());
         let personal_wind = range.1 > 0.0;
         if personal_wind {
-            let openness = self.scene.sound_reverb.sky.map_or(1.0, |s| s.exposure.clamp(0.0, 1.0));
+            let openness = self.scene.weather_sky().map_or(1.0, |s| s.exposure.clamp(0.0, 1.0));
             region_wind = self.weather_wind.now.extend(0.0) * (0.15 + 0.85 * openness);
         }
         // demo runs stay silent unless AURORA_DEMO_SOUND or AURORA_DEMO_WIND
@@ -5742,7 +5742,7 @@ impl App {
         let forward = (self.camera.target - self.camera.position).normalize_or(Vec3::X);
         let rain_input = crate::scene::rain_sound::RainSoundInput {
             rain: self.weather_now.rain(),
-            sky: self.scene.sound_reverb.sky,
+            sky: self.scene.weather_sky(),
             forward,
             underwater: (self.world.main_water_height() - self.camera.position.z).max(0.0),
             audible,
@@ -5753,7 +5753,7 @@ impl App {
             rain: self.weather_now.rain(),
             frequency: self.weather_now.thunder_frequency,
             forward,
-            sky: self.scene.sound_reverb.sky,
+            sky: self.scene.weather_sky(),
             underwater: self.camera.position.z < self.world.main_water_height(),
             audible,
         };
