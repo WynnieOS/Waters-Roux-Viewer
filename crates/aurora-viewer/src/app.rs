@@ -5713,12 +5713,8 @@ impl App {
         // Personal wind follows the region or the local direction chosen
         // by the resident. Never send this wind to the simulator.
         let range = self.weather_now.wind_range();
-        self.weather_wind.advance(
-            Instant::now(),
-            range,
-            self.weather_now.wind_heading(),
-            region_wind.truncate(),
-        );
+        self.weather_wind
+            .advance(Instant::now(), range, self.weather_now.wind_heading(), region_wind.truncate());
         let personal_wind = range.1 > 0.0;
         if personal_wind {
             let openness = self.scene.sound_reverb.sky.map_or(1.0, |s| s.exposure.clamp(0.0, 1.0));
@@ -5742,8 +5738,7 @@ impl App {
     /// Personal local precipitation, thunder and lightning. Independent of
     /// the region's EEP environment and never sent to the simulator.
     fn update_personal_weather_audio(&mut self, dt: f32) {
-        let audible = self.in_world()
-            && !(self.demo && std::env::var_os("AURORA_DEMO_SOUND").is_none());
+        let audible = self.in_world() && !(self.demo && std::env::var_os("AURORA_DEMO_SOUND").is_none());
         let forward = (self.camera.target - self.camera.position).normalize_or(Vec3::X);
         let rain_input = crate::scene::rain_sound::RainSoundInput {
             rain: self.weather_now.rain(),

@@ -5,9 +5,9 @@
 //! their own integration before the owner can approve a complete viewer.
 //! It never alters Second Life objects, shared environment or simulator state.
 
-use aurora_render::{particle_flags, ParticleInstance};
-use glam::{Vec2, Vec3};
 use crate::weather::{WeatherQuality, WeatherSettings};
+use aurora_render::{ParticleInstance, particle_flags};
+use glam::{Vec2, Vec3};
 
 const HEIGHT: f32 = 26.0;
 const HALF_WIDTH: f32 = 24.0;
@@ -25,13 +25,7 @@ fn unit(index: u32, salt: u32) -> f32 {
 
 /// Add depth-tested world-space drops/flakes following the local camera.
 /// Limited quality budgets protect the renderer from unbounded instancing.
-pub fn append(
-    out: &mut Vec<ParticleInstance>,
-    weather: &WeatherSettings,
-    camera: Vec3,
-    elapsed: f32,
-    wind: Vec2,
-) {
+pub fn append(out: &mut Vec<ParticleInstance>, weather: &WeatherSettings, camera: Vec3, elapsed: f32, wind: Vec2) {
     if !camera.is_finite() || !elapsed.is_finite() {
         return;
     }
@@ -47,7 +41,11 @@ pub fn append(
     };
     let n = (budget as f32 * fall).round() as u32;
     let speed = if snow { 1.7 } else { 17.0 };
-    let size = if snow { 0.06 + weather.snow_size.clamp(0.0, 1.0) * 0.14 } else { 0.022 };
+    let size = if snow {
+        0.06 + weather.snow_size.clamp(0.0, 1.0) * 0.14
+    } else {
+        0.022
+    };
     let axis = if snow {
         Vec3::ZERO
     } else {
@@ -68,7 +66,11 @@ pub fn append(
             pos: pos.to_array(),
             texture: 0,
             size: if snow { [size, size] } else { [size, axis.length()] },
-            flags: if snow { particle_flags::EMISSIVE } else { particle_flags::EMISSIVE | particle_flags::AXIS },
+            flags: if snow {
+                particle_flags::EMISSIVE
+            } else {
+                particle_flags::EMISSIVE | particle_flags::AXIS
+            },
             color: if snow { [234, 243, 255, 230] } else { [176, 201, 232, 156] },
             axis: axis.to_array(),
             glow: 0.0,

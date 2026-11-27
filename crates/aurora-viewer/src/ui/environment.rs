@@ -118,15 +118,18 @@ impl EnvironmentUi {
         .show(ctx, p, open, |ui| {
             self.selector_body(ui, p, view, loading, Some(time_of_day), LABEL_W, lighting, &mut out);
             ui.add_space(6.0);
-            if ui.button("Personal weather…").on_hover_text("Only visible and audible in your viewer; does not modify the region's environment").clicked() {
+            if ui
+                .button("Personal weather…")
+                .on_hover_text("Only visible and audible in your viewer; does not modify the region's environment")
+                .clicked()
+            {
                 weather_open = true;
             }
         });
         self.weather_open = weather_open;
         if self.weather_open {
             let mut shown = self.weather_open;
-            let left = (ctx.content_rect().right() - 750.0 - super::weather_window::WINDOW_W)
-                .max(ctx.content_rect().left() + 10.0);
+            let left = (ctx.content_rect().right() - 750.0 - super::weather_window::WINDOW_W).max(ctx.content_rect().left() + 10.0);
             let pos = egui::pos2(left, ctx.content_rect().top() + 90.0);
             let actions = Floater::new(
                 "waters_roux_personal_weather",
