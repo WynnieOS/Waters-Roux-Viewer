@@ -5669,7 +5669,8 @@ impl App {
         self.scene.update_sound_occlusion(&self.world, engine, listener.pos, occlusion, now);
         // the reverb of the surroundings (Aurora's own)
         let reverb = crate::scene::sound_reverb::forced().unwrap_or(self.settings.audio.sound_reverb);
-        self.scene.update_sound_reverb(&self.world, engine, listener.pos, reverb, self.weather_now.rain() > 0.0, now);
+        self.scene
+            .update_sound_reverb(&self.world, engine, listener.pos, reverb, self.weather_now.rain() > 0.0, now);
     }
 
     /// StreamTitleDisplay::checkMetadata (streamtitledisplay.cpp): the title
