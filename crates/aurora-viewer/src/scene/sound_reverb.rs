@@ -196,9 +196,7 @@ impl Sky {
         surface: 0.0,
     };
 
-    // Pending scene integration: kept from Aurora for the weather sound-exposure path.
-    // Remove this allowance when the scene calls Sky::of for live weather.
-    #[allow(dead_code)]
+    /// Derived from the same measured rays as the acoustic reverb estimate.
     pub fn of(hits: &[Option<f32>; RAYS]) -> Sky {
         let sides = [glam::Vec2::X, glam::Vec2::Y, glam::Vec2::NEG_X, glam::Vec2::NEG_Y];
         let (mut open, mut count) = ([0.0f32; 4], [0.0f32; 4]);
@@ -335,8 +333,10 @@ struct Stats {
 
 /// The reverb of the surroundings, held by the scene.
 pub struct SoundReverb {
-    tx: Sender<(Estimate, Duration)>,
-    rx: Receiver<(Estimate, Duration)>,
+    tx: Sender<(Estimate, Sky, Duration)>,
+    rx: Receiver<(Estimate, Sky, Duration)>,
+    /// Measured shelter/open sky for the resident's local weather audio.
+    pub(crate) sky: Option<Sky>,
     /// A measure is in the job, sent from there.
     waiting: Option<Vec3>,
     next: Option<Instant>,
@@ -361,6 +361,7 @@ impl Default for SoundReverb {
         SoundReverb {
             tx,
             rx,
+            sky: None,
             waiting: None,
             next: None,
             smoothed: None,
@@ -484,13 +485,15 @@ impl Scene {
         engine: Option<&aurora_audio::AudioEngine>,
         listener: Vec3,
         enabled: bool,
+        weather_needed: bool,
         now: Instant,
     ) {
         let Some(engine) = engine else {
             return;
         };
         let rev = &mut self.sound_reverb;
-        while let Ok((estimate, job)) = rev.rx.try_recv() {
+        while let Ok((estimate, sky, job)) = rev.rx.try_recv() {
+            rev.sky = Some(sky);
             let at = rev.waiting.take().unwrap_or(listener);
             rev.stats.job += job;
             rev.stats.job_max = rev.stats.job_max.max(job);
@@ -505,9 +508,15 @@ impl Scene {
             rev.sends.clear();
             rev.smoothed = None;
             rev.logged = None;
-            return;
+            // Personal precipitation needs cover measurements even when
+            // the resident switches off room reverb in Sound preferences.
+            if !weather_needed {
+                rev.sky = None;
+                return;
+            }
+        } else {
+            rev.update_sends(engine, self.sounds.audible(), listener);
         }
-        rev.update_sends(engine, self.sounds.audible(), listener);
         if rev.waiting.is_some() || rev.next.is_some_and(|t| now < t) {
             return;
         }
@@ -527,8 +536,10 @@ impl Scene {
         let tx = rev.tx.clone();
         self.jobs.run(move || {
             let started = Instant::now();
-            let estimate = Estimate::of(&measure(&request));
-            let _ = tx.send((estimate, started.elapsed()));
+            let hits = measure(&request);
+            let estimate = Estimate::of(&hits);
+            let sky = Sky::of(&hits);
+            let _ = tx.send((estimate, sky, started.elapsed()));
         });
     }
 
