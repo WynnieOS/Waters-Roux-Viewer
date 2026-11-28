@@ -26,11 +26,12 @@ fn unit(index: u32, salt: u32) -> f32 {
 /// Add depth-tested world-space drops/flakes following the local camera.
 /// Limited quality budgets protect the renderer from unbounded instancing.
 pub fn append(out: &mut Vec<ParticleInstance>, weather: &WeatherSettings, camera: Vec3, elapsed: f32, wind: Vec2) {
-    if !camera.is_finite() || !elapsed.is_finite() {
+    let weather = weather.in_effect();
+    if !camera.is_finite() || !elapsed.is_finite() || !wind.is_finite() {
         return;
     }
     let fall = weather.fall().clamp(0.0, 1.0);
-    if fall <= 0.001 {
+    if !weather.enabled || !weather.precipitation_on || !fall.is_finite() || fall <= 0.001 {
         return;
     }
     let snow = weather.snowing();
@@ -42,10 +43,13 @@ pub fn append(out: &mut Vec<ParticleInstance>, weather: &WeatherSettings, camera
     let n = (budget as f32 * fall).round() as u32;
     let speed = if snow { 1.7 } else { 17.0 };
     let size = if snow {
-        0.06 + weather.snow_size.clamp(0.0, 1.0) * 0.14
+        0.12 * weather.flake_scale()
     } else {
         0.022
     };
+    if !size.is_finite() {
+        return;
+    }
     let axis = if snow {
         Vec3::ZERO
     } else {
@@ -86,6 +90,29 @@ mod tests {
     fn disabled_weather_draws_nothing() {
         let mut out = Vec::new();
         append(&mut out, &WeatherSettings::default(), Vec3::ZERO, 2.0, Vec2::ZERO);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn raw_saved_switches_and_invalid_inputs_do_not_emit_particles() {
+        let mut w = WeatherSettings {
+            enabled: true,
+            precipitation_on: false,
+            touched: true,
+            ..Default::default()
+        };
+        let mut out = Vec::new();
+        append(&mut out, &w, Vec3::ZERO, 2.0, Vec2::ZERO);
+        assert!(out.is_empty());
+        w.precipitation_on = true;
+        w.enabled = false;
+        append(&mut out, &w, Vec3::ZERO, 2.0, Vec2::ZERO);
+        assert!(out.is_empty());
+        w.enabled = true;
+        append(&mut out, &w, Vec3::ZERO, 2.0, Vec2::new(f32::NAN, 0.0));
+        assert!(out.is_empty());
+        w.amount = f32::NAN;
+        append(&mut out, &w, Vec3::ZERO, 2.0, Vec2::ZERO);
         assert!(out.is_empty());
     }
 
