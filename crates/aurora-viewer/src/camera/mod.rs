@@ -1420,7 +1420,7 @@ impl Camera {
 
     /// Mouse motion during a camera drag (LLToolCamera::handleHover), in
     /// window pixels (y down). A full window width turns 360°.
-    pub fn drag(&mut self, mode: ToolMode, dx: f32, dy: f32, width: f32, agent: &mut AgentState) {
+    pub fn drag(&mut self, mode: ToolMode, dx: f32, dy: f32, width: f32, agent: &mut AgentState, s: &CameraSettings) {
         let Some(t) = &mut self.tool else {
             return;
         };
@@ -1438,7 +1438,7 @@ impl Camera {
             self.fold_orbit(agent);
         }
         let width = width.max(1.0);
-        let k = TAU / width;
+        let k = TAU / width * s.orbit_speed;
         match mode {
             ToolMode::Orbit => {
                 if dx != 0.0 {
@@ -1449,7 +1449,7 @@ impl Camera {
                 }
             }
             ToolMode::Pan => {
-                let meters_per_pixel = 3.0 * self.position.distance(self.target) / width;
+                let meters_per_pixel = 3.0 * self.position.distance(self.target) / width * s.pan_speed;
                 if dx != 0.0 {
                     self.pan_left(dx * meters_per_pixel);
                 }
@@ -1507,11 +1507,11 @@ impl Camera {
         self.unlock_view(agent, s);
         let over = keys.orbit_up - keys.orbit_down;
         if over != 0.0 {
-            self.orbit_over(over * ORBIT_RATE * dt);
+            self.orbit_over(over * ORBIT_RATE * s.orbit_speed * dt);
         }
         let around = keys.orbit_left - keys.orbit_right;
         if around != 0.0 {
-            self.orbit_around(around * ORBIT_RATE * dt, agent);
+            self.orbit_around(around * ORBIT_RATE * s.orbit_speed * dt, agent);
         }
         let inward = keys.zoom_in - keys.zoom_out;
         if inward != 0.0 {
@@ -1521,11 +1521,11 @@ impl Camera {
         }
         let pan_x = keys.pan_right - keys.pan_left;
         if pan_x != 0.0 {
-            self.pan_left(pan_x * -PAN_RATE * dt);
+            self.pan_left(pan_x * -PAN_RATE * s.pan_speed * dt);
         }
         let pan_y = keys.pan_up - keys.pan_down;
         if pan_y != 0.0 {
-            self.pan_up(pan_y * PAN_RATE * dt);
+            self.pan_up(pan_y * PAN_RATE * s.pan_speed * dt);
         }
     }
 
@@ -3255,7 +3255,7 @@ mod tests {
                 (ToolMode::Pan, 3.0, 0.0),
             ] {
                 let (mut cam, mut w) = alt_focused(distance, &s);
-                let longest = longest_step(&mut cam, &mut w, &s, 600, |c, w| c.drag(mode, dx, dy, 1280.0, &mut w.agent));
+                let longest = longest_step(&mut cam, &mut w, &s, 600, |c, w| c.drag(mode, dx, dy, 1280.0, &mut w.agent, &s));
                 assert!(longest < 1.0, "{mode:?} ({dx}, {dy}) at {distance} m: {longest} m in a frame");
             }
         }
@@ -3266,10 +3266,10 @@ mod tests {
         let s = strongest_smoothing();
         let (mut cam, mut w) = alt_focused(35.0, &s);
         longest_step(&mut cam, &mut w, &s, 300, |c, w| {
-            c.drag(ToolMode::Zoom, 6.0, 0.0, 1280.0, &mut w.agent)
+            c.drag(ToolMode::Zoom, 6.0, 0.0, 1280.0, &mut w.agent, &s)
         });
         let longest = longest_step(&mut cam, &mut w, &s, 60, |c, w| {
-            c.drag(ToolMode::Pan, 3.0, 0.0, 1280.0, &mut w.agent)
+            c.drag(ToolMode::Pan, 3.0, 0.0, 1280.0, &mut w.agent, &s)
         });
         assert!(longest < 1.0, "{longest} m in a frame");
     }
@@ -3279,7 +3279,7 @@ mod tests {
         let s = strongest_smoothing();
         let (mut cam, mut w) = alt_focused(20.0, &s);
         longest_step(&mut cam, &mut w, &s, 120, |c, w| {
-            c.drag(ToolMode::Zoom, 6.0, 0.0, 1280.0, &mut w.agent)
+            c.drag(ToolMode::Zoom, 6.0, 0.0, 1280.0, &mut w.agent, &s)
         });
         cam.end_drag();
         cam.handle_reset_view(&mut w.agent, &s);
@@ -3564,9 +3564,9 @@ mod tests {
         cam.orbit_drag(-200.0, 0.0, 1.0, &mut agent);
         let heading = agent.yaw + cam.orbit_yaw;
         cam.begin_drag(true);
-        cam.drag(ToolMode::Zoom, 0.0, 0.0, 1280.0, &mut agent);
+        cam.drag(ToolMode::Zoom, 0.0, 0.0, 1280.0, &mut agent, &s);
         assert!(cam.orbit_yaw > 0.5, "a still press changes nothing");
-        cam.drag(ToolMode::Zoom, -40.0, 0.0, 1280.0, &mut agent);
+        cam.drag(ToolMode::Zoom, -40.0, 0.0, 1280.0, &mut agent, &s);
         assert_eq!(cam.orbit_yaw, 0.0);
         let turned = TAU / 1280.0 * 40.0;
         assert!((agent.yaw - (heading + turned)).abs() < 1e-5, "the mouse turns the avatar itself");
@@ -3832,9 +3832,9 @@ mod tests {
                 let focus = (cam.focus_point(), cam.focus_object_id());
                 let distance = cam.position.distance(cam.target);
                 cam.begin_drag(true);
-                cam.drag(ToolMode::Zoom, 2.0, 0.0, 1280.0, &mut w.agent);
+                cam.drag(ToolMode::Zoom, 2.0, 0.0, 1280.0, &mut w.agent, &s);
                 assert_eq!(w.agent.yaw, heading, "a click inside the drag threshold must not turn");
-                cam.drag(ToolMode::Zoom, dx, 0.0, 1280.0, &mut w.agent);
+                cam.drag(ToolMode::Zoom, dx, 0.0, 1280.0, &mut w.agent, &s);
                 let expected = heading - dx * TAU / 1280.0;
                 assert!((w.agent.yaw - expected).abs() < 1e-5, "follow={follow}, dx={dx}");
                 assert_eq!((cam.focus_point(), cam.focus_object_id()), focus);
@@ -3853,7 +3853,7 @@ mod tests {
                 assert!(body.angle_between(w.bodies[&w.agent_id].rotation) > 0.5);
                 assert!((cam.position.distance(cam.target) - distance).abs() < 0.02);
                 cam.end_drag();
-                cam.drag(ToolMode::Zoom, dx, 0.0, 1280.0, &mut w.agent);
+                cam.drag(ToolMode::Zoom, dx, 0.0, 1280.0, &mut w.agent, &s);
                 assert!((w.agent.yaw - expected).abs() < 1e-5, "release ends steering");
             }
         }
@@ -3862,13 +3862,13 @@ mod tests {
     #[test]
     fn focus_drag_and_vertical_steering_do_not_turn_the_avatar() {
         for mode in [ToolMode::Zoom, ToolMode::Orbit, ToolMode::Pan] {
-            let (mut w, mut cam, _, _) = focused_object();
+            let (mut w, mut cam, s, _) = focused_object();
             let heading = w.agent.yaw;
             cam.begin_drag(false);
-            cam.drag(mode, 256.0, 0.0, 1280.0, &mut w.agent);
+            cam.drag(mode, 256.0, 0.0, 1280.0, &mut w.agent, &s);
             assert_eq!(w.agent.yaw, heading, "{mode:?} keeps independent camera control");
             cam.begin_drag(true);
-            cam.drag(ToolMode::Zoom, 0.0, 40.0, 1280.0, &mut w.agent);
+            cam.drag(ToolMode::Zoom, 0.0, 40.0, 1280.0, &mut w.agent, &s);
             assert_eq!(w.agent.yaw, heading, "vertical steering only tilts the view");
             cam.orbit_drag(256.0, 0.0, 1.0, &mut w.agent);
             assert_eq!(w.agent.yaw, heading, "right drag keeps independent camera control");

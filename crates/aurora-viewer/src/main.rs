@@ -105,6 +105,10 @@ mod updater;
 mod url_scheme;
 mod voice;
 mod wearable_editor;
+// Ported Aurora 0.9.12 weather model. Keep unused runtime hooks gated until
+// the renderer, sound and UI are actually connected and tested.
+#[allow(dead_code)]
+mod weather;
 mod window_hold;
 mod window_show;
 mod world;

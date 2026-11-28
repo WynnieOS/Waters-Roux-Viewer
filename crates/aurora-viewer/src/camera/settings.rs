@@ -232,6 +232,11 @@ pub struct CameraSettings {
     /// CameraPositionSmoothing ("Smoothing"), × 0.02 s half-life. Limits:
     /// `SMOOTHING_RANGE`.
     pub smoothing: f32,
+    /// Waters Roux: camera orbit sensitivity, relative to the familiar default (1x).
+    /// Applies to keyboard orbit and mouse-based camera orbit; separate from mouselook aim.
+    pub orbit_speed: f32,
+    /// Waters Roux: camera pan sensitivity, relative to the familiar default (1x).
+    pub pan_speed: f32,
     /// DynamicCameraStrength: lag behind the avatar in the air (0 = none, 30 = avatar velocity).
     pub dynamic_strength: f32,
     /// DisableCameraConstraints.
@@ -310,6 +315,8 @@ impl Default for CameraSettings {
             fov: DEFAULT_FOV,
             zoom_time: 0.4,
             smoothing: 1.0,
+            orbit_speed: 1.0,
+            pan_speed: 1.0,
             dynamic_strength: 2.0,
             // both off, as DisableCameraConstraints and
             // FSIgnoreSimulatorCameraConstraints in the Legacy Viewer: the
@@ -476,9 +483,42 @@ impl CameraSettings {
         self.mouselook_zoom_fov = super::mouselook_zoom::sanitize(self.mouselook_zoom_fov);
         self.zoom_time = fix(self.zoom_time, 0.0, 4.0, d.zoom_time);
         self.smoothing = fix(self.smoothing, *SMOOTHING_RANGE.start(), *SMOOTHING_RANGE.end(), d.smoothing);
+        self.orbit_speed = fix(self.orbit_speed, 0.1, 4.0, d.orbit_speed);
+        self.pan_speed = fix(self.pan_speed, 0.1, 4.0, d.pan_speed);
         self.dynamic_strength = fix(self.dynamic_strength, 0.0, 30.0, d.dynamic_strength);
         self.cinematic_follow_half_life = fix(self.cinematic_follow_half_life, 0.0, 2.0, d.cinematic_follow_half_life);
         self
+    }
+}
+
+#[cfg(test)]
+mod waters_roux_camera_speed_tests {
+    use super::*;
+
+    #[test]
+    fn camera_speed_preferences_survive_restart_and_old_profiles_use_normal_speed() {
+        let old: CameraSettings = serde_json::from_str("{}").expect("old camera profile");
+        assert_eq!((old.orbit_speed, old.pan_speed), (1.0, 1.0));
+        let camera = CameraSettings {
+            orbit_speed: 1.75,
+            pan_speed: 0.5,
+            ..CameraSettings::default()
+        };
+        let saved = serde_json::to_string(&camera).unwrap();
+        let restored: CameraSettings = serde_json::from_str(&saved).unwrap();
+        assert_eq!((restored.orbit_speed, restored.pan_speed), (1.75, 0.5));
+    }
+
+    #[test]
+    fn invalid_camera_speeds_cannot_break_controls() {
+        let broken = CameraSettings {
+            orbit_speed: f32::NAN,
+            pan_speed: 9999.0,
+            ..CameraSettings::default()
+        };
+        let fixed = broken.sanitized();
+        assert_eq!(fixed.orbit_speed, 1.0);
+        assert_eq!(fixed.pan_speed, 4.0);
     }
 }
 

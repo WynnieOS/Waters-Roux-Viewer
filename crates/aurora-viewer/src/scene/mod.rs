@@ -61,11 +61,18 @@ mod skin_binds;
 pub mod sound_occlusion;
 pub mod sound_reverb;
 pub mod sounds;
+// Weather audio processors have matching licensed OGG assets and are compiled
+// independently before the in-world weather loop is connected.
+pub mod personal_weather;
+#[allow(dead_code)]
+pub mod rain_sound;
 pub mod still_check;
 pub mod surface_area;
 mod sync_check;
 mod sync_plan;
 mod sync_slow;
+#[allow(dead_code)]
+pub mod thunder;
 mod tree_detail;
 mod world_overlays;
 pub use sync_plan::LodInfo;
@@ -1324,6 +1331,12 @@ fn tex_anim_targets(anim_face: i8, fi: usize) -> bool {
 }
 
 impl Scene {
+    /// Latest measured sky exposure, read-only for local rain and thunder audio.
+    /// Do not expose the scene's mutable reverb state to the application.
+    pub fn weather_sky(&self) -> Option<sound_reverb::Sky> {
+        self.sound_reverb.sky
+    }
+
     /// LLViewHighlightTransparent / LLPipeline::rebuildDrawInfo: invisible
     /// faces need temporary records while the transparency overlay is on.
     /// See indra/newview/llviewermenu.cpp and pipeline.cpp (LGPL 2.1).

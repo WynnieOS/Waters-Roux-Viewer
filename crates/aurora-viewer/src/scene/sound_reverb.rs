@@ -161,6 +161,81 @@ struct Request {
     reflectors: Vec<Reflector>,
 }
 
+/// The sky around the listener, as the rays saw it (the rain's sound,
+/// `rain_sound.rs`): how open it is toward the east, north, west and south
+/// (the share of the rays at or above the horizon on that side that
+/// escaped), how much of the sky above (rays more than about 17 degrees
+/// up) a roof within [`ROOF_RANGE`] covers, and how far that roof is (its
+/// hits' mean distance), and the enclosure. An arch overhead covers a strip
+/// of that sky; a ceiling, most of it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Sky {
+    pub open: [f32; 4],
+    pub roof: f32,
+    pub roof_distance: f32,
+    pub enclosure: f32,
+    /// How much falling rain is in sight overall (0..1, `rain_exposure`):
+    /// none, only what comes through walls and roofs is heard.
+    pub exposure: f32,
+    /// How far the nearest thing the rain lands on is (m; the range when
+    /// none is): flying high, the rain is only heard faintly, from afar.
+    pub surface: f32,
+}
+
+/// A roof this close above (m) drums with the rain.
+const ROOF_RANGE: f32 = 15.0;
+
+impl Sky {
+    /// Open all round, no roof.
+    pub const OPEN: Sky = Sky {
+        open: [1.0; 4],
+        roof: 0.0,
+        roof_distance: ROOF_RANGE,
+        enclosure: 0.0,
+        exposure: 1.0,
+        surface: 0.0,
+    };
+
+    /// Derived from the same measured rays as the acoustic reverb estimate.
+    pub fn of(hits: &[Option<f32>; RAYS]) -> Sky {
+        let sides = [glam::Vec2::X, glam::Vec2::Y, glam::Vec2::NEG_X, glam::Vec2::NEG_Y];
+        let (mut open, mut count) = ([0.0f32; 4], [0.0f32; 4]);
+        let (mut up, mut roofed, mut upper, mut enclosed) = (0u32, 0u32, 0u32, 0u32);
+        let mut roof_sum = 0.0f32;
+        for (dir, hit) in directions().iter().zip(hits) {
+            if dir.z < HORIZON {
+                continue;
+            }
+            upper += 1;
+            enclosed += u32::from(hit.is_some());
+            if dir.z > 0.3 {
+                up += 1;
+                if let Some(d) = hit.filter(|d| *d < ROOF_RANGE) {
+                    roofed += 1;
+                    roof_sum += d;
+                }
+            }
+            // each side weighs the rays toward it (straight up: all alike)
+            let flat = dir.truncate();
+            for (i, side) in sides.iter().enumerate() {
+                let w = flat.dot(*side).max(0.0) + 0.25 * dir.z.max(0.0);
+                count[i] += w;
+                if hit.is_none() {
+                    open[i] += w;
+                }
+            }
+        }
+        Sky {
+            open: std::array::from_fn(|i| if count[i] > 0.0 { open[i] / count[i] } else { 1.0 }),
+            roof: roofed as f32 / up.max(1) as f32,
+            roof_distance: if roofed > 0 { roof_sum / roofed as f32 } else { ROOF_RANGE },
+            enclosure: enclosed as f32 / upper.max(1) as f32,
+            exposure: 1.0 - enclosed as f32 / upper.max(1) as f32,
+            surface: 0.0,
+        }
+    }
+}
+
 /// The surroundings, as the rays saw them.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Estimate {
@@ -258,8 +333,10 @@ struct Stats {
 
 /// The reverb of the surroundings, held by the scene.
 pub struct SoundReverb {
-    tx: Sender<(Estimate, Duration)>,
-    rx: Receiver<(Estimate, Duration)>,
+    tx: Sender<(Estimate, Sky, Duration)>,
+    rx: Receiver<(Estimate, Sky, Duration)>,
+    /// Measured shelter/open sky for the resident's local weather audio.
+    pub(crate) sky: Option<Sky>,
     /// A measure is in the job, sent from there.
     waiting: Option<Vec3>,
     next: Option<Instant>,
@@ -284,6 +361,7 @@ impl Default for SoundReverb {
         SoundReverb {
             tx,
             rx,
+            sky: None,
             waiting: None,
             next: None,
             smoothed: None,
@@ -407,13 +485,15 @@ impl Scene {
         engine: Option<&aurora_audio::AudioEngine>,
         listener: Vec3,
         enabled: bool,
+        weather_needed: bool,
         now: Instant,
     ) {
         let Some(engine) = engine else {
             return;
         };
         let rev = &mut self.sound_reverb;
-        while let Ok((estimate, job)) = rev.rx.try_recv() {
+        while let Ok((estimate, sky, job)) = rev.rx.try_recv() {
+            rev.sky = Some(sky);
             let at = rev.waiting.take().unwrap_or(listener);
             rev.stats.job += job;
             rev.stats.job_max = rev.stats.job_max.max(job);
@@ -428,9 +508,15 @@ impl Scene {
             rev.sends.clear();
             rev.smoothed = None;
             rev.logged = None;
-            return;
+            // Personal precipitation needs cover measurements even when
+            // the resident switches off room reverb in Sound preferences.
+            if !weather_needed {
+                rev.sky = None;
+                return;
+            }
+        } else {
+            rev.update_sends(engine, self.sounds.audible(), listener);
         }
-        rev.update_sends(engine, self.sounds.audible(), listener);
         if rev.waiting.is_some() || rev.next.is_some_and(|t| now < t) {
             return;
         }
@@ -450,8 +536,10 @@ impl Scene {
         let tx = rev.tx.clone();
         self.jobs.run(move || {
             let started = Instant::now();
-            let estimate = Estimate::of(&measure(&request));
-            let _ = tx.send((estimate, started.elapsed()));
+            let hits = measure(&request);
+            let estimate = Estimate::of(&hits);
+            let sky = Sky::of(&hits);
+            let _ = tx.send((estimate, sky, started.elapsed()));
         });
     }
 

@@ -194,6 +194,8 @@ pub(crate) fn faux_bold_offset(ui: &egui::Ui) -> Option<Vec2> {
 const BODY_CHROME: f32 = 17.0;
 /// The least height the scrolled body of a floater keeps.
 const MIN_SCROLLED_BODY: f32 = 80.0;
+/// The outer height egui first grants an ordinary content-sized window.
+const EGUI_WINDOW_HEIGHT: f32 = 420.0;
 
 /// `pos` moved so that a window of `size` placed there stands inside `area`
 /// (its top left corner first, when it is larger).
@@ -625,11 +627,20 @@ impl<'a> Floater<'a> {
             .default_pos(self.default_pos)
             .resizable(false);
         if self.auto_height && !minimized {
-            w = w.auto_sized().min_width(self.default_size.x).max_width(self.default_size.x);
+            // Restore the body's layout room after a tiny viewer window; avoid
+            // trapping an auto-height floater permanently at a squeezed size.
+            w = w
+                .auto_sized()
+                .min_width(self.default_size.x)
+                .max_width(self.default_size.x)
+                .min_height(work.height());
         } else if self.resizable && !minimized {
             w = w.default_size(self.default_size).min_size(self.min_size);
         } else if !minimized {
-            w = w.default_width(self.default_size.x);
+            w = w
+                .default_width(self.default_size.x)
+                .min_width(self.default_size.x)
+                .min_height(EGUI_WINDOW_HEIGHT.min(work.height()));
         }
         // LLFloater::setMinimized keeps the expanded geometry. egui's Resize
         // otherwise retains the old height when the body disappears, and then
@@ -901,7 +912,11 @@ impl<'a> Floater<'a> {
                 if scrolls {
                     let above = ui.cursor().top() - ui.max_rect().top();
                     let room = (work.height() - above - BODY_CHROME).max(MIN_SCROLLED_BODY);
-                    let shown = egui::ScrollArea::vertical().id_salt("floater_body").max_height(room).show(ui, body);
+                    let shown = egui::ScrollArea::vertical()
+                        .id_salt("floater_body")
+                        .max_height(room)
+                        .min_scrolled_height(room)
+                        .show(ui, body);
                     still_too_tall = shown.content_size.y > room + 0.5;
                     out = Some(shown.inner);
                 } else {
@@ -1798,7 +1813,7 @@ pub fn switch_labeled(ui: &mut egui::Ui, p: &Palette, on: &mut bool, label: impl
 }
 
 /// Custom-painted controls follow an explicit font override in their UI scope.
-fn control_font(ui: &egui::Ui, default_size: f32) -> egui::FontId {
+pub(super) fn control_font(ui: &egui::Ui, default_size: f32) -> egui::FontId {
     ui.style()
         .override_font_id
         .clone()

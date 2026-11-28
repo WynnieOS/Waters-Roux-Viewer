@@ -143,6 +143,10 @@ pub mod update;
 pub mod viewfinder;
 pub mod voice_tag;
 pub mod wearable;
+// UI code and matching weather preferences are imported and compile checked.
+// Do not expose this window until render/audio effects are wired to the scene.
+#[allow(dead_code)]
+pub mod weather_window;
 pub mod web_browser;
 pub mod web_view;
 pub mod widgets;
